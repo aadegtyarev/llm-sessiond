@@ -37,7 +37,7 @@ lines.on("line", (line) => {
       type: "response",
       id: command.id,
       command: "prompt",
-      success: true,
+      success: command.message !== "reject",
       data: {},
     });
     if (command.message === "tool") {
@@ -55,7 +55,7 @@ lines.on("line", (line) => {
       });
     }
     if (command.message === "hold") held = true;
-    else {
+    else if (command.message !== "reject") {
       write({
         type: "message_update",
         assistantMessageEvent: {

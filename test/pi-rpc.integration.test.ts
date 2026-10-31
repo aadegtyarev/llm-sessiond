@@ -21,9 +21,14 @@ describe("Pi RPC compatibility", () => {
     rpc.command = (name, args, timeout) =>
       command(name, args, name === "prompt" ? 100 : timeout);
     const states: Record<string, unknown>[] = [];
-    const input = new PiInputController(rpc, (type, data) => {
-      if (type === "input.state") states.push(data);
-    });
+    const bus = new EventBus();
+    const emit = (type: string, data: Record<string, unknown>) => {
+      if (type === "input.state") {
+        states.push(data);
+        bus.publish("00000000-0000-4000-8000-000000000001", type, data);
+      }
+    };
+    const input = new PiInputController(rpc, emit);
     await expect(input.submit("uncertain")).rejects.toThrow(
       "INPUT_DELIVERY_UNCERTAIN",
     );
@@ -35,18 +40,27 @@ describe("Pi RPC compatibility", () => {
       reason: "prompt response was not received",
     });
     expect(await readFile(path.join(cwd, "prompt-count"), "utf8")).toBe("1");
+    const rejected = new PiInputController(rpc, emit);
+    await expect(rejected.submit("reject")).rejects.toThrow(
+      "PI_PROMPT_REJECTED",
+    );
+    expect(states.at(-1)).toMatchObject({
+      state: "failed",
+      reason: "prompt was rejected",
+    });
+    expect(await readFile(path.join(cwd, "prompt-count"), "utf8")).toBe("11");
     const malformed = new Promise<void>((resolve) =>
       rpc.once("malformed", resolve),
     );
     await rpc.command("prompt", { message: "malformed" });
     await malformed;
-    expect(await readFile(path.join(cwd, "prompt-count"), "utf8")).toBe("11");
+    expect(await readFile(path.join(cwd, "prompt-count"), "utf8")).toBe("111");
     const oversized = new Promise<void>((resolve) =>
       rpc.once("malformed", resolve),
     );
     await rpc.command("prompt", { message: "oversized" });
     await oversized;
-    expect(await readFile(path.join(cwd, "prompt-count"), "utf8")).toBe("111");
+    expect(await readFile(path.join(cwd, "prompt-count"), "utf8")).toBe("1111");
     child.kill("SIGKILL");
     const crlfPi = await startPiProcess(
       provider.launch("fake", ["--mode", "rpc", "--crlf"], cwd),
@@ -67,9 +81,9 @@ describe("Pi RPC compatibility", () => {
     const toolPi = await startPiProcess(
       provider.launch("fake", ["--mode", "rpc"], cwd),
     );
-    const bus = new EventBus();
+    const toolBus = new EventBus();
     toolPi.onEvent((type, data) =>
-      bus.publish("00000000-0000-4000-8000-000000000001", type, data),
+      toolBus.publish("00000000-0000-4000-8000-000000000001", type, data),
     );
     const toolStart = new Promise<Record<string, unknown>>((resolve) =>
       toolPi.onEvent((type, data) => {

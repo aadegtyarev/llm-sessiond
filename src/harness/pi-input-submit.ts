@@ -36,6 +36,11 @@ export async function submitPiInput(
     });
     if (response.success !== true) {
       state.rejected();
+      emit("input.state", {
+        inputId,
+        state: "failed",
+        reason: "prompt was rejected",
+      });
       throw new Error("PI_PROMPT_REJECTED");
     }
     state.accepted();
