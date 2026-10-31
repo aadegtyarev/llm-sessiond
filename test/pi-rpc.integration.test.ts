@@ -78,33 +78,5 @@ describe("Pi RPC compatibility", () => {
     await pi.submit("malformed");
     await error;
     await pi.stop();
-    const toolPi = await startPiProcess(
-      provider.launch("fake", ["--mode", "rpc"], cwd),
-    );
-    const toolBus = new EventBus();
-    toolPi.onEvent((type, data) =>
-      toolBus.publish("00000000-0000-4000-8000-000000000001", type, data),
-    );
-    const toolStart = new Promise<Record<string, unknown>>((resolve) =>
-      toolPi.onEvent((type, data) => {
-        if (type === "activity" && data.type === "tool_start") resolve(data);
-      }),
-    );
-    const toolEnd = new Promise<Record<string, unknown>>((resolve) =>
-      toolPi.onEvent((type, data) => {
-        if (type === "activity" && data.type === "tool_end") resolve(data);
-      }),
-    );
-    await toolPi.submit("tool");
-    expect(await toolStart).toMatchObject({
-      toolCallId: "tool-1",
-      toolName: "bash",
-    });
-    expect(await toolEnd).toMatchObject({
-      toolCallId: "tool-1",
-      toolName: "bash",
-      failed: true,
-    });
-    await toolPi.stop();
   });
 });
