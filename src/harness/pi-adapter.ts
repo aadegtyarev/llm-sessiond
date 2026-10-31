@@ -9,6 +9,9 @@ export class PiHarnessAdapter implements HarnessAdapter {
     private readonly provider: ProcessProvider,
     private readonly executable = process.env.PI_EXECUTABLE ?? "pi",
   ) {}
+  shutdown(): Promise<void> {
+    return this.provider.shutdown?.() ?? Promise.resolve();
+  }
   async launch(
     session: SessionRecord,
     nativeId?: string,

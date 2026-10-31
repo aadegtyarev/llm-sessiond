@@ -14,6 +14,33 @@ import {
 
 afterEach(cleanup);
 describe("stopping active inputs", () => {
+  it("serializes stop and resume so a second Pi process starts only after cleanup", async () => {
+    const { service, server, base } = await startApi();
+    try {
+      const created = await json(
+        await postJson(base, "/api/v1/sessions", {
+          harnessId: "pi",
+          cwd: await tempDir(),
+        }),
+      );
+      const id = String((created.session as Record<string, unknown>).id);
+      const oldChild = service.get(id).child;
+      const stopping = postEmpty(base, `/api/v1/sessions/${id}/stop`);
+      const deadline = Date.now() + 5000;
+      while (service.get(id).status !== "stopped") {
+        if (Date.now() > deadline) throw new Error("stop did not begin");
+        await new Promise((resolve) => setTimeout(resolve, 1));
+      }
+      const resuming = postEmpty(base, `/api/v1/sessions/${id}/resume`);
+      expect((await stopping).status).toBe(204);
+      expect((await resuming).status).toBe(204);
+      expect(oldChild).toBeDefined();
+      expect(oldChild?.exitCode ?? oldChild?.signalCode).not.toBeNull();
+      expect(service.get(id).status).toBe("running");
+    } finally {
+      await closeApi(server, service);
+    }
+  });
   it("reports uncertain delivery and cleans the Pi child", async () => {
     const { service, server, base } = await startApi();
     let child: ChildProcess | undefined;
@@ -46,7 +73,8 @@ describe("stopping active inputs", () => {
       socket.close();
     } finally {
       await closeApi(server, service);
-      expect(child?.exitCode !== null || child?.signalCode !== null).toBe(true);
+      expect(child).toBeDefined();
+      expect(child?.exitCode ?? child?.signalCode).not.toBeNull();
     }
   });
 });

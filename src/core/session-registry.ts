@@ -71,6 +71,9 @@ export class SessionRegistry {
   stopProcess(id: string): void {
     this.runtimes.delete(id);
   }
+  shutdownProvider(): Promise<void> {
+    return this.adapter.shutdown?.() ?? Promise.resolve();
+  }
   publishInterruptedInput(record: SessionRecord): void {
     if (record.currentInput)
       this.events.publish(record.id, "input.state", {

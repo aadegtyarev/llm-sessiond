@@ -2,8 +2,12 @@ import { ApiError } from "./api-error.js";
 import type { SessionRegistry } from "./session-registry.js";
 
 export class SessionLifecycle {
+  private readonly locks = new Map<string, Promise<void>>();
   constructor(private readonly registry: SessionRegistry) {}
-  async stop(id: string): Promise<void> {
+  stop(id: string): Promise<void> {
+    return this.exclusive(id, () => this.stopLocked(id));
+  }
+  private async stopLocked(id: string): Promise<void> {
     const record = this.registry.get(id);
     if (record.status === "stopped") return;
     if (record.status !== "running" && record.status !== "uncertain")
@@ -17,7 +21,10 @@ export class SessionLifecycle {
     record.currentInput = undefined;
     this.registry.status(record);
   }
-  async resume(id: string): Promise<void> {
+  resume(id: string): Promise<void> {
+    return this.exclusive(id, () => this.resumeLocked(id));
+  }
+  private async resumeLocked(id: string): Promise<void> {
     const record = this.registry.get(id);
     if (record.status !== "stopped" || !record.nativeSessionId)
       throw new ApiError(
@@ -41,10 +48,31 @@ export class SessionLifecycle {
   }
   async shutdown(): Promise<void> {
     await Promise.all(
-      this.registry.list().map(async (record) => {
-        if (record.status === "running" || record.status === "uncertain")
-          await this.stop(record.id).catch(() => {});
-      }),
+      this.registry.list().map((record) =>
+        this.exclusive(record.id, async () => {
+          if (record.status === "running" || record.status === "uncertain")
+            await this.stopLocked(record.id).catch(() => {});
+        }),
+      ),
     );
+    await this.registry.shutdownProvider();
+  }
+  private async exclusive(
+    id: string,
+    action: () => Promise<void>,
+  ): Promise<void> {
+    const previous = this.locks.get(id) ?? Promise.resolve();
+    let release = () => {};
+    const current = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this.locks.set(id, current);
+    await previous;
+    try {
+      await action();
+    } finally {
+      release();
+      if (this.locks.get(id) === current) this.locks.delete(id);
+    }
   }
 }

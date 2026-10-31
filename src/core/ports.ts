@@ -3,10 +3,12 @@ import type { ImageInput, SessionRecord } from "./types.js";
 
 export interface ProcessProvider {
   launch(executable: string, args: string[], cwd: string): ChildProcess;
+  shutdown?(): Promise<void>;
 }
 export interface HarnessAdapter {
   readonly id: string;
   launch(session: SessionRecord, nativeId?: string): Promise<HarnessSession>;
+  shutdown?(): Promise<void>;
 }
 export interface HarnessSession {
   readonly child: ChildProcess;

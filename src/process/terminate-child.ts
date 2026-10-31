@@ -9,11 +9,13 @@ function waitForExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
     const finish = (done: boolean): void => {
       clearTimeout(timer);
       child.removeListener("exit", onExit);
+      child.removeListener("close", onExit);
       resolve(done);
     };
     const onExit = (): void => finish(true);
     const timer = setTimeout(() => finish(exited(child)), timeoutMs);
     child.once("exit", onExit);
+    child.once("close", onExit);
   });
 }
 export async function terminateChild(
