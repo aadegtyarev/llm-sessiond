@@ -7,7 +7,7 @@ export interface SubmitState {
   begin(id: string): void;
   accepted(): void;
   rejected(): void;
-  uncertain(): void;
+  uncertain(): boolean;
 }
 export async function submitPiInput(
   link: RpcLink,
@@ -47,12 +47,12 @@ export async function submitPiInput(
     return inputId;
   } catch (error) {
     if ((error as Error).message === "PI_PROMPT_REJECTED") throw error;
-    state.uncertain();
-    emit("input.state", {
-      inputId,
-      state: "uncertain",
-      reason: "prompt response was not received",
-    });
+    if (state.uncertain())
+      emit("input.state", {
+        inputId,
+        state: "uncertain",
+        reason: "prompt response was not received",
+      });
     throw new Error("INPUT_DELIVERY_UNCERTAIN", { cause: error });
   }
 }

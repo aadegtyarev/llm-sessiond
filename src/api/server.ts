@@ -29,16 +29,26 @@ export function createApiServer(
       );
     }
   });
-  const ws = new WebSocketServer({ noServer: true, maxPayload: 4096 });
+  const ws = new WebSocketServer({ noServer: true, maxPayload: 4096 }).on(
+    "error",
+    () => {},
+  );
+  server.on("clientError", (_error, socket) => socket.destroy());
   const clients = new Set<{
     socket: WebSocket;
     sessionId: string | undefined;
   }>();
   ws.on("connection", (socket, request) => {
-    const sessionId =
-      new URL(request.url ?? "/", "http://127.0.0.1").searchParams.get(
-        "sessionId",
-      ) ?? undefined;
+    let sessionId: string | undefined;
+    try {
+      sessionId =
+        new URL(request.url ?? "/", "http://127.0.0.1").searchParams.get(
+          "sessionId",
+        ) ?? undefined;
+    } catch {
+      socket.close(1002, "invalid request target");
+      return;
+    }
     if (sessionId && !service.sessions.has(sessionId)) {
       socket.close(1008, "unknown session");
       return;
@@ -46,6 +56,10 @@ export function createApiServer(
     const client = { socket, sessionId };
     clients.add(client);
     socket.on("close", () => clients.delete(client));
+    socket.on("error", () => {
+      clients.delete(client);
+      socket.terminate();
+    });
   });
   service.events.on("event", (event) => {
     const message = JSON.stringify(event);
@@ -66,14 +80,24 @@ export function createApiServer(
     }
   });
   server.on("upgrade", (request, socket, head) => {
-    const url = new URL(request.url ?? "/", "http://127.0.0.1");
+    let url: URL;
+    try {
+      url = new URL(request.url ?? "/", "http://127.0.0.1");
+    } catch {
+      socket.destroy();
+      return;
+    }
     if (url.pathname !== "/api/v1/events") {
       socket.destroy();
       return;
     }
-    ws.handleUpgrade(request, socket, head, (client) =>
-      ws.emit("connection", client, request),
-    );
+    try {
+      ws.handleUpgrade(request, socket, head, (client) =>
+        ws.emit("connection", client, request),
+      );
+    } catch {
+      socket.destroy();
+    }
   });
   return server;
 }

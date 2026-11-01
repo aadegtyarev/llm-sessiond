@@ -5,6 +5,7 @@ import type { EventBus } from "./event-bus.js";
 import { ApiError } from "./api-error.js";
 import { assertValidCwd } from "./cwd-validator.js";
 import { connectSessionEvents } from "./session-runtime-events.js";
+import { watchSessionExit } from "./session-exit.js";
 
 export class SessionRegistry {
   readonly sessions = new Map<string, SessionRecord>();
@@ -23,6 +24,9 @@ export class SessionRegistry {
       status: "starting",
       child: undefined,
       currentInput: undefined,
+      pendingSubmit: undefined,
+      submitSequence: 0,
+      runtimeGeneration: 0,
     };
     this.sessions.set(record.id, record);
     try {
@@ -33,26 +37,31 @@ export class SessionRegistry {
     return record;
   }
   async start(record: SessionRecord, nativeId?: string): Promise<void> {
+    const generation = ++record.runtimeGeneration;
     const runtime = await this.adapter.launch(record, nativeId);
+    if (generation !== record.runtimeGeneration) {
+      await runtime.stop();
+      return;
+    }
     this.runtimes.set(record.id, runtime);
     record.child = runtime.child;
     record.nativeSessionId = runtime.nativeSessionId;
     record.status = "running";
     this.status(record);
-    connectSessionEvents(record, runtime, this.events, (session) =>
-      this.status(session),
+    connectSessionEvents(
+      record,
+      runtime,
+      this.events,
+      (session) => this.status(session),
+      () => record.runtimeGeneration === generation,
     );
-    runtime.child.once("exit", (code) => {
-      if (record.status !== "running" && record.status !== "uncertain") return;
-      record.status = code === 0 ? "stopped" : "failed";
-      if (record.status === "failed")
-        record.failure = {
-          code: "PI_PROCESS_EXITED",
-          at: new Date().toISOString(),
-        };
-      this.publishInterruptedInput(record);
-      this.status(record);
-    });
+    watchSessionExit(
+      record,
+      runtime,
+      generation,
+      (session) => this.publishInterruptedInput(session),
+      (session) => this.status(session),
+    );
   }
   get(id: string): SessionRecord {
     const record = this.sessions.get(id);

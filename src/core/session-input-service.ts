@@ -10,7 +10,7 @@ export class SessionInputService {
     events: EventBus,
     input: SessionInput,
   ): Promise<string> {
-    if (record.currentInput)
+    if (record.currentInput || record.pendingSubmit !== undefined)
       throw new ApiError(
         409,
         "INPUT_BUSY",
@@ -22,8 +22,27 @@ export class SessionInputService {
     );
     if (bytes > 20 * 1024 * 1024)
       throw new ApiError(413, "LIMIT_EXCEEDED", "images exceed size limit");
+    const token = ++record.submitSequence;
+    const generation = record.runtimeGeneration;
+    record.pendingSubmit = token;
     try {
       const inputId = await runtime.submit(input.text, input.images);
+      if (
+        generation !== record.runtimeGeneration ||
+        record.pendingSubmit !== token
+      ) {
+        if (runtime.isInputActive(inputId))
+          events.publish(record.id, "input.state", {
+            inputId,
+            state: "uncertain",
+            reason: "session stopped during submit",
+          });
+        throw new ApiError(
+          409,
+          "INPUT_UNCERTAIN",
+          "input was interrupted by session lifecycle",
+        );
+      }
       if (runtime.isInputActive(inputId)) {
         record.currentInput = inputId;
         events.publish(record.id, "input.state", {
@@ -34,6 +53,13 @@ export class SessionInputService {
       }
       return inputId;
     } catch (error) {
+      if (error instanceof ApiError) throw error;
+      if (String(error).includes("SESSION_INPUT_BUSY"))
+        throw new ApiError(
+          409,
+          "INPUT_BUSY",
+          "session already has an active input",
+        );
       const uncertain =
         String(error).includes("UNCERTAIN") ||
         String(error).includes("TIMEOUT");
@@ -44,6 +70,8 @@ export class SessionInputService {
           ? "input delivery is uncertain; do not retry"
           : "input could not be submitted",
       );
+    } finally {
+      if (record.pendingSubmit === token) record.pendingSubmit = undefined;
     }
   }
   async cancel(
@@ -56,12 +84,6 @@ export class SessionInputService {
       throw new ApiError(409, "INPUT_NOT_CURRENT", "input is not current");
     try {
       await runtime.cancel(inputId);
-      record.currentInput = undefined;
-      events.publish(record.id, "input.state", {
-        inputId,
-        state: "failed",
-        reason: "cancelled",
-      });
     } catch {
       throw new ApiError(
         409,

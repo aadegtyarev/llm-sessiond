@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { canonicalBase64Schema } from "./base64-schema.js";
 
 export const sessionCreateSchema = z.strictObject({
   harnessId: z.literal("pi"),
@@ -11,7 +12,7 @@ export const inputSchema = z.strictObject({
     .array(
       z.strictObject({
         mimeType: z.string().min(1),
-        data: z.string().min(4),
+        data: canonicalBase64Schema,
       }),
     )
     .optional(),

@@ -7,8 +7,17 @@ export function connectSessionEvents(
   runtime: HarnessSession,
   events: EventBus,
   publishStatus: (session: SessionRecord) => void,
+  isCurrent: () => boolean,
 ): void {
   runtime.onEvent((type, data) => {
+    if (!isCurrent()) {
+      if (
+        type === "input.state" &&
+        ["completed", "failed", "uncertain"].includes(String(data.state))
+      )
+        events.publish(record.id, type, data);
+      return;
+    }
     if (type === "session.error") {
       record.status = "failed";
       record.failure = {

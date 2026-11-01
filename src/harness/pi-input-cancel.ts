@@ -1,11 +1,11 @@
 import type { RpcLink } from "./rpc-link.js";
 
 export interface CancelState {
-  canCancel(): boolean;
-  begin(): void;
-  uncertain(): void;
-  rejected(): void;
-  canceled(): void;
+  canCancel(inputId: string): boolean;
+  beginCancel(): void;
+  uncertain(): boolean;
+  abortRejected(): void;
+  acknowledged(): void;
 }
 export async function cancelPiInput(
   link: RpcLink,
@@ -13,23 +13,23 @@ export async function cancelPiInput(
   state: CancelState,
   emit: (type: string, data: Record<string, unknown>) => void,
 ): Promise<void> {
-  if (!state.canCancel()) throw new Error("INPUT_NOT_CANCELLABLE");
-  state.begin();
+  if (!state.canCancel(inputId)) throw new Error("INPUT_NOT_CANCELLABLE");
+  state.beginCancel();
   let response: Record<string, unknown>;
   try {
     response = await link.command("abort");
   } catch {
-    state.uncertain();
-    emit("input.state", {
-      inputId,
-      state: "uncertain",
-      reason: "abort response was not received",
-    });
+    if (state.uncertain())
+      emit("input.state", {
+        inputId,
+        state: "uncertain",
+        reason: "abort response was not received",
+      });
     throw new Error("ABORT_UNCERTAIN");
   }
   if (response.success !== true) {
-    state.rejected();
+    state.abortRejected();
     throw new Error("PI_ABORT_REJECTED");
   }
-  state.canceled();
+  state.acknowledged();
 }

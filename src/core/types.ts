@@ -33,5 +33,8 @@ export interface EventEnvelope {
 }
 export interface SessionRecord extends SessionSummary {
   currentInput: string | undefined;
+  pendingSubmit: number | undefined;
+  submitSequence: number;
+  runtimeGeneration: number;
   child: import("node:child_process").ChildProcess | undefined;
 }

@@ -2,7 +2,14 @@ import { Readable } from "node:stream";
 import { describe, expect, it } from "vitest";
 import { readBody, BODY_LIMIT } from "../src/api/http-support.js";
 import { afterEach } from "vitest";
-import { closeApi, json, startApi, tempDir, cleanup } from "./helpers.js";
+import {
+  closeApi,
+  json,
+  postJson,
+  startApi,
+  tempDir,
+  cleanup,
+} from "./helpers.js";
 
 afterEach(cleanup);
 describe("API bounds", () => {
@@ -30,6 +37,28 @@ describe("API bounds", () => {
           images: [{ mimeType: "image/png", data }],
         }),
       ).rejects.toMatchObject({ status: 413 });
+    } finally {
+      await closeApi(server, service);
+    }
+  });
+  it("rejects noncanonical base64 padding bits", async () => {
+    const { service, server, base } = await startApi();
+    try {
+      const made = await json(
+        await postJson(base, "/api/v1/sessions", {
+          harnessId: "pi",
+          cwd: await tempDir(),
+        }),
+      );
+      const id = String((made.session as Record<string, unknown>).id);
+      const response = await postJson(base, `/api/v1/sessions/${id}/inputs`, {
+        text: "",
+        images: [{ mimeType: "image/png", data: "AB==" }],
+      });
+      expect(response.status).toBe(400);
+      expect(await json(response)).toMatchObject({
+        error: { code: "VALIDATION_ERROR" },
+      });
     } finally {
       await closeApi(server, service);
     }

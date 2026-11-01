@@ -14,7 +14,10 @@ export class SessionLifecycle {
       throw new ApiError(409, "SESSION_NOT_RUNNING", "session is not running");
     const runtime = this.registry.process(record);
     record.status = "stopped";
+    record.runtimeGeneration++;
     this.registry.publishInterruptedInput(record);
+    record.currentInput = undefined;
+    record.pendingSubmit = undefined;
     this.registry.stopProcess(id);
     await runtime.stop();
     record.child = undefined;
@@ -32,6 +35,8 @@ export class SessionLifecycle {
         "SESSION_NOT_RESUMABLE",
         "session has no stopped native session",
       );
+    record.currentInput = undefined;
+    record.pendingSubmit = undefined;
     record.status = "starting";
     this.registry.status(record);
     try {
