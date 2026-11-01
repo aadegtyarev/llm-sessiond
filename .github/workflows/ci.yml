@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run format:check
+      - run: npm run version:check
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+      - name: Enforce authored source and test line limit
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          files = [p for root in ("src", "test") for p in Path(root).rglob("*")
+                   if p.is_file() and p.suffix in (".ts", ".tsx", ".js", ".mjs")]
+          oversized = [(p, len(p.read_text().splitlines())) for p in files
+                       if len(p.read_text().splitlines()) > 100]
+          if oversized:
+              raise SystemExit("source/test files exceed 100 lines: " + str(oversized))
+          PY
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
