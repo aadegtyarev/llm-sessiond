@@ -1,0 +1,23 @@
+# Generic control plane
+
+## Boundary and ownership
+
+Core owns generic session lifecycle, persistence, registry, and capability routing only. Harness implementations are injected via registry; Pi and Claude are composition-root choices, never core cases. A new harness requires no core, API route, database column, or closed DTO-union change. See [adapter contracts](harness-adapters.md).
+
+## Generic identity and descriptors
+
+`Session={id,harnessId,cwd,status,name?,nativeSessionId?,adapterOptions?,failureReason?,failedAt?}`; status is `starting|running|stopped|failed|uncertain`. IDs are authoritative opaque exact case-sensitive strings with existing grammar `[A-Za-z0-9][A-Za-z0-9._-]{0,127}`. Native session ID is optional opaque metadata, not universal routing identity or resume prerequisite. Harness IDs/aliases are registry-owned. Instance ID changes each daemon boot; connection/binding/callback/request/context IDs are separate non-credential namespaces.
+
+Registry descriptor: `{id,aliases:string[],capabilities:string[],metadata?:Record<string,string>,options?:OptionDescriptor[],extensions?:ExtensionDescriptor[]}`. Option descriptor is `{key,label,values,allowCustom?,defaultValue?,dangerousValues?}`. Registry states each adapter's true capability subset; no synthetic parity (for example, no Pi-only feature implied for Claude).
+
+## Standard capabilities
+
+Generic ports cover launch/stop/resume, submit/images/current cancellation, live status/usage, models/effort, options, command inventory/execution, reload, and optional file-send/permission callbacks. DTOs: `Model={provider,id,name}`; `Usage={totalTokens?,inputTokens?,outputTokens?,cacheReadTokens?,cacheWriteTokens?,costUsd?,contextTokens?:number|null,contextWindow?,contextPercent?:number|null}`; `LiveStatus={model?,effort?,usage?}`; `Status={session,live?}`; catalogs expose descriptors and optional current/default/override/effective data; model changes can report model success with effort unconfirmed. Commands use `{name,description}` and result `handled|accepted` plus optional output. Input failures distinguish prompt rejected, hold timeout, held-and-stopped, and canceled. Unsupported capability fails explicitly.
+
+Core carries no harness implementation, protocol code, model list, permission-mode enum, fixed option/value cases, closures, AbortSignals, or process handles. Namespaced operations/events/checkpoints follow [adapter schemas](harness-adapters.md); persisted generic fields and restart behavior follow [persistence](persistence.md).
+
+## Lifecycle and uncertainty
+
+Daemon owns processes and durable sessions. Startup never launches/resumes/replays from stored records; restart reconciliation and shutdown are specified in [persistence](persistence.md). Exact resume uses adapter checkpoint and identity protections where declared. Running clears failure metadata; starting/stopped may retain it. Input uncertainty is explicit and never automatically retried. Current cancellation targets exact active input; control cancellation is distinct.
+
+Clients detach on bridge disconnect/shutdown: callback leases and selection guards expire, but daemon session/process remains alive. A missing lease fails callback closed. Loopback binding is not authentication. See [HTTP v2](api-v2.md) and [duplex bridge](bridge-v2.md).

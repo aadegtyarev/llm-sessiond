@@ -13,6 +13,8 @@ Make `llm-sessiond` the transport-neutral owner of durable sessions and executio
 
 The daemon-boundary IDs are authoritative and exact. Unavailable or uncertain operations fail explicitly; uncertain input is never replayed. Do not log prompts, reasoning, or raw errors.
 
+Core owns generic lifecycle, persistence, registry, and capability routing only. Inject harness adapters through the registry; Pi/Claude are built-in composition choices, not core cases. A new harness requires no core, API-route, database-column, or closed DTO-union changes. Generic standard capabilities plus versioned namespaced schemas cover adapter-specific operations, events, and checkpoints.
+
 ## Scenarios
 
 Support durable session lifecycle, exact resume, submission including images, exact current cancellation, recovery and uncertainty reporting without replay, status/usage, models/effort, reload, and runtime lifecycle events and controls. Preserve rich activity/anomaly events and advertised options, including agent file-send and interactive permission flows, for Pi and Claude clients.
@@ -25,7 +27,7 @@ This contract does not include plasma integration, production switch, native har
 
 - [API v1](../surfaces/api-v1.md) — compatibility unchanged.
 - [Session lifecycle](../surfaces/session-lifecycle.md).
-- New durable API v2, control-plane, and persistence surfaces may be established during implementation.
+- [API v2](../surfaces/api-v2.md), [duplex bridge](../surfaces/bridge-v2.md), [generic control plane](../surfaces/control-plane.md), [harness adapters](../surfaces/harness-adapters.md), and [persistence](../surfaces/persistence.md).
 
 ## Acceptance and validation
 
