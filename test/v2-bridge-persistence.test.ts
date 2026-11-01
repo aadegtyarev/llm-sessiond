@@ -26,6 +26,7 @@ describe("v2 bridge and persistence fixtures", () => {
     expect(guards[0].invalidateAckBeforeSelectionChange).toBe(true);
     expect(guards[1].queuedWrite).toBe("reject-before-write");
     expect(guards[2]).toMatchObject({
+      disconnect: "invalidate",
       beforeWrite: "reject",
       afterWrite: "unknown-no-replay",
     });

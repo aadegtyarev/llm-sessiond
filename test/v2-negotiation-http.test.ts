@@ -50,10 +50,19 @@ describe("v2 negotiation and HTTP golden fixtures", () => {
       "PATCH /sessions/S1/options",
       "GET /sessions/S1/commands",
     ]);
+    const allRoutes = fixtures.flatMap((name) => load(name).routes);
+    expect(allRoutes.every((route: unknown[]) => route.length === 5)).toBe(
+      true,
+    );
     expect(
-      fixtures
-        .flatMap((name) => load(name).routes)
-        .every((route: unknown[]) => route.length === 5),
+      allRoutes.every((route: unknown[]) =>
+        [200, 201, 202, 204].includes(Number(route[2])),
+      ),
+    ).toBe(true);
+    expect(
+      allRoutes.every((route: unknown[]) =>
+        route[2] === 204 ? route[4] === null : route[4] !== null,
+      ),
     ).toBe(true);
     const life = load("http-lifecycle.json").routes;
     expect(life.find((route: unknown[]) => route[0] === "PATCH")[3]).toEqual({
