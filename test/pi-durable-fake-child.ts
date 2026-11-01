@@ -3,7 +3,7 @@ import type { ChildProcess } from "node:child_process";
 
 class FakePipe extends EventEmitter {
   writable = true;
-  setEncoding(_encoding: string): this {
+  setEncoding(): this {
     return this;
   }
   write?: (chunk: string, callback?: (error?: Error | null) => void) => boolean;
