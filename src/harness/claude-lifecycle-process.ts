@@ -39,6 +39,8 @@ export class ClaudeLifecycleProcess {
     });
     try {
       await initializeClaude(child, expectedId, this.readinessTimeoutMs);
+      if (child.exitCode !== null || child.signalCode !== null)
+        throw new Error("CLAUDE_STARTUP_FAILED");
       child.stdout?.on("data", () => {});
     } catch {
       await this.stop();

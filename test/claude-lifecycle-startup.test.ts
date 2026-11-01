@@ -12,6 +12,7 @@ const modes = [
   "oversized",
   "wrong-correlation",
   "mismatch",
+  "metadata-mismatch",
   "rejected",
   "early-exit",
 ];

@@ -19,6 +19,10 @@ input.on("line", (line) => {
     process.stdout.write(
       `${JSON.stringify({ type: "system", subtype: "init", session_id: "00000000-0000-4000-8000-000000000000" })}\n`,
     );
+  if (mode === "metadata-mismatch")
+    process.stdout.write(
+      `${JSON.stringify({ type: "system", subtype: "metadata", session_id: "00000000-0000-4000-8000-000000000000" })}\n`,
+    );
   const responseId =
     mode === "wrong-correlation" ? "wrong" : request.request_id;
   const response =

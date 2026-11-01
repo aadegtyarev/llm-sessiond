@@ -1,32 +1,11 @@
 import { HarnessRegistry } from "../core/adapter-registry.js";
 import { DurableSessionManager } from "../core/durable-session-manager.js";
-import type {
-  LifecycleExecution,
-  LifecycleExecutionFactory,
-} from "../core/lifecycle-execution.js";
+import type { LifecycleExecutionFactory } from "../core/lifecycle-execution.js";
 import type { DurableSessionStore } from "../core/session-manager-store.js";
 import type { OwnerGeneration } from "../persistence/session-record.js";
 import type { HarnessAdapter } from "../core/adapter-contracts.js";
 import type { ProcessProvider } from "../core/ports.js";
-
-class RegisteredLifecycleExecutionFactory implements LifecycleExecutionFactory {
-  private readonly factories: Map<HarnessAdapter, LifecycleExecutionFactory>;
-  constructor(
-    bindings: Array<{
-      adapter: HarnessAdapter;
-      factory: LifecycleExecutionFactory;
-    }>,
-  ) {
-    this.factories = new Map(
-      bindings.map(({ adapter, factory }) => [adapter, factory]),
-    );
-  }
-  create(adapter: HarnessAdapter): LifecycleExecution {
-    const factory = this.factories.get(adapter);
-    if (!factory) throw new Error("UNSUPPORTED_ADAPTER");
-    return factory.create(adapter);
-  }
-}
+import { TrackedLifecycleFactory } from "./tracked-lifecycle-factory.js";
 export function createDurableRuntime(input: {
   store: DurableSessionStore;
   owner: OwnerGeneration;
@@ -43,10 +22,11 @@ export function createDurableRuntime(input: {
     input.bindings.map(({ adapter }) => adapter),
     input.defaultId,
   );
+  const factory = new TrackedLifecycleFactory(input.bindings);
   const manager = new DurableSessionManager(
     input.store,
     registry,
-    new RegisteredLifecycleExecutionFactory(input.bindings),
+    factory,
     input.owner,
     input.id,
     input.stopTimeoutMs,
@@ -55,8 +35,25 @@ export function createDurableRuntime(input: {
     registry,
     manager,
     async shutdown(): Promise<void> {
-      await manager.shutdownOwned();
-      for (const provider of input.providers ?? []) await provider.shutdown?.();
+      let failed = false;
+      try {
+        await manager.shutdownOwned();
+      } catch {
+        failed = true;
+      }
+      for (const provider of input.providers ?? []) {
+        try {
+          await provider.shutdown?.();
+        } catch {
+          failed = true;
+        }
+      }
+      try {
+        factory.assertStopped();
+      } catch {
+        failed = true;
+      }
+      if (failed) throw new Error("RUNTIME_SHUTDOWN_UNCONFIRMED");
     },
   };
 }

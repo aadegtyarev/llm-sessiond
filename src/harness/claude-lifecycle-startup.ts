@@ -1,93 +1,84 @@
 import type { ChildProcess } from "node:child_process";
-import { StringDecoder } from "node:string_decoder";
+import { ClaudeJsonlDecoder } from "./claude-jsonl-decoder.js";
+import { isClaudeInitializeAck } from "./claude-lifecycle-protocol.js";
 
-const MAX_RECORD_BYTES = 1024 * 1024;
-export async function initializeClaude(
+export function initializeClaude(
   child: ChildProcess,
   expectedId: string,
   timeoutMs: number,
 ): Promise<void> {
-  if (!child.stdout || !child.stdin) throw new Error("CLAUDE_STARTUP_FAILED");
+  if (!child.stdout || !child.stdin)
+    return Promise.reject(new Error("CLAUDE_STARTUP_FAILED"));
   const requestId = `llm-sessiond-${expectedId}`;
-  const decoder = new StringDecoder("utf8");
-  let pending = "";
+  const decoder = new ClaudeJsonlDecoder();
+  let ready = false;
   let settled = false;
-  let resolveResult!: () => void;
-  let rejectResult!: (error: Error) => void;
+  let resolveReady!: () => void;
+  let rejectReady!: (error: Error) => void;
   const result = new Promise<void>((resolve, reject) => {
-    resolveResult = resolve;
-    rejectResult = reject;
+    resolveReady = resolve;
+    rejectReady = reject;
   });
   const finish = (error?: Error): void => {
     if (settled) return;
     settled = true;
     clearTimeout(timer);
-    child.stdout?.removeListener("data", onData);
-    child.removeListener("exit", onExit);
-    if (error) rejectResult(error);
-    else resolveResult();
+    if (error) rejectReady(new Error("CLAUDE_STARTUP_FAILED"));
+    else resolveReady();
   };
-  const onExit = (): void => finish(new Error("CLAUDE_STARTUP_FAILED"));
-  const onData = (chunk: Buffer | string): void => {
-    pending += typeof chunk === "string" ? chunk : decoder.write(chunk);
-    if (
-      Buffer.byteLength(pending) > MAX_RECORD_BYTES &&
-      !pending.includes("\n")
-    )
-      return finish(new Error("CLAUDE_STARTUP_FAILED"));
-    let newline: number;
-    while ((newline = pending.indexOf("\n")) >= 0) {
-      let line = pending.slice(0, newline);
-      pending = pending.slice(newline + 1);
-      if (line.endsWith("\r")) line = line.slice(0, -1);
-      if (Buffer.byteLength(line) > MAX_RECORD_BYTES)
-        return finish(new Error("CLAUDE_STARTUP_FAILED"));
+  const failProtocol = (): void => {
+    finish(new Error("CLAUDE_STARTUP_FAILED"));
+    if (ready) {
       try {
-        const parsed: unknown = JSON.parse(line);
-        if (!parsed || typeof parsed !== "object" || Array.isArray(parsed))
-          return finish(new Error("CLAUDE_STARTUP_FAILED"));
-        const record = parsed as Record<string, unknown>;
-        if (typeof record.type !== "string")
-          return finish(new Error("CLAUDE_STARTUP_FAILED"));
-        if (record.type === "result")
-          return finish(new Error("CLAUDE_STARTUP_FAILED"));
-        if (record.type === "system" && record.subtype === "init") {
-          if (record.session_id !== expectedId)
-            return finish(new Error("CLAUDE_STARTUP_FAILED"));
-          continue;
-        }
-        if (record.type !== "control_response") continue;
-        const response = record.response as Record<string, unknown> | undefined;
-        if (
-          !response ||
-          response.request_id !== requestId ||
-          (response.subtype !== "success" && response.subtype !== "error")
-        )
-          return finish(new Error("CLAUDE_STARTUP_FAILED"));
-        if (
-          response.subtype !== "success" ||
-          !response.response ||
-          typeof response.response !== "object" ||
-          Array.isArray(response.response)
-        )
-          return finish(new Error("CLAUDE_STARTUP_FAILED"));
-        const body = response.response as Record<string, unknown>;
-        if (body.session_id !== undefined && body.session_id !== expectedId)
-          return finish(new Error("CLAUDE_STARTUP_FAILED"));
-        return finish();
-      } catch {
-        return finish(new Error("CLAUDE_STARTUP_FAILED"));
-      }
+        child.kill("SIGTERM");
+      } catch {}
     }
-    if (Buffer.byteLength(pending) > MAX_RECORD_BYTES)
+  };
+  const onData = (chunk: Buffer): void => {
+    let acknowledged = false;
+    try {
+      for (const line of decoder.push(chunk)) {
+        if (isClaudeInitializeAck(line, expectedId, requestId))
+          acknowledged = true;
+      }
+      if (acknowledged) {
+        ready = true;
+        finish();
+      }
+    } catch {
+      failProtocol();
+    }
+  };
+  const onStdinError = (): void => finish(new Error("CLAUDE_STARTUP_FAILED"));
+  const onStreamError = (): void => finish(new Error("CLAUDE_STARTUP_FAILED"));
+  const onExit = (): void => finish(new Error("CLAUDE_STARTUP_FAILED"));
+  const cleanup = (): void => {
+    clearTimeout(timer);
+    child.stdout?.removeListener("data", onData);
+    child.stdout?.removeListener("error", onStreamError);
+    child.stdin?.removeListener("error", onStdinError);
+    child.removeListener("error", onStreamError);
+    child.removeListener("exit", onExit);
+  };
+  const onClose = (): void => {
+    try {
+      decoder.finish();
+      if (!ready) finish(new Error("CLAUDE_STARTUP_FAILED"));
+    } catch {
       finish(new Error("CLAUDE_STARTUP_FAILED"));
+    }
+    cleanup();
   };
   const timer = setTimeout(
     () => finish(new Error("CLAUDE_STARTUP_FAILED")),
     timeoutMs,
   );
+  child.stdin.on("error", onStdinError);
+  child.stdout.on("error", onStreamError);
+  child.on("error", onStreamError);
   child.stdout.on("data", onData);
   child.once("exit", onExit);
+  child.once("close", onClose);
   try {
     child.stdin.write(
       `${JSON.stringify({ type: "control_request", request_id: requestId, request: { subtype: "initialize", hooks: null } })}\n`,
@@ -98,5 +89,5 @@ export async function initializeClaude(
   } catch {
     finish(new Error("CLAUDE_STARTUP_FAILED"));
   }
-  await result;
+  return result;
 }

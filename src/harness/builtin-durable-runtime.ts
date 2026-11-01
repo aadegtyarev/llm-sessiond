@@ -1,6 +1,7 @@
 import type { DurableSessionStore } from "../core/session-manager-store.js";
 import type { OwnerGeneration } from "../persistence/session-record.js";
 import type { ProcessProvider } from "../core/ports.js";
+import { ConfirmedProcessProvider } from "../process/confirmed-provider.js";
 import { NodeProcessProvider } from "../process/node-provider.js";
 import { ClaudeLifecycleAdapter } from "./claude-lifecycle-adapter.js";
 import { ClaudeLifecycleExecutionFactory } from "./claude-lifecycle-factory.js";
@@ -17,7 +18,9 @@ export function createBuiltinDurableRuntime(input: {
   stopTimeoutMs?: number;
   readinessTimeoutMs?: number;
 }) {
-  const provider = input.provider ?? new NodeProcessProvider();
+  const provider = new ConfirmedProcessProvider(
+    input.provider ?? new NodeProcessProvider(),
+  );
   const pi = new PiLifecycleAdapter();
   const claude = new ClaudeLifecycleAdapter();
   const runtime = createDurableRuntime({
