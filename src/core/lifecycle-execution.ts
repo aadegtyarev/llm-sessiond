@@ -1,11 +1,13 @@
 import type { AdapterCheckpoint, HarnessAdapter } from "./adapter-contracts.js";
 import type { JsonValue } from "./generic-json.js";
+import type { ExecutionInputPort } from "./execution-input-port.js";
 
 export interface LifecycleLaunchResult {
   nativeSessionId?: string;
   checkpoint?: AdapterCheckpoint;
 }
 export interface LifecycleExecution {
+  readonly inputs?: ExecutionInputPort | undefined;
   launch(input: {
     cwd: string;
     options?: JsonValue;

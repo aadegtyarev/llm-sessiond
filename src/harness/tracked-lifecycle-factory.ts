@@ -34,6 +34,9 @@ class TrackedExecution implements LifecycleExecution {
     private readonly execution: LifecycleExecution,
     private readonly onStopped: () => void,
   ) {}
+  get inputs() {
+    return this.execution.inputs;
+  }
   launch(input: Parameters<LifecycleExecution["launch"]>[0]) {
     return this.execution.launch(input);
   }

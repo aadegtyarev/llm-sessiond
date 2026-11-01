@@ -37,4 +37,4 @@ Initial v2 bounds: HTTP JSON 24 MiB, UTF-8 text 256 KiB, decoded images 20 MiB c
 
 ## Related surfaces
 
-See [control plane](control-plane.md), [adapter extensions](harness-adapters.md), and [API v1](api-v1.md).
+The [generic input runtime foundation](input-runtime.md) is currently manager-internal; the HTTP and bridge input routes described here are not wired to built-in executions by that foundation alone. See [control plane](control-plane.md), [adapter extensions](harness-adapters.md), and [API v1](api-v1.md).

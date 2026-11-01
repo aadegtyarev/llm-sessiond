@@ -14,7 +14,12 @@ export type ControlPlaneErrorCode =
   | "OPERATION_FAILED"
   | "OPERATION_TIMEOUT"
   | "STALE_OWNER"
-  | "STORE_FAILED";
+  | "STORE_FAILED"
+  | "INVALID_INPUT"
+  | "INPUT_BUSY"
+  | "INPUT_UNCERTAIN"
+  | "INPUT_NOT_CURRENT"
+  | "INPUT_REJECTED";
 const MESSAGES: Record<ControlPlaneErrorCode, string> = {
   NOT_FOUND: "session not found",
   SESSION_ID_COLLISION: "session id collision",
@@ -32,6 +37,11 @@ const MESSAGES: Record<ControlPlaneErrorCode, string> = {
   OPERATION_TIMEOUT: "lifecycle operation timed out",
   STALE_OWNER: "store owner is stale",
   STORE_FAILED: "durable store operation failed",
+  INVALID_INPUT: "input is invalid or exceeds limits",
+  INPUT_BUSY: "session already has an unresolved input",
+  INPUT_UNCERTAIN: "input outcome is uncertain",
+  INPUT_NOT_CURRENT: "input is not the accepted current input",
+  INPUT_REJECTED: "input was rejected",
 };
 export class ControlPlaneError extends Error {
   constructor(readonly code: ControlPlaneErrorCode) {

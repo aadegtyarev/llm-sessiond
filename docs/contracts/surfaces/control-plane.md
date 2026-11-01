@@ -2,7 +2,7 @@
 
 ## Boundary and ownership
 
-Core owns generic session lifecycle, persistence, registry, and capability routing only. Harness implementations are injected via registry; Pi and Claude are composition-root choices, never core cases. A new harness requires no core, API route, database column, or closed DTO-union change. See [adapter contracts](harness-adapters.md).
+Core owns generic session lifecycle, persistence, registry, and capability routing only. Harness implementations are injected via registry; Pi and Claude are composition-root choices, never core cases. A new harness requires no core, API route, database column, or closed DTO-union change. See [adapter contracts](harness-adapters.md) and the [generic input runtime foundation](input-runtime.md).
 
 ## Generic identity and descriptors
 

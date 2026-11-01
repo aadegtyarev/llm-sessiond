@@ -25,6 +25,7 @@ export function setup(
     factory?: () => LifecycleExecution;
     id?: () => string;
     timeout?: number;
+    inputTimeout?: number;
     adapter?: HarnessAdapter;
     owner?: OwnerGeneration;
   } = {},
@@ -62,6 +63,7 @@ export function setup(
     overrides.owner ?? { token: "test-owner", generation: 1 },
     overrides.id ?? (() => "session-1"),
     overrides.timeout ?? 25,
+    overrides.inputTimeout ?? 5000,
   );
   return { manager, store, calls };
 }

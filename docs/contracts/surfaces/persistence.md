@@ -25,6 +25,10 @@ Daemon: readiness off, begin close, invalidate guards/callbacks, bounded drain/s
 
 Store path precedence: `LLM_SESSIOND_STATE_DIR`, `$XDG_STATE_HOME/llm-sessiond`, then home state directory. POSIX private ownership/mode; Windows requires fully qualified drive/UNC path without claiming specific ACL behavior. Cwd is validated via daemon OS realpath/access; reject relative/drive-relative paths. Windows drive/UNC paths are not client-converted to POSIX/URI. Cwd is not a sandbox.
 
+## Transient input runtime
+
+Input commands and normalized state are runtime-only. No input body, input ID history, or pending command is added to the store; restart does not replay input. See [input runtime](input-runtime.md).
+
 ## Privacy and related surfaces
 
 Options retain max 8192 bytes/depth 5 and secret-key restrictions. Do not persist/log prompt bodies, reasoning, credentials, raw errors or stacks. See [generic lifecycle](control-plane.md), [adapter checkpoint schemas](harness-adapters.md), [API limits](api-v2.md), and [v1 unchanged](api-v1.md).

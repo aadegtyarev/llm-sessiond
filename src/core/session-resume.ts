@@ -18,6 +18,7 @@ import { finalizeExecutionFailure } from "./session-execution-finalizer.js";
 export async function resumeSession(
   context: DurableManagerContext,
   id: string,
+  preparedExecution?: LifecycleExecution,
 ): Promise<DurableSession> {
   const row = DurableSessionManagerRead.get(context.store, id);
   if (context.owned.has(id) || context.pending.has(id))
@@ -52,10 +53,10 @@ export async function resumeSession(
     row.failureReason ?? null,
     row.failedAt ?? null,
   );
-  let execution: LifecycleExecution | undefined;
+  let execution: LifecycleExecution | undefined = preparedExecution;
   let result: LifecycleLaunchResult;
   try {
-    execution = context.factory.create(adapter);
+    execution ??= context.factory.create(adapter);
     context.owned.set(id, execution);
     result = await execution.resume({
       cwd: row.cwd,

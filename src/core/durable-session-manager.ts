@@ -1,13 +1,10 @@
 import { randomUUID } from "node:crypto";
 import type { HarnessRegistry } from "./adapter-registry.js";
-import { ControlPlaneError } from "./control-plane-error.js";
 import type { DurableManagerContext } from "./durable-manager-context.js";
 import { PerSessionLock } from "./per-session-lock.js";
 import { SafeSessionStore } from "./safe-session-store.js";
-import { createSession } from "./session-launch.js";
 import { resumeSession } from "./session-resume.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
-import { validateLifecycleCwd } from "./lifecycle-cwd-validation.js";
 import { deleteSession, stopSession } from "./session-stop-delete.js";
 import {
   assertCurrentOwner,
@@ -20,11 +17,13 @@ import type {
 } from "../persistence/session-record.js";
 import type { JsonValue } from "./generic-json.js";
 import type { DurableSessionStore } from "./session-manager-store.js";
-import { validateSessionId } from "./durable-validation.js";
+import { createManagedSession } from "./create-session-command.js";
 import { shutdownOwnedSessions } from "./shutdown-owned-sessions.js";
+import { DurableInputRuntime } from "./durable-input-runtime.js";
 export type { DurableSessionStore } from "./session-manager-store.js";
 export class DurableSessionManager {
   private readonly context: DurableManagerContext;
+  readonly inputs: DurableInputRuntime;
   private readonly locks = new PerSessionLock();
   constructor(
     store: DurableSessionStore,
@@ -33,6 +32,7 @@ export class DurableSessionManager {
     owner: OwnerGeneration,
     private readonly id: () => string = randomUUID,
     stopTimeoutMs = 30_000,
+    inputTimeoutMs = 5_000,
   ) {
     this.context = {
       store: new SafeSessionStore(store),
@@ -43,6 +43,12 @@ export class DurableSessionManager {
       pending: new Map(),
       stopTimeoutMs,
     };
+    this.inputs = new DurableInputRuntime(
+      this.context,
+      this.locks,
+      this.id,
+      inputTimeoutMs,
+    );
   }
   list(): DurableSession[] {
     return this.context.store.list();
@@ -53,22 +59,13 @@ export class DurableSessionManager {
   descriptor(id: string) {
     return resolveAdapter(this.context.registry, id).descriptor;
   }
-  async create(input: {
+  create(input: {
     cwd: string;
     harnessId?: string;
     name?: string;
     options?: JsonValue;
   }): Promise<DurableSession> {
-    const cwd = await validateLifecycleCwd(input.cwd);
-    const id = this.id();
-    try {
-      validateSessionId(id);
-    } catch {
-      throw new ControlPlaneError("INVALID_SESSION_ID");
-    }
-    return this.locks.run(id, () =>
-      createSession(this.context, id, { ...input, cwd }),
-    );
+    return createManagedSession(this.context, this.locks, this.id, input);
   }
   rename(id: string, name: string | null): Promise<DurableSession> {
     return this.locks.run(id, async () => {
@@ -81,7 +78,9 @@ export class DurableSessionManager {
   }
   stop(id: string): Promise<DurableSession> {
     return this.locks.run(id, async () => {
+      this.inputs.markStopped(id);
       await stopSession(this.context, id);
+      this.inputs.confirmStopped(id);
       return this.get(id);
     });
   }
@@ -89,6 +88,9 @@ export class DurableSessionManager {
     return this.locks.run(id, () => resumeSession(this.context, id));
   }
   shutdownOwned(): Promise<void> {
-    return shutdownOwnedSessions(this.context, this.locks);
+    this.inputs.markAllStopped();
+    return shutdownOwnedSessions(this.context, this.locks).then(() => {
+      this.inputs.confirmAllStopped();
+    });
   }
 }
