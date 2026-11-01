@@ -88,11 +88,15 @@ export async function initializeClaude(
   );
   child.stdout.on("data", onData);
   child.once("exit", onExit);
-  child.stdin.write(
-    `${JSON.stringify({ type: "control_request", request_id: requestId, request: { subtype: "initialize", hooks: null } })}\n`,
-    (error) => {
-      if (error) finish(new Error("CLAUDE_STARTUP_FAILED"));
-    },
-  );
+  try {
+    child.stdin.write(
+      `${JSON.stringify({ type: "control_request", request_id: requestId, request: { subtype: "initialize", hooks: null } })}\n`,
+      (error) => {
+        if (error) finish(new Error("CLAUDE_STARTUP_FAILED"));
+      },
+    );
+  } catch {
+    finish(new Error("CLAUDE_STARTUP_FAILED"));
+  }
   await result;
 }
