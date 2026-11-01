@@ -10,7 +10,15 @@ type Column = {
   hidden: number;
 };
 type SchemaObject = { type: string; name: string; tbl_name: string };
-type Index = { unique: number; origin: string; partial: number };
+type Index = { name: string; unique: number; origin: string; partial: number };
+type IndexedColumn = {
+  seqno: number;
+  cid: number;
+  name: string | null;
+  desc: number;
+  coll: string;
+  key: number;
+};
 const sessionColumns = [
   ["id", "TEXT", 1, 1],
   ["harness_id", "TEXT", 1, 0],
@@ -66,11 +74,26 @@ function validateTable(
   )
     throw new SafeValidationError("CORRUPT_DATABASE_SCHEMA");
   const indexes = db.prepare(`PRAGMA index_list(${name})`).all() as Index[];
+  const primary = expected.find((column) => column[3] === 1)?.[0];
   if (
     indexes.length !== 1 ||
     indexes[0]?.unique !== 1 ||
     indexes[0]?.origin !== "pk" ||
-    indexes[0]?.partial !== 0
+    indexes[0]?.partial !== 0 ||
+    !primary
+  )
+    throw new SafeValidationError("CORRUPT_DATABASE_SCHEMA");
+  const keys = db
+    .prepare(`PRAGMA index_xinfo(${indexes[0].name})`)
+    .all() as IndexedColumn[];
+  const keyColumns = keys.filter((column) => column.key === 1);
+  if (
+    keyColumns.length !== 1 ||
+    keyColumns[0]?.seqno !== 0 ||
+    keyColumns[0]?.cid !== 0 ||
+    keyColumns[0]?.name !== primary ||
+    keyColumns[0]?.desc !== 0 ||
+    keyColumns[0]?.coll !== "BINARY"
   )
     throw new SafeValidationError("CORRUPT_DATABASE_SCHEMA");
 }

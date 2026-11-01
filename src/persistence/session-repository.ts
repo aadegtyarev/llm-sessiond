@@ -80,7 +80,11 @@ export class SessionRepository {
     )
       throw new SafeValidationError("SESSION_NOT_FOUND");
   }
-  updateCheckpoint(id: string, checkpoint: DurableSession["adapterState"], owner: OwnerGeneration): void {
+  updateCheckpoint(
+    id: string,
+    checkpoint: DurableSession["adapterState"],
+    owner: OwnerGeneration,
+  ): void {
     this.checkpointWriter.update(id, checkpoint, owner);
   }
 }

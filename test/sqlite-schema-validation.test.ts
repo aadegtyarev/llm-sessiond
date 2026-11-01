@@ -36,6 +36,12 @@ describe("revision-one schema integrity", () => {
       goodSessions.replace("id TEXT PRIMARY KEY NOT NULL", "id TEXT NOT NULL"),
     );
     await rejectedSchema(
+      goodSessions.replace(
+        "id TEXT PRIMARY KEY NOT NULL",
+        "id TEXT COLLATE NOCASE PRIMARY KEY NOT NULL",
+      ),
+    );
+    await rejectedSchema(
       goodSessions,
       "CREATE TABLE control_metadata(key TEXT,value TEXT NOT NULL)",
     );
