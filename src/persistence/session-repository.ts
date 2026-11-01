@@ -60,6 +60,22 @@ export class SessionRepository {
       id,
     );
   }
+  assertOwner(owner: OwnerGeneration): void {
+    this.checkpointWriter.assertOwner(owner);
+  }
+  updateExecution(
+    id: string,
+    nativeSessionId: string | undefined,
+    checkpoint: DurableSession["adapterState"],
+    owner: OwnerGeneration,
+  ): void {
+    this.checkpointWriter.updateExecution(
+      id,
+      nativeSessionId,
+      checkpoint,
+      owner,
+    );
+  }
   updateOptions(id: string, options: DurableSession["adapterOptions"]): void {
     validateSessionId(id);
     this.update(
@@ -79,12 +95,5 @@ export class SessionRepository {
       ) !== 1
     )
       throw new SafeValidationError("SESSION_NOT_FOUND");
-  }
-  updateCheckpoint(
-    id: string,
-    checkpoint: DurableSession["adapterState"],
-    owner: OwnerGeneration,
-  ): void {
-    this.checkpointWriter.update(id, checkpoint, owner);
   }
 }

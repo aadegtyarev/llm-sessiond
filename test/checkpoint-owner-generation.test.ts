@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import { openSessionDatabase } from "../src/persistence/sqlite-database.js";
 import { OwnedStoreLease } from "../src/persistence/owned-store.js";
 import { SessionRepository } from "../src/persistence/session-repository.js";
+import { CheckpointRepository } from "../src/persistence/checkpoint-repository.js";
 
 describe("checkpoint owner generation", () => {
   it("rejects writes from released and superseded generations", async () => {
@@ -12,6 +13,7 @@ describe("checkpoint owner generation", () => {
     const db = openSessionDatabase(path.join(dir, "db.sqlite"));
     try {
       const repository = new SessionRepository(db);
+      const checkpoints = new CheckpointRepository(db);
       repository.create({
         id: "s1",
         harnessId: "third",
@@ -24,17 +26,39 @@ describe("checkpoint owner generation", () => {
       await first.release();
       const second = await OwnedStoreLease.acquire(dir, db);
       expect(() =>
-        repository.updateCheckpoint(
+        checkpoints.update(
           "s1",
           { namespace: "third.audit", version: 1, data: {} },
           oldGeneration,
         ),
       ).toThrow("STALE_OWNER_GENERATION");
-      repository.updateCheckpoint(
+      expect(() =>
+        repository.updateExecution(
+          "s1",
+          "stale-native",
+          { namespace: "third.audit", version: 1, data: {} },
+          oldGeneration,
+        ),
+      ).toThrow("STALE_OWNER_GENERATION");
+      expect(repository.get("s1")?.nativeSessionId).toBeUndefined();
+      repository.updateExecution(
         "s1",
-        { namespace: "third.audit", version: 1, data: {} },
+        "native",
+        { namespace: "third.audit", version: 1, data: { updated: true } },
         second.generation,
       );
+      expect(repository.get("s1")?.nativeSessionId).toBe("native");
+      expect(repository.get("s1")?.adapterState?.data).toEqual({
+        updated: true,
+      });
+      expect(() =>
+        repository.updateExecution(
+          "missing",
+          "native",
+          undefined,
+          second.generation,
+        ),
+      ).toThrow("SESSION_NOT_FOUND");
       await second.release();
     } finally {
       db.close();
