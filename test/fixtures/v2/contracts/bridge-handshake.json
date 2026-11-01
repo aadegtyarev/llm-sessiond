@@ -1,0 +1,42 @@
+{
+  "frames": [
+    {
+      "apiVersion": "v2",
+      "type": "server.hello",
+      "protocolRevision": 1,
+      "instanceId": "boot-A",
+      "connectionId": "C1"
+    },
+    {
+      "apiVersion": "v2",
+      "type": "client.open",
+      "requestId": "open-1",
+      "protocolRevision": 1,
+      "callbacks": ["tool.permission", "agent.file.send"]
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "open-1",
+      "result": {
+        "protocolRevision": 1,
+        "instanceId": "boot-A",
+        "connectionId": "C1"
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "guard.set",
+      "requestId": "guard-1",
+      "contextId": "ctx-1",
+      "generation": 1,
+      "sessionId": "S1"
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "guard-1",
+      "result": { "contextId": "ctx-1", "generation": 1, "sessionId": "S1" }
+    }
+  ]
+}

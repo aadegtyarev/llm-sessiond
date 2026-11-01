@@ -1,25 +1,52 @@
 {
-  "snapshot": {
-    "begin": {
+  "snapshotFrames": [
+    {
+      "apiVersion": "v2",
       "type": "snapshot.begin",
       "snapshotId": "snap-1",
       "afterSequence": 5
     },
-    "sessions": [
-      {
-        "type": "snapshot.session",
-        "snapshotId": "snap-1",
-        "session": {
-          "id": "S1",
-          "harnessId": "third-harness",
-          "cwd": "/tmp/work",
-          "status": "running"
-        }
+    {
+      "apiVersion": "v2",
+      "type": "snapshot.session",
+      "snapshotId": "snap-1",
+      "session": {
+        "id": "S1",
+        "harnessId": "third-harness",
+        "cwd": "/tmp/work",
+        "status": "running"
       }
-    ],
-    "end": { "type": "snapshot.end", "snapshotId": "snap-1" },
-    "ordering": "post-boundary-events-after-snapshot.end"
-  },
+    },
+    { "apiVersion": "v2", "type": "snapshot.end", "snapshotId": "snap-1" }
+  ],
+  "validTranscript": [
+    {
+      "apiVersion": "v2",
+      "type": "snapshot.begin",
+      "snapshotId": "snap-1",
+      "afterSequence": 5
+    },
+    {
+      "apiVersion": "v2",
+      "type": "snapshot.session",
+      "snapshotId": "snap-1",
+      "session": {
+        "id": "S1",
+        "harnessId": "third-harness",
+        "cwd": "/tmp/work",
+        "status": "running"
+      }
+    },
+    { "apiVersion": "v2", "type": "snapshot.end", "snapshotId": "snap-1" },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-Alpha",
+      "sequence": 6,
+      "at": "2026-10-31T12:00:05Z",
+      "event": { "kind": "session.deleted", "sessionId": "S2" }
+    }
+  ],
   "restart": {
     "oldInstanceId": "boot-Alpha",
     "newInstanceId": "boot-Beta",

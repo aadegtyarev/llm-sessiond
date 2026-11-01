@@ -1,36 +1,53 @@
 import { describe, expect, it } from "vitest";
+import { evaluateGuards } from "./v2-guard-evaluator.js";
+import { evaluateLease } from "./v2-lease-evaluator.js";
 import { load } from "./v2-fixture-support.js";
 
-describe("v2 bridge and persistence fixtures", () => {
-  it("validates callback leases, deadlines, and uncertainty", () => {
-    const f = load("bridge-callbacks-guards.json");
-    expect(f.lease.conflict).toMatchObject({ status: 409, effect: "no-steal" });
-    expect(f.lease.disconnect).toMatchObject({
-      session: "continues",
-      process: "continues",
-      pendingCallback: "not-reassigned",
-    });
-    expect(f.callbacks[0]).toMatchObject({
-      deadlineSeconds: 60,
-      uiDeadlineSeconds: 55,
-      lateAfterCancel: "ignored",
-    });
-    expect(f.callbacks[1]).toMatchObject({
-      overallDeadlineSeconds: 300,
-      partial: { delivered: 1, recipients: 2 },
-      lostAfterDispatch: "unknown",
-    });
+describe("v2 bridge scenarios and persistence fixtures", () => {
+  it("computes lease conflict, wrong connection, duplicate, late, and detach outcomes", () => {
+    const result = evaluateLease(load("lease-transcript.json").steps);
+    expect(result).toEqual([
+      "connected",
+      "bound:B1",
+      "pending",
+      "connected",
+      "conflict",
+      "wrong-connection",
+      "accepted",
+      "duplicate",
+      "pending",
+      "time-advanced",
+      "late",
+      "unbound",
+      "bound:B2",
+      "pending",
+      "canceled",
+      "canceled-late-ignored",
+      "detached",
+      "connected",
+      "bound:B3",
+      "wrong-connection",
+      "running/process-owned",
+    ]);
   });
-  it("validates guard invalidation and write races", () => {
-    const guards = load("bridge-callbacks-guards.json").guards;
-    expect(guards[0].invalidateAckBeforeSelectionChange).toBe(true);
-    expect(guards[1].queuedWrite).toBe("reject-before-write");
-    expect(guards[2]).toMatchObject({
-      disconnect: "invalidate",
-      beforeWrite: "reject",
-      afterWrite: "unknown-no-replay",
-    });
-    expect(guards[3].cancelControl.isInputCancel).toBe(false);
+  it("computes generation invalidation and write-boundary uncertainty", () => {
+    const result = evaluateGuards(load("guard-transcript.json").steps);
+    expect(result).toEqual([
+      "awaiting-invalidate-ack",
+      "acknowledged",
+      "awaiting-invalidate-ack",
+      "rejected-before-write",
+      "acknowledged",
+      "awaiting-invalidate-ack",
+      "acknowledged",
+      "generation-rejected",
+      "awaiting-invalidate-ack",
+      "rejected-before-write",
+      "acknowledged",
+      "disconnected-invalidated",
+      "rejected-before-write",
+      "unknown-after-write",
+    ]);
   });
   it("validates migration, reconciliation, checkpoints, and bounds", () => {
     const p = load("persistence-restart.json");

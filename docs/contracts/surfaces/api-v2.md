@@ -31,7 +31,7 @@ Reload, command execution, and guard-required extension writes use the [bridge](
 
 ## Errors, bounds, privacy
 
-Safe errors use `{code,message,category,outcome,reference,inputId?,failure?,resumed?:true,adapterError?}`. Categories: validation, not-found, unsupported, conflict, unavailable, uncertain, internal; outcomes: not-applied, applied, unknown. Mapping: 400 validation, 404 absent, 409 conflict/guard/uncertainty, 413 limit, 503 unavailable/closing/instance-changed, 500 safe internal. Raw messages, causes, stacks, prompts, and reasoning are not serialized/logged.
+Safe errors are strict `{code,message,category,outcome,reference,inputId?,failure?,resumed?:true,adapterError?}`. `failure` is strict `{reason,text?}` with reason `prompt_rejected|hold_timeout|held_and_stopped|canceled`; `adapterError` is `{namespace,version,code}`. Categories: validation, not-found, unsupported, conflict, unavailable, uncertain, internal; outcomes: not-applied, applied, unknown. Mapping: 400 validation, 404 absent, 409 unsupported/conflict/guard/uncertainty, 413 limit, 503 unavailable/closing/instance-changed, 500 safe internal. Raw messages, causes, stacks, prompts, and reasoning are not serialized/logged.
 
 Initial v2 bounds: HTTP JSON 24 MiB, UTF-8 text 256 KiB, decoded images 20 MiB canonical base64; WS frame 1 MiB and queue/buffer 4 MiB; options retain 8192 bytes/depth 5 and secret-key restrictions; checkpoints 64 KiB. Oversize fails explicitly, never truncates. Executable bounds and data classes are in [persistence](persistence.md) and [bridge](bridge-v2.md).
 

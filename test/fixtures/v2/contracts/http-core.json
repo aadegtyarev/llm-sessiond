@@ -26,7 +26,19 @@
       "/harnesses",
       200,
       null,
-      { "defaultHarnessId": "third-harness", "harnesses": [] }
+      {
+        "defaultHarnessId": "third-harness",
+        "harnesses": [
+          {
+            "id": "third-harness",
+            "aliases": ["third", "alt-third"],
+            "capabilities": ["input.submit", "harness.stop"],
+            "metadata": { "family": "synthetic" },
+            "options": [],
+            "extensions": []
+          }
+        ]
+      }
     ],
     ["GET", "/sessions", 200, null, { "sessions": [] }],
     [

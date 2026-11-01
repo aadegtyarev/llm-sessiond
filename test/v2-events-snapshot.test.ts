@@ -1,22 +1,33 @@
 import { describe, expect, it } from "vitest";
 import { containsKey, load } from "./v2-fixture-support.js";
+import { liveEvent, snapshotFrame } from "./v2-bridge-event-schema.js";
+import { validateSnapshotTranscript } from "./v2-snapshot-evaluator.js";
 
-describe("v2 event and snapshot fixtures", () => {
-  it("preserves rich event projections without internal diagnostics", () => {
-    const f = load("rich-events.json");
-    expect(
-      f.events.map((event: { sequence: number }) => event.sequence),
-    ).toEqual([1, 2, 3, 4, 5]);
-    expect(f.events[1].event.event.type).toBe("anomaly");
-    expect(f.events[2].event.event.state).toBe("uncertain");
-    expect(f.events[3].event.event.type).toBe("tool_summary");
-    for (const key of f.forbiddenPublicFields)
-      expect(containsKey(f.events, key.split(".").at(-1)!)).toBe(false);
+describe("v2 event and snapshot wire fixtures", () => {
+  it("strictly validates every standard and namespaced event payload", () => {
+    const files = [
+      "events-core.json",
+      "events-activity.json",
+      "events-agent-activity.json",
+      "events-anomaly-extension.json",
+    ];
+    const events = files.flatMap((file) => load(file).events);
+    expect(events.map((event: { sequence: number }) => event.sequence)).toEqual(
+      Array.from({ length: 15 }, (_, i) => i + 1),
+    );
+    for (const event of events)
+      expect(liveEvent.safeParse(event).success).toBe(true);
+    for (const forbidden of ["head", "diagnosticTail"])
+      expect(containsKey(events, forbidden)).toBe(false);
   });
-  it("uses instance-local cursors and snapshot barriers across restart", () => {
+  it("computes snapshot ordering and rejects interleaved live events", () => {
     const f = load("snapshot-restart.json");
-    expect(f.snapshot.ordering).toContain("after-snapshot.end");
-    expect(f.snapshot.begin.afterSequence).toBe(5);
+    for (const frame of f.snapshotFrames)
+      expect(snapshotFrame.safeParse(frame).success).toBe(true);
+    expect(validateSnapshotTranscript(f.validTranscript)).toBe(true);
+    expect(
+      validateSnapshotTranscript(load("snapshot-interleaved.json").frames),
+    ).toBe(false);
     expect(f.restart).toMatchObject({
       cursorReplay: "unsupported",
       clientAction: "new-handshake-snapshot-no-replay",

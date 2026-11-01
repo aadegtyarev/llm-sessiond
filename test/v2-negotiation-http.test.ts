@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { load } from "./v2-fixture-support.js";
 
-describe("v2 negotiation and HTTP golden fixtures", () => {
-  it("checks negotiation, opaque identity, and instance mismatch", () => {
+describe("v2 negotiation fixtures", () => {
+  it("covers negotiation, opaque IDs, aliases, and instance mismatch", () => {
     const f = load("negotiation.json");
     expect(f.health).toMatchObject({
       apiVersion: "v2",
@@ -17,78 +17,5 @@ describe("v2 negotiation and HTTP golden fixtures", () => {
       expectedStatus: 503,
       expectedOutcome: "not-applied",
     });
-  });
-  it("covers every documented HTTP method, route, status, request, and response", () => {
-    const fixtures = [
-      "http-core.json",
-      "http-lifecycle.json",
-      "http-inputs.json",
-      "http-capabilities.json",
-    ];
-    const routes = fixtures
-      .flatMap((name) => load(name).routes)
-      .map(([method, path]: string[]) => `${method} ${path}`);
-    expect(routes).toEqual([
-      "GET /health",
-      "GET /harnesses",
-      "GET /sessions",
-      "POST /sessions",
-      "GET /sessions/S1",
-      "PATCH /sessions/S1",
-      "DELETE /sessions/S1",
-      "POST /sessions/S1/stop",
-      "POST /sessions/S1/resume",
-      "POST /sessions/S1/inputs",
-      "POST /sessions/S1/inputs/opaque.input-1/cancel",
-      "POST /sessions/S1/cancel-current",
-      "GET /sessions/S1/status",
-      "GET /sessions/S1/models",
-      "POST /sessions/S1/model",
-      "GET /sessions/S1/efforts",
-      "POST /sessions/S1/effort",
-      "GET /sessions/S1/options",
-      "PATCH /sessions/S1/options",
-      "GET /sessions/S1/commands",
-    ]);
-    const allRoutes = fixtures.flatMap((name) => load(name).routes);
-    expect(allRoutes.every((route: unknown[]) => route.length === 5)).toBe(
-      true,
-    );
-    expect(
-      allRoutes.every((route: unknown[]) =>
-        [200, 201, 202, 204].includes(Number(route[2])),
-      ),
-    ).toBe(true);
-    expect(
-      allRoutes.every((route: unknown[]) =>
-        route[2] === 204 ? route[4] === null : route[4] !== null,
-      ),
-    ).toBe(true);
-    const life = load("http-lifecycle.json").routes;
-    expect(life.find((route: unknown[]) => route[0] === "PATCH")[3]).toEqual({
-      name: null,
-    });
-    expect(
-      load("http-capabilities.json").routes.find(
-        (route: unknown[]) => route[0] === "PATCH",
-      )[3],
-    ).toEqual({ resetKeys: ["layout"] });
-    const edge = load("http-edge-cases.json");
-    expect(edge.partialSubmit.error).toMatchObject({
-      outcome: "unknown",
-      resumed: true,
-    });
-    expect(edge.extension).toMatchObject({ method: "POST", status: 200 });
-    const caps = load("http-capabilities.json");
-    expect(caps.usageVariants).toEqual([
-      { usage: {} },
-      { usage: { contextTokens: null, contextPercent: null } },
-    ]);
-    expect(
-      caps.routes.find(
-        (route: unknown[]) =>
-          route[0] === "POST" && route[1] === "/sessions/S1/model",
-      )[4].effortConfirmed,
-    ).toBe(false);
   });
 });

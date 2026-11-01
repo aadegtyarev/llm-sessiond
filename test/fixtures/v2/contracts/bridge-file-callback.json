@@ -1,0 +1,48 @@
+{
+  "frames": [
+    {
+      "apiVersion": "v2",
+      "type": "callback.request",
+      "callbackId": "cb-f",
+      "bindingId": "B1",
+      "sessionId": "S1",
+      "deadlineAt": "2026-10-31T12:05:00Z",
+      "kind": "agent.file.send",
+      "payload": { "path": "/work/result.txt", "caption": "done" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "callback.result",
+      "callbackId": "cb-f",
+      "bindingId": "B1",
+      "result": {
+        "kind": "file",
+        "fileName": "result.txt",
+        "delivered": 1,
+        "recipients": 2
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "callback.result",
+      "callbackId": "cb-f2",
+      "bindingId": "B1",
+      "result": {
+        "kind": "failure",
+        "error": {
+          "code": "FILE_SEND_UNCERTAIN",
+          "message": "Delivery outcome is unknown",
+          "category": "uncertain",
+          "outcome": "unknown",
+          "reference": "cb-f2"
+        }
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "callback.cancel",
+      "callbackId": "cb-p",
+      "reason": "input-canceled"
+    }
+  ]
+}

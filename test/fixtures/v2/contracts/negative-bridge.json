@@ -1,0 +1,75 @@
+{
+  "cases": [
+    {
+      "schema": "open",
+      "value": {
+        "apiVersion": "v2",
+        "type": "client.open",
+        "requestId": "o1",
+        "protocolRevision": 1
+      }
+    },
+    {
+      "schema": "open",
+      "value": {
+        "apiVersion": "v2",
+        "type": "client.open",
+        "requestId": "o1",
+        "protocolRevision": 1,
+        "callbacks": [],
+        "extra": true
+      }
+    },
+    {
+      "schema": "control",
+      "value": {
+        "apiVersion": "v2",
+        "type": "control.request",
+        "requestId": "c1",
+        "sessionId": "S1",
+        "guard": { "contextId": "ctx", "generation": 1 },
+        "timeoutMs": 1000,
+        "operation": "command.run",
+        "command": { "name": "go", "remainder": "" }
+      }
+    },
+    {
+      "schema": "permission",
+      "value": {
+        "apiVersion": "v2",
+        "type": "callback.request",
+        "callbackId": "cb",
+        "bindingId": "B1",
+        "sessionId": "S1",
+        "deadlineAt": "2026-10-31T12:00:00Z",
+        "kind": "tool.permission",
+        "inputId": "I1",
+        "payload": { "toolName": "Write", "input": {} }
+      }
+    },
+    {
+      "schema": "callback",
+      "value": {
+        "apiVersion": "v2",
+        "type": "callback.result",
+        "callbackId": "cb",
+        "bindingId": "B1",
+        "result": {
+          "kind": "file",
+          "fileName": "a",
+          "delivered": 1,
+          "recipients": 2,
+          "extra": true
+        }
+      }
+    },
+    {
+      "schema": "snapshot",
+      "value": {
+        "type": "snapshot.begin",
+        "snapshotId": "snap",
+        "afterSequence": 0
+      }
+    }
+  ]
+}

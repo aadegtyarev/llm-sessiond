@@ -29,24 +29,12 @@
     "version": 3,
     "data": { "resumeKey": "opaque-5", "cursor": 12 }
   },
-  "extension": {
+  "sample": {
+    "namespace": "third-harness.audit",
     "version": 7,
+    "operation": "inspect",
     "input": { "scope": "current" },
     "output": { "items": 2 },
-    "event": {
-      "kind": "extension",
-      "namespace": "third-harness.audit",
-      "version": 7,
-      "name": "audit.finished",
-      "data": { "count": 2 }
-    }
-  },
-  "schemaConstraint": {
-    "requiredCapabilities": ["input.submit", "harness.stop"],
-    "forbiddenFixedEnums": ["pi", "claude"],
-    "forbiddenDatabaseFields": ["pi_*", "claude_*"],
-    "forbiddenDtoCases": ["PiSession", "ClaudeSession"],
-    "forbiddenRouteAdditions": true,
-    "registrationAccepted": true
+    "event": { "name": "audit.finished", "data": { "count": 2 } }
   }
 }

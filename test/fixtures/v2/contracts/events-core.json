@@ -1,10 +1,9 @@
 {
-  "instanceId": "boot-Alpha",
   "events": [
     {
       "apiVersion": "v2",
       "type": "event",
-      "instanceId": "boot-Alpha",
+      "instanceId": "boot-A",
       "sequence": 1,
       "at": "2026-10-31T12:00:00Z",
       "event": {
@@ -12,7 +11,7 @@
         "session": {
           "id": "S1",
           "harnessId": "third-harness",
-          "cwd": "/tmp/work",
+          "cwd": "/work",
           "status": "running"
         }
       }
@@ -20,74 +19,71 @@
     {
       "apiVersion": "v2",
       "type": "event",
-      "instanceId": "boot-Alpha",
+      "instanceId": "boot-A",
       "sequence": 2,
       "at": "2026-10-31T12:00:01Z",
       "event": {
         "kind": "harness.event",
         "sessionId": "S1",
-        "event": {
-          "type": "anomaly",
-          "kind": "tool",
-          "action": "blocked",
-          "ref": "r1",
-          "running": false,
-          "stopRequested": false,
-          "recordType": "policy",
-          "command": "audit",
-          "bytes": 12,
-          "detail": "redacted"
-        }
+        "event": { "kind": "output", "text": "hello" }
       }
     },
     {
       "apiVersion": "v2",
       "type": "event",
-      "instanceId": "boot-Alpha",
+      "instanceId": "boot-A",
       "sequence": 3,
       "at": "2026-10-31T12:00:02Z",
       "event": {
         "kind": "harness.event",
         "sessionId": "S1",
-        "event": {
-          "type": "input.state",
-          "inputId": "input.0042",
-          "state": "uncertain",
-          "reason": "write outcome unknown"
-        }
+        "event": { "kind": "status", "text": "running" }
       }
     },
     {
       "apiVersion": "v2",
       "type": "event",
-      "instanceId": "boot-Alpha",
+      "instanceId": "boot-A",
       "sequence": 4,
       "at": "2026-10-31T12:00:03Z",
       "event": {
         "kind": "harness.event",
         "sessionId": "S1",
         "event": {
-          "type": "tool_summary",
-          "toolCallId": "t-1",
-          "toolName": "audit",
-          "outcome": "completed"
+          "kind": "error",
+          "text": "safe failure",
+          "fatal": true,
+          "stop": { "reason": "process_exited", "exit": "1" }
         }
       }
     },
     {
       "apiVersion": "v2",
       "type": "event",
-      "instanceId": "boot-Alpha",
+      "instanceId": "boot-A",
       "sequence": 5,
       "at": "2026-10-31T12:00:04Z",
       "event": {
-        "kind": "extension",
-        "namespace": "third-harness.audit",
-        "version": 1,
-        "name": "audit.finished",
-        "data": { "count": 2 }
+        "kind": "harness.event",
+        "sessionId": "S1",
+        "event": {
+          "kind": "input",
+          "inputEvent": {
+            "inputId": "input.1",
+            "state": "failed",
+            "detail": "not delivered",
+            "failure": { "reason": "prompt_rejected", "text": "safe reason" }
+          }
+        }
       }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-A",
+      "sequence": 6,
+      "at": "2026-10-31T12:00:05Z",
+      "event": { "kind": "session.deleted", "sessionId": "S2" }
     }
-  ],
-  "forbiddenPublicFields": ["anomaly.head", "diagnosticTail", "rawReasoning"]
+  ]
 }

@@ -3,16 +3,29 @@
     "status": 409,
     "error": {
       "code": "INPUT_UNCERTAIN",
+      "message": "Input outcome is uncertain",
+      "category": "uncertain",
       "outcome": "unknown",
-      "resumed": true,
-      "inputId": "opaque.input-2"
+      "reference": "req-uncertain",
+      "inputId": "opaque.input-2",
+      "resumed": true
     }
   },
-  "extension": {
-    "method": "POST",
-    "path": "/sessions/S1/extensions/third-harness.audit/inspect",
-    "request": { "version": 1, "input": { "scope": "current" } },
-    "status": 200,
-    "response": { "version": 1, "output": { "items": 2 } }
+  "extensionRoute": [
+    "POST",
+    "/sessions/S1/extensions/third-harness.audit/inspect",
+    200,
+    { "version": 7, "input": { "scope": "current" } },
+    { "version": 7, "output": { "items": 2 } }
+  ],
+  "unsupported": {
+    "status": 409,
+    "error": {
+      "code": "UNSUPPORTED_CAPABILITY",
+      "message": "Capability is not supported",
+      "category": "unsupported",
+      "outcome": "not-applied",
+      "reference": "req-unsupported"
+    }
   }
 }

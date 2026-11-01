@@ -1,0 +1,69 @@
+{
+  "routes": [
+    [
+      "POST",
+      "/sessions/S1/inputs",
+      202,
+      { "images": [] },
+      { "inputId": "input.x", "resumed": false }
+    ],
+    [
+      "PATCH",
+      "/sessions/S1",
+      200,
+      { "name": "ok", "unexpected": true },
+      {
+        "session": {
+          "id": "S1",
+          "harnessId": "x",
+          "cwd": "/tmp",
+          "status": "running"
+        }
+      }
+    ],
+    [
+      "GET",
+      "/sessions/S1/models",
+      200,
+      null,
+      { "models": [], "unexpected": true }
+    ],
+    ["GET", "/sessions/S1/models", 204, null, null],
+    ["POST", "/sessions/S1/no-route", 200, {}, {}]
+  ],
+  "unsupportedOperation": {
+    "method": "POST",
+    "path": "/sessions/S1/extensions/third-harness.audit/missing",
+    "request": { "version": 9, "input": {} },
+    "status": 409,
+    "error": {
+      "code": "UNSUPPORTED_OPERATION",
+      "message": "Extension operation is unsupported",
+      "category": "unsupported",
+      "outcome": "not-applied",
+      "reference": "unsupported-op"
+    }
+  },
+  "safeErrors": [
+    {
+      "status": 409,
+      "error": {
+        "code": "UNSUPPORTED_CAPABILITY",
+        "category": "unsupported",
+        "outcome": "not-applied",
+        "reference": "r1"
+      }
+    },
+    {
+      "status": 409,
+      "error": {
+        "code": "UNSUPPORTED_CAPABILITY",
+        "message": "safe",
+        "category": "unsupported",
+        "outcome": "not-applied",
+        "reference": "r1",
+        "unexpected": true
+      }
+    }
+  ]
+}

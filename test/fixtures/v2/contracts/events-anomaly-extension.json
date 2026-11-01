@@ -1,0 +1,43 @@
+{
+  "events": [
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-A",
+      "sequence": 14,
+      "at": "2026-10-31T12:00:13Z",
+      "event": {
+        "kind": "harness.event",
+        "sessionId": "S1",
+        "event": {
+          "kind": "anomaly",
+          "anomalyEvent": {
+            "kind": "invalid_json",
+            "action": "skipped",
+            "ref": "ref-1",
+            "running": true,
+            "stopRequested": false,
+            "recordType": "response",
+            "command": "prompt",
+            "bytes": 42,
+            "detail": "redacted"
+          }
+        }
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-A",
+      "sequence": 15,
+      "at": "2026-10-31T12:00:14Z",
+      "event": {
+        "kind": "extension",
+        "namespace": "third-harness.audit",
+        "version": 7,
+        "name": "audit.finished",
+        "data": { "count": 2 }
+      }
+    }
+  ]
+}

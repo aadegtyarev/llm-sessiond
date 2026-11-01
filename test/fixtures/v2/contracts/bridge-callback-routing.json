@@ -1,0 +1,71 @@
+{
+  "frames": [
+    {
+      "apiVersion": "v2",
+      "type": "callback.bind",
+      "requestId": "bind-1",
+      "sessionId": "S1"
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "bind-1",
+      "result": { "bindingId": "B1", "sessionId": "S1" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "callback.unbind",
+      "requestId": "unbind-1",
+      "bindingId": "B1"
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "unbind-1",
+      "result": {}
+    },
+    {
+      "apiVersion": "v2",
+      "type": "callback.request",
+      "callbackId": "cb-p",
+      "bindingId": "B1",
+      "sessionId": "S1",
+      "deadlineAt": "2026-10-31T12:01:00Z",
+      "kind": "tool.permission",
+      "inputId": "input.1",
+      "payload": {
+        "toolName": "Write",
+        "input": { "file_path": "/work/a.txt", "content": "safe" },
+        "context": {
+          "toolUseId": "tu-1",
+          "agentId": "agent-2",
+          "blockedPath": "/work/a.txt",
+          "decisionReason": "approval required",
+          "title": "Write file",
+          "displayName": "Write",
+          "description": "Create file",
+          "suggestions": ["allow", "deny"]
+        }
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "callback.result",
+      "callbackId": "cb-p",
+      "bindingId": "B1",
+      "result": { "kind": "permission", "behavior": "allow" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "callback.result",
+      "callbackId": "cb-p2",
+      "bindingId": "B1",
+      "result": {
+        "kind": "permission",
+        "behavior": "deny",
+        "message": "Not approved",
+        "interrupt": false
+      }
+    }
+  ]
+}

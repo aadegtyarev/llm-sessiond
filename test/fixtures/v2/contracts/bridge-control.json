@@ -1,0 +1,79 @@
+{
+  "frames": [
+    {
+      "apiVersion": "v2",
+      "type": "control.request",
+      "requestId": "reload-1",
+      "sessionId": "S1",
+      "guard": { "contextId": "ctx-1", "generation": 1 },
+      "timeoutMs": 5000,
+      "operation": "reload"
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "reload-1",
+      "result": { "reloaded": true }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "control.request",
+      "requestId": "command-1",
+      "sessionId": "S1",
+      "guard": { "contextId": "ctx-1", "generation": 1 },
+      "timeoutMs": 5000,
+      "operation": "command.run",
+      "name": "audit",
+      "remainder": "--fast"
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "command-1",
+      "result": { "disposition": "handled", "output": "ok" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "control.request",
+      "requestId": "ext-1",
+      "sessionId": "S1",
+      "guard": { "contextId": "ctx-1", "generation": 1 },
+      "timeoutMs": 5000,
+      "operation": "extension",
+      "namespace": "third-harness.audit",
+      "version": 7,
+      "name": "apply",
+      "input": { "scope": "current" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "ext-1",
+      "result": { "version": 7, "output": { "applied": true } }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "control.cancel",
+      "requestId": "cancel-1",
+      "targetRequestId": "command-1"
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.succeeded",
+      "requestId": "cancel-1",
+      "result": { "outcome": "unknown" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "request.failed",
+      "requestId": "unsupported-1",
+      "error": {
+        "code": "UNSUPPORTED_CAPABILITY",
+        "message": "Operation is not supported",
+        "category": "unsupported",
+        "outcome": "not-applied",
+        "reference": "unsupported-1"
+      }
+    }
+  ]
+}
