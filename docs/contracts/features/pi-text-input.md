@@ -1,6 +1,6 @@
 # Pi text input and settlement
 
-- Status: Approved; implementation in progress
+- Status: Implemented; pending independent review
 - Based on: `docs/contracts/features/control-plane-v2.md`
 
 ## Goal

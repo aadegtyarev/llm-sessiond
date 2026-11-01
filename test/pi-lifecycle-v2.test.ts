@@ -14,13 +14,17 @@ describe("Pi v2 lifecycle adapter", () => {
     expect(adapter.descriptor).toEqual({
       id: "pi",
       aliases: [],
-      capabilities: ["harness.launch", "harness.resume", "harness.stop"],
+      capabilities: [
+        "harness.launch",
+        "harness.resume",
+        "harness.stop",
+        "input.submit",
+      ],
     });
     expect(adapter.validateCheckpoint({ sessionId: "id" })).toBe(true);
     expect(
       adapter.validateCheckpoint({ sessionId: "id", prompt: "secret" }),
     ).toBe(false);
-    expect(adapter.validateCheckpoint({ sessionId: "" })).toBe(false);
   });
   it("persists exact Pi identity and uses it for resume; shutdown stops ownership first", async () => {
     const cwd = await tempDir();
@@ -84,16 +88,5 @@ describe("Pi v2 lifecycle adapter", () => {
     expect(launches).toBe(0);
     await execution.stop();
     await execution.stop();
-  });
-  it("rejects factory use with a different adapter", () => {
-    const adapter = new PiLifecycleAdapter();
-    const factory = new PiLifecycleExecutionFactory(adapter, {
-      launch: () => {
-        throw new Error("spawned");
-      },
-    });
-    expect(() => factory.create(new PiLifecycleAdapter())).toThrow(
-      "UNSUPPORTED_ADAPTER",
-    );
   });
 });

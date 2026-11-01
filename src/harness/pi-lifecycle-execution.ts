@@ -1,4 +1,3 @@
-import type { ChildProcess } from "node:child_process";
 import type { ProcessProvider } from "../core/ports.js";
 import type {
   LifecycleExecution,
@@ -7,30 +6,34 @@ import type {
 import type { AdapterCheckpoint } from "../core/adapter-contracts.js";
 import type { JsonValue } from "../core/generic-json.js";
 import { piCheckpoint, PiLifecycleAdapter } from "./pi-lifecycle-adapter.js";
-import { startPiProcess } from "./pi-startup.js";
-import type { PiRpcProcess } from "./pi-process.js";
-import { ChildStop, type ChildTerminator } from "../process/child-stop.js";
+import type { ChildTerminator } from "../process/child-stop.js";
+import { PiDurableProcess } from "./pi-durable-process.js";
 export class PiLifecycleExecution implements LifecycleExecution {
-  private child?: ChildProcess;
-  private stopped = false;
-  private childStop?: ChildStop;
+  private readonly process: PiDurableProcess;
+  get inputs() {
+    return this.process.inputs;
+  }
   constructor(
     private readonly adapter: PiLifecycleAdapter,
     private readonly provider: ProcessProvider,
     private readonly executable: string,
     private readonly readinessTimeoutMs: number,
     private readonly terminate?: ChildTerminator,
-  ) {}
+  ) {
+    this.process = new PiDurableProcess(
+      provider,
+      executable,
+      readinessTimeoutMs,
+      terminate,
+    );
+  }
   async launch(input: {
     cwd: string;
     options?: JsonValue;
   }): Promise<LifecycleLaunchResult> {
     this.rejectOptions(input.options);
-    const process = await this.start(input.cwd, []);
-    return {
-      nativeSessionId: process.nativeSessionId,
-      checkpoint: piCheckpoint(process.nativeSessionId),
-    };
+    const nativeSessionId = await this.process.start(input.cwd, []);
+    return { nativeSessionId, checkpoint: piCheckpoint(nativeSessionId) };
   }
   async resume(input: {
     cwd: string;
@@ -53,45 +56,15 @@ export class PiLifecycleExecution implements LifecycleExecution {
       input.nativeSessionId !== sessionId
     )
       throw new Error("SESSION_ID_MISMATCH");
-    const process = await this.start(
+    const nativeSessionId = await this.process.start(
       input.cwd,
       ["--session", sessionId],
       sessionId,
     );
-    return {
-      nativeSessionId: process.nativeSessionId,
-      checkpoint: piCheckpoint(process.nativeSessionId),
-    };
+    return { nativeSessionId, checkpoint: piCheckpoint(nativeSessionId) };
   }
-  async stop(): Promise<void> {
-    if (this.stopped) return;
-    if (!this.childStop) {
-      this.stopped = true;
-      return;
-    }
-    await this.childStop.stop();
-    this.stopped = true;
-  }
-  private async start(
-    cwd: string,
-    args: string[],
-    expectedId?: string,
-  ): Promise<PiRpcProcess> {
-    if (this.child || this.stopped)
-      throw new Error("EXECUTION_ALREADY_STARTED");
-    const child = this.provider.launch(
-      this.executable,
-      ["--mode", "rpc", ...args],
-      cwd,
-    );
-    this.child = child;
-    this.childStop = new ChildStop(child, this.terminate);
-    try {
-      return await startPiProcess(child, expectedId, this.readinessTimeoutMs);
-    } catch {
-      await this.stop();
-      throw new Error("PI_STARTUP_FAILED");
-    }
+  stop(): Promise<void> {
+    return this.process.stop();
   }
   private rejectOptions(options: JsonValue | undefined): void {
     if (options !== undefined) throw new Error("UNSUPPORTED_OPTIONS");

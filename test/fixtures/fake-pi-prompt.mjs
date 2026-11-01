@@ -24,6 +24,10 @@ function writeCompletion(message, write) {
 }
 export function handleFakePrompt(command, state) {
   appendFileSync(`${process.cwd()}/prompt-count`, "1");
+  appendFileSync(
+    `${process.cwd()}/prompt-requests.jsonl`,
+    `${JSON.stringify(command)}\n`,
+  );
   state.setAbortMode(command.message);
   if (command.message === "uncertain") return;
   if (command.message === "settle-before-timeout") {

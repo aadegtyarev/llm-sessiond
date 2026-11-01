@@ -5,7 +5,12 @@ export const PI_CHECKPOINT = { namespace: "pi.session", version: 1 } as const;
 export const piDescriptor = {
   id: "pi",
   aliases: [],
-  capabilities: ["harness.launch", "harness.resume", "harness.stop"],
+  capabilities: [
+    "harness.launch",
+    "harness.resume",
+    "harness.stop",
+    "input.submit",
+  ],
 };
 
 export function piCheckpoint(sessionId: string) {
