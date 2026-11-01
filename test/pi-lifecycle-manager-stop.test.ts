@@ -52,17 +52,29 @@ describe("Pi durable stop retry", () => {
       10,
     );
     const session = await manager.create({ cwd: process.cwd() });
-    await expect(manager.stop(session.id)).rejects.toThrow("timed out");
     let shutdownFinished = false;
-    const shutdown = manager.shutdownOwned().then(() => {
-      shutdownFinished = true;
-    });
-    await Promise.resolve();
-    expect(shutdownFinished).toBe(false);
-    expect(manager.get(session.id).status).toBe("uncertain");
-    release();
-    await shutdown;
-    await childClosed;
+    let shutdown: Promise<void> | undefined;
+    try {
+      await expect(manager.stop(session.id)).rejects.toThrow("timed out");
+      await expect(manager.resume(session.id)).rejects.toMatchObject({
+        code: "SESSION_UNAVAILABLE",
+      });
+      await expect(manager.delete(session.id)).rejects.toMatchObject({
+        code: "SESSION_NOT_STOPPED",
+      });
+      shutdown = manager.shutdownOwned().then(() => {
+        shutdownFinished = true;
+      });
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(shutdownFinished).toBe(false);
+      expect(manager.get(session.id).status).toBe("uncertain");
+    } finally {
+      release();
+      if (shutdown) await shutdown;
+      else await manager.shutdownOwned();
+      await childClosed;
+      await manager.shutdownOwned();
+    }
     expect(manager.get(session.id).status).toBe("stopped");
   });
 });

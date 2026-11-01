@@ -41,10 +41,14 @@ describe("Pi v2 stop coalescing", () => {
     let finished = 0;
     const first = instance.stop().then(() => finished++);
     const second = instance.stop().then(() => finished++);
-    expect(calls).toBe(1);
-    expect(finished).toBe(0);
-    release();
-    await Promise.all([first, second]);
+    try {
+      expect(calls).toBe(1);
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(finished).toBe(0);
+    } finally {
+      release();
+      await Promise.allSettled([first, second]);
+    }
     expect(finished).toBe(2);
     expect(calls).toBe(1);
   });
