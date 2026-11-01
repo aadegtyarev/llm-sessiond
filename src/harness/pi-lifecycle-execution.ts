@@ -9,16 +9,17 @@ import type { JsonValue } from "../core/generic-json.js";
 import { piCheckpoint, PiLifecycleAdapter } from "./pi-lifecycle-adapter.js";
 import { startPiProcess } from "./pi-startup.js";
 import type { PiRpcProcess } from "./pi-process.js";
-import { terminateChild } from "../process/terminate-child.js";
+import { ChildStop, type ChildTerminator } from "../process/child-stop.js";
 export class PiLifecycleExecution implements LifecycleExecution {
   private child?: ChildProcess;
-  private rpcProcess?: PiRpcProcess;
   private stopped = false;
+  private childStop?: ChildStop;
   constructor(
     private readonly adapter: PiLifecycleAdapter,
     private readonly provider: ProcessProvider,
     private readonly executable: string,
     private readonly readinessTimeoutMs: number,
+    private readonly terminate?: ChildTerminator,
   ) {}
   async launch(input: {
     cwd: string;
@@ -64,9 +65,12 @@ export class PiLifecycleExecution implements LifecycleExecution {
   }
   async stop(): Promise<void> {
     if (this.stopped) return;
+    if (!this.childStop) {
+      this.stopped = true;
+      return;
+    }
+    await this.childStop.stop();
     this.stopped = true;
-    if (this.rpcProcess) await this.rpcProcess.stop();
-    else if (this.child) await terminateChild(this.child);
   }
   private async start(
     cwd: string,
@@ -81,13 +85,9 @@ export class PiLifecycleExecution implements LifecycleExecution {
       cwd,
     );
     this.child = child;
+    this.childStop = new ChildStop(child, this.terminate);
     try {
-      this.rpcProcess = await startPiProcess(
-        child,
-        expectedId,
-        this.readinessTimeoutMs,
-      );
-      return this.rpcProcess;
+      return await startPiProcess(child, expectedId, this.readinessTimeoutMs);
     } catch {
       await this.stop();
       throw new Error("PI_STARTUP_FAILED");

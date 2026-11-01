@@ -40,7 +40,7 @@ describe("Pi v2 startup cleanup", () => {
         provider,
         id: () => `pi-${mode}`,
         stopTimeoutMs: 100,
-        readinessTimeoutMs: mode === "mismatch" ? 1000 : 20,
+        readinessTimeoutMs: mode === "timeout" ? 40 : 1000,
       });
       let row = await runtime.manager.create({ cwd: process.cwd() });
       if (mode === "mismatch") {
