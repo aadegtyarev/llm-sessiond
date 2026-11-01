@@ -12,7 +12,7 @@ Implement transport-neutral in-memory input admission, coordination, and executi
 - Submit text and optional canonical-base64 images within API v2 limits; reject unsupported capabilities and invalid data before resume or dispatch.
 - Running sessions admit one input. Stopped sessions resume the exact checkpoint once and dispatch once. Definite rejection, unknown outcomes, ACK timeout, early settlement, stop, and late results remain safe and never replay.
 - Cancel only the exact accepted current input; resolve cancel-current at dispatch. Reject mismatches, pending/uncertain/canceling work, and unsupported operations before writes.
-- Runtime observers receive normalized states; listener failures and stale/malformed events cannot affect execution or unrelated inputs. Stop/shutdown progress while input commands are gated.
+- Runtime observers receive normalized states; listener failures and stale/malformed events cannot affect execution or unrelated inputs. Stop, shutdown, or normalized execution-ended progress marks unresolved input uncertain while input commands are gated.
 
 ## Non-goals
 

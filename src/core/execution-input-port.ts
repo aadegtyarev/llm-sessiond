@@ -6,11 +6,13 @@ export type InputCommandOutcome =
   | { kind: "accepted" }
   | { kind: "rejected"; reason: InputFailureReason }
   | { kind: "uncertain" };
-export type ExecutionInputEvent = {
-  inputId: string;
-  state: "accepted" | "completed" | "failed" | "uncertain";
-  reason?: InputFailureReason;
-};
+export type ExecutionInputEvent =
+  | {
+      inputId: string;
+      state: "accepted" | "completed" | "failed" | "uncertain";
+      reason?: InputFailureReason;
+    }
+  | { kind: "execution-ended" };
 export interface ExecutionInputPort {
   submit(input: {
     inputId: string;

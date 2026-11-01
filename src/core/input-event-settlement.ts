@@ -20,6 +20,10 @@ export function subscribeInputEvents(
   return subscribe?.((value) => {
     if (!isCurrent(operation) || !value || typeof value !== "object") return;
     const event = value as Record<string, unknown>;
+    if (event.kind === "execution-ended" && Object.keys(event).length === 1) {
+      settle("uncertain");
+      return;
+    }
     if (
       Object.keys(event).some(
         (key) => !["inputId", "state", "reason"].includes(key),
