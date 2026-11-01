@@ -18,7 +18,7 @@ export class ClaudeJsonlDecoder {
       this.checkSize(line);
       lines.push(line);
     }
-    this.checkSize(this.pending);
+    this.checkPendingSize();
     return lines;
   }
   finish(): void {
@@ -31,6 +31,11 @@ export class ClaudeJsonlDecoder {
   }
   private checkSize(text: string): void {
     if (Buffer.byteLength(text) > MAX_RECORD_BYTES)
+      throw new Error("CLAUDE_STARTUP_FAILED");
+  }
+  private checkPendingSize(): void {
+    const allowance = this.pending.endsWith("\r") ? 1 : 0;
+    if (Buffer.byteLength(this.pending) > MAX_RECORD_BYTES + allowance)
       throw new Error("CLAUDE_STARTUP_FAILED");
   }
 }

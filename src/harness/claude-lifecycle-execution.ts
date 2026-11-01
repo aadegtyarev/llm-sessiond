@@ -67,7 +67,11 @@ export class ClaudeLifecycleExecution implements LifecycleExecution {
   }
   async stop(): Promise<void> {
     if (this.stopped) return;
-    await this.lifecycleProcess?.stop();
+    if (!this.lifecycleProcess) {
+      this.stopped = true;
+      return;
+    }
+    await this.lifecycleProcess.stop();
     this.stopped = true;
   }
   private async start(

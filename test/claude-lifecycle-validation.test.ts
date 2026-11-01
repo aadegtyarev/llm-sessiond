@@ -4,6 +4,42 @@ import { ClaudeLifecycleExecutionFactory } from "../src/harness/claude-lifecycle
 
 const sessionId = "12345678-abcd-4abc-8abc-1234567890ab";
 describe("Claude lifecycle validation", () => {
+  it.each(["launch", "resume"] as const)(
+    "makes stop-before-start terminal for %s",
+    async (operation) => {
+      let launches = 0;
+      const adapter = new ClaudeLifecycleAdapter();
+      const execution = new ClaudeLifecycleExecutionFactory(
+        adapter,
+        {
+          launch: () => {
+            launches++;
+            throw new Error("unexpected spawn");
+          },
+        },
+        undefined,
+        20,
+        () => sessionId,
+      ).create(adapter);
+      const stopping = execution.stop();
+      const concurrentStop = execution.stop();
+      const starting =
+        operation === "launch"
+          ? execution.launch({ cwd: process.cwd() })
+          : execution.resume({
+              cwd: process.cwd(),
+              checkpoint: {
+                namespace: "claude.session",
+                version: 1,
+                data: { sessionId },
+              },
+              nativeSessionId: sessionId,
+            });
+      await expect(starting).rejects.toThrow("EXECUTION_ALREADY_STARTED");
+      await Promise.all([stopping, concurrentStop, execution.stop()]);
+      expect(launches).toBe(0);
+    },
+  );
   it("rejects unsupported options, malformed checkpoints, and identity mismatch before spawn", async () => {
     let launches = 0;
     const adapter = new ClaudeLifecycleAdapter();
