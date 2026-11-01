@@ -61,9 +61,11 @@ function validateMigrationEnvelope(
   value: unknown,
   expectedVersion: number,
 ): asserts value is { version: number; value: JsonValue } {
-  if (!value || typeof value !== "object" || Array.isArray(value))
+  if (!value || typeof value !== "object")
     throw new SafeValidationError("EXTENSION_MIGRATION_FAILED");
   validateJson(value, 65536, 20);
+  if (Array.isArray(value))
+    throw new SafeValidationError("EXTENSION_MIGRATION_FAILED");
   const row = value as Record<string, unknown>;
   if (
     Object.keys(row).sort().join(",") !== "value,version" ||

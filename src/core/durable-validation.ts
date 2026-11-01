@@ -16,8 +16,10 @@ export function validateHarnessId(value: unknown): asserts value is string {
 export function validateCheckpointEnvelope(
   value: unknown,
 ): asserts value is AdapterCheckpoint {
-  if (!value || typeof value !== "object" || Array.isArray(value))
+  if (!value || typeof value !== "object")
     throw new SafeValidationError("INVALID_CHECKPOINT");
+  validateJson(value, CHECKPOINT_MAX_BYTES, 20);
+  if (Array.isArray(value)) throw new SafeValidationError("INVALID_CHECKPOINT");
   const row = value as Record<string, unknown>;
   if (
     Object.keys(row).sort().join(",") !== "data,namespace,version" ||
@@ -27,7 +29,6 @@ export function validateCheckpointEnvelope(
     (row.version as number) < 1
   )
     throw new SafeValidationError("INVALID_CHECKPOINT");
-  validateJson(value, CHECKPOINT_MAX_BYTES, 20);
 }
 export function decodeCheckpointEnvelope(text: unknown): AdapterCheckpoint {
   if (
