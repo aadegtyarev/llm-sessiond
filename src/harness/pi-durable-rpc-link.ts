@@ -40,6 +40,9 @@ export class PiDurableRpcLink extends EventEmitter {
     }
     return request.promise;
   }
+  closeAdmission(): void {
+    this.fail();
+  }
   dispose(): void {
     this.fail();
     this.child.stdout?.off("data", this.onData);
@@ -53,6 +56,7 @@ export class PiDurableRpcLink extends EventEmitter {
     this.removeAllListeners();
   }
   private consume(chunk: string): void {
+    if (this.dead) return;
     const decoded = decodePiRpcChunk(this.buffer, chunk);
     this.buffer = decoded.buffer;
     if (decoded.malformed) {
@@ -60,6 +64,7 @@ export class PiDurableRpcLink extends EventEmitter {
       return;
     }
     for (const record of decoded.records) {
+      if (this.dead) break;
       if (record.type === "response") this.response(record);
       else this.emit("event", record);
     }

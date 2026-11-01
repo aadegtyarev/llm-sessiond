@@ -11,13 +11,13 @@ const owner = { token: "test-owner", generation: 1 };
 describe("Pi durable text input", () => {
   it("rejects direct image and cancel calls without a live RPC link", async () => {
     const port = new PiDurableInputPort();
-    expect(
-      await port.submit({
+    await expect(
+      port.submit({
         inputId: "input-1",
         text: "text",
         images: [{ mimeType: "image/png", data: "AA==" }],
       }),
-    ).toEqual({ kind: "rejected", reason: "prompt_rejected" });
+    ).rejects.toThrow("UNSUPPORTED_CAPABILITY");
     await expect(port.cancel("input-1")).rejects.toThrow(
       "UNSUPPORTED_CAPABILITY",
     );

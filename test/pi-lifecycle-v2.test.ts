@@ -25,6 +25,7 @@ describe("Pi v2 lifecycle adapter", () => {
     expect(
       adapter.validateCheckpoint({ sessionId: "id", prompt: "secret" }),
     ).toBe(false);
+    expect(adapter.validateCheckpoint({ sessionId: "" })).toBe(false);
   });
   it("persists exact Pi identity and uses it for resume; shutdown stops ownership first", async () => {
     const cwd = await tempDir();

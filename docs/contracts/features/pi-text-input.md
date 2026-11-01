@@ -11,7 +11,7 @@ Expose the existing generic durable input port on Pi v2 lifecycle executions for
 
 - Launch and exact-resume keep one live RPC reader from correlated `get_state` readiness through prompt and event processing.
 - Submit the daemon-assigned opaque input ID and exact text once using Pi `prompt` with `streamingBehavior:"steer"`; correlated success is accepted, correlated explicit false is `prompt_rejected`, and ambiguous delivery is uncertain without replay.
-- `agent_settled` completes only the matching current input under the existing single-active-input turn rule. Events before acknowledgement and late acknowledgements cannot mutate a newer input.
+- A live `agent_settled` completes only the current input under the single-active-input turn rule, including uncertain delivery when the stream remains trustworthy. Terminal/dead streams cannot settle. Events before acknowledgement and late acknowledgements cannot mutate a newer input.
 - Unsupported images and cancellation fail explicitly before side effects; images are also rejected at the adapter boundary.
 - Process/stream failure and stop fence writes, settle uncertainty safely, and retain ownership until exit is confirmed.
 - Generic manager composition, stopped exact autoresume, and observer/source fences remain intact.

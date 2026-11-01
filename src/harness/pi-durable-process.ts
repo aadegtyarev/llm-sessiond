@@ -10,6 +10,7 @@ export class PiDurableProcess {
   readonly inputs = new PiDurableInputPort();
   private child?: ChildProcess;
   private stopped = false;
+  private stopRequested = false;
   private link?: PiDurableRpcLink;
   private stopping: Promise<void> | undefined;
   constructor(
@@ -23,7 +24,7 @@ export class PiDurableProcess {
     args: string[],
     expectedId?: string,
   ): Promise<string> {
-    if (this.child || this.stopped)
+    if (this.child || this.stopped || this.stopRequested)
       throw new Error("EXECUTION_ALREADY_STARTED");
     const child = this.provider.launch(
       this.executable,
@@ -45,14 +46,21 @@ export class PiDurableProcess {
       throw new Error("PI_STARTUP_FAILED");
     }
   }
-  async stop(): Promise<void> {
-    if (this.stopped) return;
-    if (!this.child) {
+  stop(): Promise<void> {
+    this.stopRequested = true;
+    this.inputs.end();
+    this.link?.closeAdmission();
+    if (this.stopped) return Promise.resolve();
+    const child = this.child;
+    if (!child) {
       this.stopped = true;
-      return;
+      return Promise.resolve();
     }
     if (this.stopping) return this.stopping;
-    const attempt = this.stopChild(this.child);
+    return this.stopOwnedChild(child);
+  }
+  private async stopOwnedChild(child: ChildProcess): Promise<void> {
+    const attempt = this.stopChild(child);
     this.stopping = attempt;
     try {
       await attempt;

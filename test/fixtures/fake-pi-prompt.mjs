@@ -30,8 +30,30 @@ export function handleFakePrompt(command, state) {
   );
   state.setAbortMode(command.message);
   if (command.message === "uncertain") return;
+  if (command.message === "uncertain-then-settle") {
+    setTimeout(() => state.write({ type: "agent_settled" }), 75);
+    return;
+  }
   if (command.message === "settle-before-timeout") {
     state.write({ type: "agent_settled" });
+    return;
+  }
+  if (command.message === "settle-delay-ack") {
+    state.write({ type: "agent_settled" });
+    state.setPendingAck({
+      type: "response",
+      id: command.id,
+      command: "prompt",
+      success: true,
+      data: {},
+    });
+    const response = state.getPendingAck();
+    setTimeout(() => {
+      if (state.getPendingAck() === response) {
+        state.setPendingAck(undefined);
+        state.write(response);
+      }
+    }, 250);
     return;
   }
   if (command.message === "malformed") process.stdout.write("{not json}\n");
