@@ -1,7 +1,18 @@
 import { access, constants, realpath, stat } from "node:fs/promises";
 import path from "node:path";
 import { ControlPlaneError } from "./control-plane-error.js";
-export async function validateLifecycleCwd(cwd: string): Promise<string> {
+export function isQualifiedWindowsCwd(cwd: string): boolean {
+  return (
+    /^[A-Za-z]:[\\/]/.test(cwd) ||
+    /^(?:\\\\|\/\/)[^\\/]+[\\/][^\\/]+(?:[\\/].*)?$/.test(cwd)
+  );
+}
+export async function validateLifecycleCwd(
+  cwd: string,
+  platform = process.platform,
+): Promise<string> {
+  if (platform === "win32" && !isQualifiedWindowsCwd(cwd))
+    throw new ControlPlaneError("INVALID_CWD");
   if (!path.isAbsolute(cwd)) throw new ControlPlaneError("INVALID_CWD");
   try {
     const canonical = await realpath(cwd);

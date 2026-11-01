@@ -7,12 +7,15 @@ import {
   requireCapability,
   resolveAdapter,
 } from "./session-lifecycle-support.js";
+import { persistFinalization } from "./finalization-store.js";
 
 export async function stopSession(
   context: DurableManagerContext,
   id: string,
 ): Promise<void> {
   assertCurrentOwner(context);
+  if (context.pending.has(id))
+    throw new ControlPlaneError("SESSION_UNAVAILABLE");
   const row = DurableSessionManagerRead.get(context.store, id);
   if (row.status === "stopped") return;
   if (row.status === "uncertain")
@@ -24,41 +27,30 @@ export async function stopSession(
   const execution = context.owned.get(id);
   if (!execution) throw new ControlPlaneError("SESSION_UNAVAILABLE");
   const result = await boundedExecutionStop(context, execution);
+  const at = new Date().toISOString();
+  const pending = {
+    status: "stopped" as const,
+    reason: null,
+    at,
+    execution,
+    stopRequired: !result.stopped,
+  };
+  context.pending.set(id, pending);
   if (!result.stopped) {
-    assertCurrentOwner(context);
-    context.store.setStatus(
-      id,
-      "uncertain",
-      "STOP_FAILED",
-      new Date().toISOString(),
-    );
+    if (!persistFinalization(context, id, "uncertain", "STOP_FAILED", at))
+      throw new ControlPlaneError("STALE_OWNER");
     throw new ControlPlaneError(
       result.timedOut ? "OPERATION_TIMEOUT" : "OPERATION_FAILED",
     );
   }
-  assertCurrentOwner(context);
-  context.owned.delete(id);
-  context.store.setStatus(id, "stopped");
-}
-export async function shutdownOwnedExecution(
-  context: DurableManagerContext,
-  id: string,
-): Promise<void> {
-  const execution = context.owned.get(id);
-  if (!execution) return;
-  const result = await boundedExecutionStop(context, execution);
-  if (result.stopped) context.owned.delete(id);
-  try {
-    assertCurrentOwner(context);
-    context.store.setStatus(
-      id,
-      result.stopped ? "stopped" : "uncertain",
-      result.stopped ? null : "STOP_FAILED",
-      result.stopped ? null : new Date().toISOString(),
-    );
-  } catch {
-    /* shutdown cleanup must not overwrite another owner's row */
+  pending.stopRequired = false;
+  if (!persistFinalization(context, id, "stopped", null, at)) {
+    context.owned.delete(id);
+    context.pending.delete(id);
+    throw new ControlPlaneError("STALE_OWNER");
   }
+  context.owned.delete(id);
+  context.pending.delete(id);
 }
 export function deleteSession(
   context: DurableManagerContext,
@@ -66,7 +58,11 @@ export function deleteSession(
 ): void {
   assertCurrentOwner(context);
   const row = DurableSessionManagerRead.get(context.store, id);
-  if (row.status !== "stopped" || context.owned.has(id))
+  if (
+    row.status !== "stopped" ||
+    context.owned.has(id) ||
+    context.pending.has(id)
+  )
     throw new ControlPlaneError("SESSION_NOT_STOPPED");
   context.store.delete(id);
 }

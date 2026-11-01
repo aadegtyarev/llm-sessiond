@@ -20,7 +20,8 @@ export async function resumeSession(
   id: string,
 ): Promise<DurableSession> {
   const row = DurableSessionManagerRead.get(context.store, id);
-  if (context.owned.has(id)) throw new ControlPlaneError("SESSION_UNAVAILABLE");
+  if (context.owned.has(id) || context.pending.has(id))
+    throw new ControlPlaneError("SESSION_UNAVAILABLE");
   if (row.status !== "stopped" && row.status !== "failed")
     throw new ControlPlaneError("SESSION_NOT_RESUMABLE");
   const adapter = resolveAdapter(context.registry, row.harnessId);

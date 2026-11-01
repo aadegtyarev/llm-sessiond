@@ -58,7 +58,7 @@ describe("durable success-transition failures", () => {
     storeRef.current = configured.store;
     await expect(
       configured.manager.create({ cwd: process.cwd() }),
-    ).rejects.toMatchObject({ code: "OPERATION_FAILED" });
+    ).rejects.toMatchObject({ code: "STALE_OWNER" });
     expect(live).toBe(false);
     expect(storeRef.current.get("session-1")?.status).toBe("starting");
   });
@@ -78,7 +78,7 @@ describe("durable success-transition failures", () => {
     storeRef.current = configured.store;
     await expect(
       configured.manager.create({ cwd: process.cwd() }),
-    ).rejects.toMatchObject({ code: "OPERATION_FAILED" });
+    ).rejects.toMatchObject({ code: "NOT_FOUND" });
     expect(live).toBe(false);
     expect(storeRef.current.get("session-1")).toBeUndefined();
   });

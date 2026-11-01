@@ -48,7 +48,7 @@ describe("resume success-transition cleanup", () => {
       store.stale = true;
     };
     await expect(manager.resume(row.id)).rejects.toMatchObject({
-      code: "OPERATION_FAILED",
+      code: "STALE_OWNER",
     });
     expect(live).toBe(false);
     expect(store.get(row.id)?.status).toBe("starting");

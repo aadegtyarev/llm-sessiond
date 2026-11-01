@@ -9,9 +9,23 @@ import {
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
-import { validateLifecycleCwd } from "../src/core/lifecycle-cwd-validation.js";
+import {
+  isQualifiedWindowsCwd,
+  validateLifecycleCwd,
+} from "../src/core/lifecycle-cwd-validation.js";
 import { setup } from "./durable-manager-support.js";
 describe("lifecycle cwd canonical validation", () => {
+  it("accepts only fully-qualified Windows drive and UNC forms", () => {
+    for (const value of [
+      "C:\\work",
+      "c:/work",
+      "\\\\server\\share",
+      "//server/share/path",
+    ])
+      expect(isQualifiedWindowsCwd(value)).toBe(true);
+    for (const value of ["\\work", "/work", "C:work", "\\\\server"])
+      expect(isQualifiedWindowsCwd(value)).toBe(false);
+  });
   it("resolves a directory symlink before persistence and launch", async () => {
     if (process.platform === "win32") return;
     const root = await mkdtemp(path.join(os.tmpdir(), "cwd-canonical-"));

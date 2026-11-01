@@ -8,8 +8,9 @@ import type { HarnessRegistry } from "./adapter-registry.js";
 export function assertCurrentOwner(context: DurableManagerContext): void {
   try {
     context.store.assertOwner(context.owner);
-  } catch {
-    throw new ControlPlaneError("STALE_OWNER");
+  } catch (error) {
+    if (error instanceof ControlPlaneError) throw error;
+    throw new ControlPlaneError("STORE_FAILED");
   }
 }
 export function resolveAdapter(registry: HarnessRegistry, id?: string) {

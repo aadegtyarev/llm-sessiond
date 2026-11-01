@@ -3,15 +3,12 @@ import type { HarnessRegistry } from "./adapter-registry.js";
 import { ControlPlaneError } from "./control-plane-error.js";
 import type { DurableManagerContext } from "./durable-manager-context.js";
 import { PerSessionLock } from "./per-session-lock.js";
+import { SafeSessionStore } from "./safe-session-store.js";
 import { createSession } from "./session-launch.js";
 import { resumeSession } from "./session-resume.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import { validateLifecycleCwd } from "./lifecycle-cwd-validation.js";
-import {
-  deleteSession,
-  shutdownOwnedExecution,
-  stopSession,
-} from "./session-stop-delete.js";
+import { deleteSession, stopSession } from "./session-stop-delete.js";
 import {
   assertCurrentOwner,
   resolveAdapter,
@@ -24,6 +21,7 @@ import type {
 import type { JsonValue } from "./generic-json.js";
 import type { DurableSessionStore } from "./session-manager-store.js";
 import { validateSessionId } from "./durable-validation.js";
+import { shutdownOwnedSessions } from "./shutdown-owned-sessions.js";
 export type { DurableSessionStore } from "./session-manager-store.js";
 export class DurableSessionManager {
   private readonly context: DurableManagerContext;
@@ -37,11 +35,12 @@ export class DurableSessionManager {
     stopTimeoutMs = 30_000,
   ) {
     this.context = {
-      store,
+      store: new SafeSessionStore(store),
       registry,
       factory,
       owner,
       owned: new Map(),
+      pending: new Map(),
       stopTimeoutMs,
     };
   }
@@ -89,11 +88,7 @@ export class DurableSessionManager {
   resume(id: string): Promise<DurableSession> {
     return this.locks.run(id, () => resumeSession(this.context, id));
   }
-  async shutdownOwned(): Promise<void> {
-    await Promise.all(
-      [...this.context.owned.keys()].map((id) =>
-        this.locks.run(id, () => shutdownOwnedExecution(this.context, id)),
-      ),
-    );
+  shutdownOwned(): Promise<void> {
+    return shutdownOwnedSessions(this.context, this.locks);
   }
 }

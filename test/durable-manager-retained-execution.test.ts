@@ -33,7 +33,7 @@ describe("retained uncertain executions", () => {
     failStop = false;
     await manager.shutdownOwned();
     expect(live).toBe(false);
-    expect(manager.get(row.id).status).toBe("stopped");
+    expect(manager.get(row.id).status).toBe("failed");
   });
   it("cleans invalid checkpoint after resume side effect", async () => {
     let live = false;

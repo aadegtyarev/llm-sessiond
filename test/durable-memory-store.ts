@@ -3,13 +3,15 @@ import type {
   DurableSession,
   OwnerGeneration,
 } from "../src/persistence/session-record.js";
+import { SafeValidationError } from "../src/core/generic-json.js";
 export class MemoryStore implements DurableSessionStore {
   stale = false;
   failExecutionUpdate = false;
   failRunningStatus = false;
+  failStatus: DurableSession["status"] | undefined;
   assertOwner(owner: OwnerGeneration) {
     if (this.stale || owner.token !== "test-owner" || owner.generation !== 1)
-      throw new Error("stale");
+      throw new SafeValidationError("STALE_OWNER_GENERATION");
   }
   rows = new Map<string, DurableSession>();
   create(row: DurableSession) {
@@ -33,11 +35,16 @@ export class MemoryStore implements DurableSessionStore {
     reason: string | null = null,
     at: string | null = null,
   ) {
+    if (status === this.failStatus) {
+      this.failStatus = undefined;
+      throw new Error("status persistence secret");
+    }
     if (status === "running" && this.failRunningStatus) {
       this.failRunningStatus = false;
       throw new Error("persistence secret");
     }
-    const row = this.rows.get(id)!;
+    const row = this.rows.get(id);
+    if (!row) throw new SafeValidationError("SESSION_NOT_FOUND");
     row.status = status;
     if (reason) row.failureReason = reason;
     else delete row.failureReason;
@@ -55,7 +62,8 @@ export class MemoryStore implements DurableSessionStore {
       this.failExecutionUpdate = false;
       throw new Error("identity secret");
     }
-    const row = this.rows.get(id)!;
+    const row = this.rows.get(id);
+    if (!row) throw new SafeValidationError("SESSION_NOT_FOUND");
     if (nativeId !== undefined) row.nativeSessionId = nativeId;
     else delete row.nativeSessionId;
     if (checkpoint !== undefined) row.adapterState = checkpoint;

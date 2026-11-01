@@ -28,7 +28,7 @@ export async function createSession(
 ): Promise<DurableSession> {
   const adapter = resolveAdapter(context.registry, input.harnessId);
   requireCapability(adapter, "harness.launch");
-  if (context.store.get(id))
+  if (context.store.get(id) || context.owned.has(id) || context.pending.has(id))
     throw new ControlPlaneError("SESSION_ID_COLLISION");
   try {
     if (input.options !== undefined) validateJson(input.options, 8192, 5);
