@@ -19,3 +19,7 @@ The service binds to `127.0.0.1` (default port `4317`, configurable with `PORT`)
 HTTP routes: `GET /api/v1/health`, `GET /api/v1/harnesses`, `GET|POST /api/v1/sessions`, `GET /api/v1/sessions/:id`, `POST /api/v1/sessions/:id/inputs|cancel|stop|resume`. WebSocket events: `/api/v1/events` with optional `sessionId` filter. Exact schemas, bounds, errors, and event envelopes are specified in [API v1 contract](docs/contracts/surfaces/api-v1.md); lifecycle semantics are in [session lifecycle](docs/contracts/surfaces/session-lifecycle.md).
 
 No TLS, bearer authentication, Unix sockets, durable state, restart recovery, Claude, or client migration. Prompt bodies and stderr are never logged; uncertain inputs are not retried. See [ROADMAP.md](ROADMAP.md) and the [harnessd](docs/integration-harnessd.md) and [plasma-ai-assist](docs/integration-plasma-ai-assist.md) integration plans.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
