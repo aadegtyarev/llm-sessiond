@@ -5,6 +5,10 @@ import { persistFinalization } from "./finalization-store.js";
 export async function shutdownOwnedExecution(
   context: DurableManagerContext,
   id: string,
+  onStopped?: (
+    id: string,
+    execution: import("./lifecycle-execution.js").LifecycleExecution,
+  ) => void,
 ): Promise<boolean> {
   let pending = context.pending.get(id);
   const execution = context.owned.get(id);
@@ -32,10 +36,11 @@ export async function shutdownOwnedExecution(
           new Date().toISOString(),
         )
       )
-        return false;
+        throw new ControlPlaneError("STALE_OWNER");
       return false;
     }
     pending.stopRequired = false;
+    onStopped?.(id, execution);
   }
   const written = persistFinalization(
     context,
@@ -47,7 +52,7 @@ export async function shutdownOwnedExecution(
   if (!written) {
     context.owned.delete(id);
     context.pending.delete(id);
-    return true;
+    throw new ControlPlaneError("STALE_OWNER");
   }
   context.owned.delete(id);
   context.pending.delete(id);

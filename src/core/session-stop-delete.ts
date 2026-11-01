@@ -15,6 +15,9 @@ export async function stopSession(
   onStopping?: (
     execution: import("./lifecycle-execution.js").LifecycleExecution,
   ) => void,
+  onStopped?: (
+    execution: import("./lifecycle-execution.js").LifecycleExecution,
+  ) => void,
 ): Promise<void> {
   assertCurrentOwner(context);
   if (context.pending.has(id))
@@ -31,6 +34,7 @@ export async function stopSession(
   if (!execution) throw new ControlPlaneError("SESSION_UNAVAILABLE");
   onStopping?.(execution);
   const result = await boundedExecutionStop(context, execution);
+  if (result.stopped) onStopped?.(execution);
   const at = new Date().toISOString();
   const pending = {
     status: "stopped" as const,

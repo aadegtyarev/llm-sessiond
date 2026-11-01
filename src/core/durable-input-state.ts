@@ -59,10 +59,6 @@ export class DurableInputState {
   register(operation: InputOperation): void {
     this.ledger.register(operation);
   }
-  markAllStopping(executions: Map<string, LifecycleExecution>): void {
-    for (const [sessionId, execution] of executions)
-      this.markStopping(sessionId, execution);
-  }
   markStopping(sessionId: string, execution: LifecycleExecution): void {
     const source = this.source(sessionId, execution);
     if (source) this.ledger.markStopping(sessionId, source);

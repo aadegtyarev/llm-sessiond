@@ -5,6 +5,7 @@ import {
   type InputOperation,
 } from "./durable-input-state.js";
 import { InputRuntimeError } from "./input-runtime-error.js";
+import { dispatchAdmittedInput } from "./input-submit-dispatch.js";
 import { hasInputSubmitPort } from "./has-input-submit-port.js";
 import { validateInput } from "./input-validation.js";
 import { validateSessionId } from "./durable-validation.js";
@@ -87,12 +88,5 @@ export async function admitInput(
     stopInvalidated: false,
     executionEnded: false,
   };
-  state.register(operation);
-  let command: Promise<unknown>;
-  try {
-    command = Promise.resolve(execution.inputs!.submit({ inputId, ...input }));
-  } catch {
-    command = Promise.resolve({ kind: "uncertain" });
-  }
-  return { operation, command };
+  return dispatchAdmittedInput(context, state, operation, input);
 }

@@ -88,9 +88,6 @@ export class DurableSessionManager {
   }
   shutdownOwned(): Promise<void> {
     assertCurrentOwner(this.context);
-    this.inputState.markAllStopping(this.context.owned);
-    return shutdownOwnedSessions(this.context, this.locks, (id, execution) => {
-      this.inputState.confirmExecution(id, execution);
-    });
+    return shutdownOwnedSessions(this.context, this.locks);
   }
 }

@@ -15,11 +15,12 @@ export function stopManagedSession(
     assertCurrentOwner(context);
     if (row.status === "running" && !context.owned.has(id))
       throw new ControlPlaneError("SESSION_UNAVAILABLE");
-    const execution = context.owned.get(id);
-    await stopSession(context, id, (ownedExecution) =>
-      context.inputState.markStopping(id, ownedExecution),
+    await stopSession(
+      context,
+      id,
+      (execution) => context.inputState.markStopping(id, execution),
+      (execution) => context.inputState.confirmExecution(id, execution),
     );
-    if (execution) context.inputState.confirmExecution(id, execution);
     return DurableSessionManagerRead.get(context.store, id);
   });
 }
