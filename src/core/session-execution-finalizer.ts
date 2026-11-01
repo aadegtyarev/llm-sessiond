@@ -24,6 +24,8 @@ export async function finalizeExecutionFailure(
   };
   context.pending.set(row.id, pending);
   if (execution) context.owned.set(row.id, execution);
+  if (stopped && execution)
+    context.inputState.confirmExecution(row.id, execution);
   if (!stopped) {
     if (
       !persistFinalization(context, row.id, "uncertain", "OPERATION_FAILED", at)

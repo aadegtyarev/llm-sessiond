@@ -51,6 +51,7 @@ export async function createSession(
   try {
     execution = context.factory.create(adapter);
     context.owned.set(id, execution);
+    context.inputState.trackExecution(id, execution);
     result = await execution.launch({
       cwd: row.cwd,
       ...(row.adapterOptions !== undefined

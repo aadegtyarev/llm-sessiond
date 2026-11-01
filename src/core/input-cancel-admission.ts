@@ -3,6 +3,7 @@ import type { DurableManagerContext } from "./durable-manager-context.js";
 import type { InputOperation } from "./durable-input-state.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import {
+  assertCurrentOwner,
   requireCapability,
   resolveAdapter,
 } from "./session-lifecycle-support.js";
@@ -15,10 +16,21 @@ export async function admitInputCancel(
   operation?: InputOperation,
 ) {
   const row = DurableSessionManagerRead.get(context.store, sessionId);
+  assertCurrentOwner(context);
   const adapter = resolveAdapter(context.registry, row.harnessId);
   requireCapability(adapter, current ? "input.cancel-current" : "input.cancel");
   if (!operation || inputId !== operation.id)
     throw new ControlPlaneError("INPUT_NOT_CURRENT");
+  const source = context.inputState.source(sessionId, operation.execution);
+  if (
+    row.status !== "running" ||
+    context.owned.get(sessionId) !== operation.execution ||
+    !source ||
+    source !== operation.source ||
+    !source.live ||
+    !source.subscribed
+  )
+    throw new ControlPlaneError("SESSION_UNAVAILABLE");
   if (operation.state === "uncertain")
     throw new ControlPlaneError("INPUT_UNCERTAIN");
   if (operation.state !== "accepted") throw new ControlPlaneError("INPUT_BUSY");

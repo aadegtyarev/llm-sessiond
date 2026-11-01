@@ -58,6 +58,7 @@ export async function resumeSession(
   try {
     execution ??= context.factory.create(adapter);
     context.owned.set(id, execution);
+    context.inputState.trackExecution(id, execution);
     result = await execution.resume({
       cwd: row.cwd,
       ...(row.adapterOptions !== undefined

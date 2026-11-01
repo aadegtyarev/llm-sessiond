@@ -6,6 +6,7 @@ import type {
 import type { DurableSessionStore } from "./session-manager-store.js";
 import type { OwnerGeneration } from "../persistence/session-record.js";
 import type { PendingFinalization } from "./pending-finalization.js";
+import type { DurableInputState } from "./durable-input-state.js";
 export interface DurableManagerContext {
   store: DurableSessionStore;
   registry: HarnessRegistry;
@@ -14,4 +15,5 @@ export interface DurableManagerContext {
   owned: Map<string, LifecycleExecution>;
   pending: Map<string, PendingFinalization>;
   stopTimeoutMs: number;
+  inputState: DurableInputState;
 }

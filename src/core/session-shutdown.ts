@@ -5,11 +5,11 @@ import { persistFinalization } from "./finalization-store.js";
 export async function shutdownOwnedExecution(
   context: DurableManagerContext,
   id: string,
-): Promise<void> {
+): Promise<boolean> {
   let pending = context.pending.get(id);
   const execution = context.owned.get(id);
   if (!pending) {
-    if (!execution) return;
+    if (!execution) return true;
     pending = {
       status: "stopped",
       reason: null,
@@ -32,8 +32,8 @@ export async function shutdownOwnedExecution(
           new Date().toISOString(),
         )
       )
-        return;
-      return;
+        return false;
+      return false;
     }
     pending.stopRequired = false;
   }
@@ -47,8 +47,9 @@ export async function shutdownOwnedExecution(
   if (!written) {
     context.owned.delete(id);
     context.pending.delete(id);
-    return;
+    return true;
   }
   context.owned.delete(id);
   context.pending.delete(id);
+  return true;
 }

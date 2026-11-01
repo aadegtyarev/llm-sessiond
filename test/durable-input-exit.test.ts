@@ -23,7 +23,7 @@ describe("input execution termination", () => {
     await new Promise((resolve) => setImmediate(resolve));
     emit({ kind: "execution-ended" });
     accept({ kind: "accepted" });
-    await pending;
+    await expect(pending).rejects.toMatchObject({ code: "INPUT_UNCERTAIN" });
     expect(states).toEqual(["pending", "uncertain"]);
   });
 });

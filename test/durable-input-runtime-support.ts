@@ -1,12 +1,17 @@
-import type { LifecycleExecution } from "../src/core/lifecycle-execution.js";
+import type { ExecutionInputPort } from "../src/core/execution-input-port.js";
 import type { HarnessAdapter } from "../src/core/adapter-contracts.js";
 import { setup, synthetic } from "./durable-manager-support.js";
 
 export function configured(
-  inputs: NonNullable<LifecycleExecution["inputs"]>,
+  inputs: Pick<ExecutionInputPort, "submit" | "cancel"> &
+    Partial<Pick<ExecutionInputPort, "subscribe">>,
   ids = ["session-1", "input.custom"],
   inputTimeout = 5000,
   imageSupport = true,
+  onFactoryCreate?: () => void,
+  onStop?: () => void,
+  stopExecution?: () => Promise<void>,
+  stopTimeout = 25,
 ) {
   const inputCapabilities = [
     "input.submit",
@@ -24,21 +29,30 @@ export function configured(
       ],
     },
   };
+  const port = inputs as ExecutionInputPort;
+  port.subscribe ??= () => () => {};
   return setup({
     adapter,
     id: () => ids.shift() ?? "input.next",
     inputTimeout,
-    factory: () => ({
-      inputs,
-      launch: async () => ({
-        nativeSessionId: "native",
-        checkpoint: { namespace: "synthetic.audit", version: 3, data: {} },
-      }),
-      resume: async () => ({
-        nativeSessionId: "native",
-        checkpoint: { namespace: "synthetic.audit", version: 3, data: {} },
-      }),
-      stop: async () => {},
-    }),
+    timeout: stopTimeout,
+    factory: () => {
+      onFactoryCreate?.();
+      return {
+        inputs: port,
+        launch: async () => ({
+          nativeSessionId: "native",
+          checkpoint: { namespace: "synthetic.audit", version: 3, data: {} },
+        }),
+        resume: async () => ({
+          nativeSessionId: "native",
+          checkpoint: { namespace: "synthetic.audit", version: 3, data: {} },
+        }),
+        stop: async () => {
+          onStop?.();
+          await stopExecution?.();
+        },
+      };
+    },
   });
 }

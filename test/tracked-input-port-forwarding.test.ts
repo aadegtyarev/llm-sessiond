@@ -6,6 +6,7 @@ it("forwards optional input ports through tracked executions", () => {
   const port = {
     submit: async () => ({ kind: "accepted" as const }),
     cancel: async () => ({ kind: "accepted" as const }),
+    subscribe: () => () => {},
   };
   const tracker = new TrackedLifecycleFactory([
     {

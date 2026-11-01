@@ -4,14 +4,14 @@ import { configured } from "./durable-input-runtime-support.js";
 describe("durable input races", () => {
   it("does not reopen early terminal settlement when acknowledgement arrives late", async () => {
     let emit!: (event: unknown) => void;
-    let rejectAck!: (value: {
+    let resolveAck!: (value: {
       kind: "rejected";
       reason: "prompt_rejected";
     }) => void;
     const { manager } = configured({
       submit: async () =>
-        new Promise((_, reject) => {
-          rejectAck = reject;
+        new Promise((resolve) => {
+          resolveAck = resolve;
         }),
       cancel: async () => ({ kind: "accepted" }),
       subscribe: (listener) => {
@@ -25,10 +25,11 @@ describe("durable input races", () => {
     const pending = manager.inputs.submit(row.id, { text: "prompt" });
     await new Promise((resolve) => setImmediate(resolve));
     emit({ inputId: "input.custom", state: "completed" });
-    rejectAck({ kind: "rejected", reason: "prompt_rejected" });
-    await expect(pending).resolves.toEqual({
+    resolveAck({ kind: "rejected", reason: "prompt_rejected" });
+    await expect(pending).rejects.toMatchObject({
+      code: "INPUT_REJECTED",
       inputId: "input.custom",
-      resumed: false,
+      failureReason: "prompt_rejected",
     });
     expect(states).toEqual(["pending", "completed"]);
   });
@@ -74,7 +75,7 @@ describe("durable input races", () => {
     await new Promise((resolve) => setImmediate(resolve));
     await manager.stop(row.id);
     release({ kind: "accepted" });
-    await pending;
+    await expect(pending).rejects.toMatchObject({ code: "INPUT_UNCERTAIN" });
     expect(states).toEqual(["pending", "uncertain"]);
   });
 });

@@ -5,7 +5,8 @@ import { PerSessionLock } from "./per-session-lock.js";
 import { SafeSessionStore } from "./safe-session-store.js";
 import { resumeSession } from "./session-resume.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
-import { deleteSession, stopSession } from "./session-stop-delete.js";
+import { deleteSession } from "./session-stop-delete.js";
+import { stopManagedSession } from "./durable-manager-stop.js";
 import {
   assertCurrentOwner,
   resolveAdapter,
@@ -20,9 +21,11 @@ import type { DurableSessionStore } from "./session-manager-store.js";
 import { createManagedSession } from "./create-session-command.js";
 import { shutdownOwnedSessions } from "./shutdown-owned-sessions.js";
 import { DurableInputRuntime } from "./durable-input-runtime.js";
+import { DurableInputState } from "./durable-input-state.js";
 export type { DurableSessionStore } from "./session-manager-store.js";
 export class DurableSessionManager {
   private readonly context: DurableManagerContext;
+  private readonly inputState = new DurableInputState();
   readonly inputs: DurableInputRuntime;
   private readonly locks = new PerSessionLock();
   constructor(
@@ -42,6 +45,7 @@ export class DurableSessionManager {
       owned: new Map(),
       pending: new Map(),
       stopTimeoutMs,
+      inputState: this.inputState,
     };
     this.inputs = new DurableInputRuntime(
       this.context,
@@ -77,20 +81,16 @@ export class DurableSessionManager {
     return this.locks.run(id, async () => deleteSession(this.context, id));
   }
   stop(id: string): Promise<DurableSession> {
-    return this.locks.run(id, async () => {
-      this.inputs.markStopped(id);
-      await stopSession(this.context, id);
-      this.inputs.confirmStopped(id);
-      return this.get(id);
-    });
+    return stopManagedSession(this.context, this.locks, id);
   }
   resume(id: string): Promise<DurableSession> {
     return this.locks.run(id, () => resumeSession(this.context, id));
   }
   shutdownOwned(): Promise<void> {
-    this.inputs.markAllStopped();
-    return shutdownOwnedSessions(this.context, this.locks).then(() => {
-      this.inputs.confirmAllStopped();
+    assertCurrentOwner(this.context);
+    this.inputState.markAllStopping(this.context.owned);
+    return shutdownOwnedSessions(this.context, this.locks, (id, execution) => {
+      this.inputState.confirmExecution(id, execution);
     });
   }
 }

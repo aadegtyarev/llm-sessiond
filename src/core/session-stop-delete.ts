@@ -12,6 +12,9 @@ import { persistFinalization } from "./finalization-store.js";
 export async function stopSession(
   context: DurableManagerContext,
   id: string,
+  onStopping?: (
+    execution: import("./lifecycle-execution.js").LifecycleExecution,
+  ) => void,
 ): Promise<void> {
   assertCurrentOwner(context);
   if (context.pending.has(id))
@@ -26,6 +29,7 @@ export async function stopSession(
   requireCapability(adapter, "harness.stop");
   const execution = context.owned.get(id);
   if (!execution) throw new ControlPlaneError("SESSION_UNAVAILABLE");
+  onStopping?.(execution);
   const result = await boundedExecutionStop(context, execution);
   const at = new Date().toISOString();
   const pending = {

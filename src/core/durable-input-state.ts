@@ -3,98 +3,81 @@ import type {
   InputCommandOutcome,
   InputFailureReason,
 } from "./execution-input-port.js";
-import { subscribeInputEvents } from "./input-event-settlement.js";
+import type { ManagedInputEvent } from "./input-runtime-events.js";
 import {
-  InputEventObservers,
-  type ManagedInputEvent,
-} from "./input-runtime-events.js";
-export type RecordState = "pending" | "accepted" | "uncertain" | "canceling";
+  ExecutionInputSources,
+  type ExecutionInputSource,
+} from "./execution-input-source.js";
+import { InputOperationLedger } from "./input-operation-ledger.js";
+
+export type InputRecordState =
+  "pending" | "accepted" | "uncertain" | "canceling";
 export interface InputOperation {
   id: string;
   sessionId: string;
   execution: LifecycleExecution;
-  state: RecordState;
-  unsubscribe: (() => void) | undefined;
+  source: ExecutionInputSource;
+  state: InputRecordState;
+  resumed: boolean;
+  terminal?: "completed" | "failed" | "stopped";
+  failureReason?: InputFailureReason | undefined;
+  stopInvalidated: boolean;
+  executionEnded: boolean;
 }
 export class DurableInputState {
-  private readonly active = new Map<string, InputOperation>();
-  private readonly ids = new Set<string>();
-  private readonly events = new InputEventObservers();
+  private readonly ledger = new InputOperationLedger();
+  private readonly sources = new ExecutionInputSources((source, event) =>
+    this.ledger.receive(source, event),
+  );
   subscribe(listener: (event: ManagedInputEvent) => void): () => void {
-    return this.events.subscribe(listener);
+    return this.ledger.subscribe(listener);
+  }
+  trackExecution(
+    sessionId: string,
+    execution: LifecycleExecution,
+  ): ExecutionInputSource {
+    return this.sources.track(sessionId, execution);
+  }
+  source(
+    sessionId: string,
+    execution: LifecycleExecution,
+  ): ExecutionInputSource | undefined {
+    return this.sources.get(sessionId, execution);
+  }
+  sourceIsCurrent(source: ExecutionInputSource): boolean {
+    return this.sources.isCurrent(source);
   }
   reserve(id: string): boolean {
-    if (this.ids.has(id)) return false;
-    this.ids.add(id);
-    return true;
+    return this.ledger.reserve(id);
   }
   current(sessionId: string): InputOperation | undefined {
-    return this.active.get(sessionId);
+    return this.ledger.current(sessionId);
   }
   isCurrent(operation: InputOperation): boolean {
-    return this.active.get(operation.sessionId) === operation;
+    return this.ledger.isCurrent(operation);
   }
   register(operation: InputOperation): void {
-    this.active.set(operation.sessionId, operation);
-    operation.unsubscribe = subscribeInputEvents(
-      operation,
-      operation.execution.inputs?.subscribe,
-      (source) => this.isCurrent(source),
-      (state, reason) => this.transition(operation, state, reason),
-    );
-    this.publish(operation, "pending");
+    this.ledger.register(operation);
   }
-  markStopped(sessionId: string): void {
-    const item = this.current(sessionId);
-    if (item) this.transition(item, "uncertain");
+  markAllStopping(executions: Map<string, LifecycleExecution>): void {
+    for (const [sessionId, execution] of executions)
+      this.markStopping(sessionId, execution);
   }
-  markAllStopped(): void {
-    for (const id of this.active.keys()) this.markStopped(id);
+  markStopping(sessionId: string, execution: LifecycleExecution): void {
+    const source = this.source(sessionId, execution);
+    if (source) this.ledger.markStopping(sessionId, source);
   }
-  confirmStopped(sessionId: string): void {
-    const item = this.current(sessionId);
-    if (item?.state === "uncertain") {
-      item.unsubscribe?.();
-      this.active.delete(sessionId);
-    }
-  }
-  confirmAllStopped(): void {
-    for (const id of this.active.keys()) this.confirmStopped(id);
+  confirmExecution(sessionId: string, execution: LifecycleExecution): boolean {
+    const source = this.source(sessionId, execution);
+    if (!source) return false;
+    this.ledger.confirmExecution(sessionId, source);
+    this.sources.close(source);
+    return true;
   }
   settleCommand(operation: InputOperation, outcome: InputCommandOutcome): void {
-    if (outcome.kind === "accepted" && operation.state === "pending") {
-      operation.state = "accepted";
-      this.publish(operation, "accepted");
-    } else if (outcome.kind === "uncertain")
-      this.transition(operation, "uncertain");
-    else if (outcome.kind === "rejected")
-      this.transition(operation, "failed", outcome.reason);
+    this.ledger.settleCommand(operation, outcome);
   }
-  private transition(
-    operation: InputOperation,
-    state: ManagedInputEvent["state"],
-    reason?: InputFailureReason,
-  ): void {
-    if (!this.isCurrent(operation)) return;
-    if (state === "uncertain" && operation.state === "uncertain") return;
-    if (state === "accepted") operation.state = "accepted";
-    else if (state === "uncertain") operation.state = "uncertain";
-    else {
-      operation.unsubscribe?.();
-      this.active.delete(operation.sessionId);
-    }
-    this.publish(operation, state, reason);
-  }
-  private publish(
-    operation: InputOperation,
-    state: ManagedInputEvent["state"],
-    reason?: InputFailureReason,
-  ): void {
-    this.events.publish({
-      sessionId: operation.sessionId,
-      inputId: operation.id,
-      state,
-      ...(reason ? { reason } : {}),
-    });
+  settleCancel(operation: InputOperation, outcome: InputCommandOutcome): void {
+    this.ledger.settleCancel(operation, outcome);
   }
 }

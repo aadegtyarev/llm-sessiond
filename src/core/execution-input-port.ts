@@ -20,5 +20,5 @@ export interface ExecutionInputPort {
     images?: InputImage[];
   }): Promise<InputCommandOutcome>;
   cancel(inputId: string): Promise<InputCommandOutcome>;
-  subscribe?(listener: (event: unknown) => void): () => void;
+  subscribe(listener: (event: unknown) => void): () => void;
 }
