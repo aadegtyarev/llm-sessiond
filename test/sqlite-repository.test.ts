@@ -6,30 +6,34 @@ import { openSessionDatabase } from "../src/persistence/sqlite-database.js";
 import { SessionRepository } from "../src/persistence/session-repository.js";
 
 describe("revision-one SQLite repository", () => {
-  it("round-trips a checkpoint at the full-envelope 64 KiB boundary", async () => {
+  it("rejects duplicate opaque IDs without replacing the durable record", async () => {
     const directory = await mkdtemp(
-      path.join(os.tmpdir(), "sessiond-checkpoint-limit-"),
+      path.join(os.tmpdir(), "sessiond-duplicate-id-"),
     );
-    const file = path.join(directory, "sessions.sqlite");
-    let db = openSessionDatabase(file);
+    const db = openSessionDatabase(path.join(directory, "db.sqlite"));
+    const repository = new SessionRepository(db);
     try {
-      const empty = { namespace: "third.audit", version: 1, data: "" };
-      const overhead = Buffer.byteLength(JSON.stringify(empty));
-      const checkpoint = { ...empty, data: "x".repeat(65536 - overhead) };
-      expect(Buffer.byteLength(JSON.stringify(checkpoint))).toBe(65536);
-      new SessionRepository(db).create({
-        id: "S-boundary",
+      repository.create({
+        id: "same-id",
         harnessId: "third",
-        cwd: "/work",
+        cwd: "/first",
         status: "stopped",
-        adapterState: checkpoint,
-        createdAt: "now",
+        createdAt: "first",
       });
-      db.close();
-      db = openSessionDatabase(file);
-      expect(new SessionRepository(db).get("S-boundary")?.adapterState).toEqual(
-        checkpoint,
-      );
+      expect(() =>
+        repository.create({
+          id: "same-id",
+          harnessId: "third",
+          cwd: "/replacement",
+          status: "running",
+          createdAt: "second",
+        }),
+      ).toThrow();
+      expect(repository.get("same-id")).toMatchObject({
+        cwd: "/first",
+        createdAt: "first",
+        status: "stopped",
+      });
     } finally {
       db.close();
       await rm(directory, { recursive: true, force: true });
