@@ -40,11 +40,15 @@ export async function prepareStateDirectory(
   const finalPath = await fs.lstat(directory);
   assertDirectory(finalPath, getuid);
   const canonical = await fs.realpath(directory);
+  assertDirectory(await fs.lstat(directory), getuid);
   assertDirectory(await fs.lstat(canonical), getuid);
   if (platform !== "win32") {
     await fs.chmod(canonical, 0o700);
     const linkInfo = await fs.lstat(canonical);
     assertDirectory(linkInfo, getuid);
+    assertDirectory(await fs.lstat(directory), getuid);
+    if ((await fs.realpath(directory)) !== canonical)
+      throw new SafeValidationError("STATE_DIRECTORY_CHANGED");
     const verified = await fs.stat(canonical);
     assertDirectory(verified, getuid);
     if ((verified.mode & 0o077) !== 0)

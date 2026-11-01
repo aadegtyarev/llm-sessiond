@@ -40,6 +40,14 @@ describe("durable record read boundary", () => {
       expect(() => new SessionRepository(db).get("S1")).toThrow(
         "CORRUPT_SESSION_RECORD",
       );
+      db.prepare("UPDATE sessions SET adapter_state=?").run(
+        `${" ".repeat(65537)}{"namespace":"third.audit","version":1,"data":{}}`,
+      );
+      db.close();
+      db = openSessionDatabase(file);
+      expect(() => new SessionRepository(db).get("S1")).toThrow(
+        "CORRUPT_SESSION_RECORD",
+      );
     } finally {
       db.close();
       await rm(dir, { recursive: true, force: true });

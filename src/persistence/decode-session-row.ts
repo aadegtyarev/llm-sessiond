@@ -1,5 +1,5 @@
 import {
-  validateCheckpointEnvelope,
+  decodeCheckpointEnvelope,
   validateHarnessId,
   validateSessionId,
 } from "../core/durable-validation.js";
@@ -67,13 +67,9 @@ function parseJsonText(value: unknown): unknown {
   }
 }
 function parseCheckpoint(value: unknown): AdapterCheckpoint {
-  if (typeof value !== "string" || Buffer.byteLength(value) > 65536)
-    throw new SafeValidationError("CORRUPT_SESSION_RECORD");
-  const parsed = parseJsonText(value);
   try {
-    validateCheckpointEnvelope(parsed);
+    return decodeCheckpointEnvelope(value);
   } catch {
     throw new SafeValidationError("CORRUPT_SESSION_RECORD");
   }
-  return parsed;
 }
