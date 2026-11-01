@@ -12,14 +12,33 @@ describe("checkpoint owner generation", () => {
     const db = openSessionDatabase(path.join(dir, "db.sqlite"));
     try {
       const repository = new SessionRepository(db);
-      repository.create({ id: "s1", harnessId: "third", cwd: "/work", status: "stopped", createdAt: "now" });
+      repository.create({
+        id: "s1",
+        harnessId: "third",
+        cwd: "/work",
+        status: "stopped",
+        createdAt: "now",
+      });
       const first = await OwnedStoreLease.acquire(dir, db);
       const oldGeneration = first.generation;
       await first.release();
       const second = await OwnedStoreLease.acquire(dir, db);
-      expect(() => repository.updateCheckpoint("s1", { namespace: "third.audit", version: 1, data: {} }, oldGeneration)).toThrow("STALE_OWNER_GENERATION");
-      repository.updateCheckpoint("s1", { namespace: "third.audit", version: 1, data: {} }, second.generation);
+      expect(() =>
+        repository.updateCheckpoint(
+          "s1",
+          { namespace: "third.audit", version: 1, data: {} },
+          oldGeneration,
+        ),
+      ).toThrow("STALE_OWNER_GENERATION");
+      repository.updateCheckpoint(
+        "s1",
+        { namespace: "third.audit", version: 1, data: {} },
+        second.generation,
+      );
       await second.release();
-    } finally { db.close(); await rm(dir, { recursive: true, force: true }); }
+    } finally {
+      db.close();
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

@@ -16,24 +16,80 @@ describe("deterministic startup reconciliation", () => {
     const adapter = {
       descriptor: { id: "synthetic", aliases: [], capabilities: [] },
       checkpoint: { namespace: "synthetic.state", version: 2 },
-      validateCheckpoint: (value) => !!value && typeof value === "object" && !Array.isArray(value),
+      validateCheckpoint: (value) =>
+        !!value && typeof value === "object" && !Array.isArray(value),
       isResumable: () => true,
-      launch: () => executions++, resume: () => executions++,
+      launch: () => executions++,
+      resume: () => executions++,
     } as HarnessAdapter & { launch: () => number; resume: () => number };
     try {
       const repo = new SessionRepository(db);
-      repo.create({ id: "running", harnessId: "synthetic", cwd: "/w", status: "running", createdAt: "1" });
-      repo.create({ id: "starting", harnessId: "synthetic", cwd: "/w", status: "starting", createdAt: "2" });
-      repo.create({ id: "failed-resumable", harnessId: "synthetic", cwd: "/w", status: "failed", failureReason: "exit", failedAt: "now", adapterState: { namespace: "synthetic.state", version: 2, data: {} }, createdAt: "3" });
-      repo.create({ id: "failed-unknown-version", harnessId: "synthetic", cwd: "/w", status: "failed", adapterState: { namespace: "synthetic.state", version: 9, data: {} }, createdAt: "4" });
-      repo.create({ id: "missing-adapter", harnessId: "absent", cwd: "/w", status: "failed", createdAt: "5" });
+      repo.create({
+        id: "running",
+        harnessId: "synthetic",
+        cwd: "/w",
+        status: "running",
+        createdAt: "1",
+      });
+      repo.create({
+        id: "starting",
+        harnessId: "synthetic",
+        cwd: "/w",
+        status: "starting",
+        createdAt: "2",
+      });
+      repo.create({
+        id: "failed-resumable",
+        harnessId: "synthetic",
+        cwd: "/w",
+        status: "failed",
+        failureReason: "exit",
+        failedAt: "now",
+        adapterState: { namespace: "synthetic.state", version: 2, data: {} },
+        createdAt: "3",
+      });
+      repo.create({
+        id: "failed-unknown-version",
+        harnessId: "synthetic",
+        cwd: "/w",
+        status: "failed",
+        adapterState: { namespace: "synthetic.state", version: 9, data: {} },
+        createdAt: "4",
+      });
+      repo.create({
+        id: "failed-unknown-namespace",
+        harnessId: "synthetic",
+        cwd: "/w",
+        status: "failed",
+        adapterState: { namespace: "other.state", version: 2, data: {} },
+        createdAt: "5",
+      });
+      repo.create({
+        id: "missing-adapter",
+        harnessId: "absent",
+        cwd: "/w",
+        status: "failed",
+        createdAt: "6",
+      });
       const report = reconcileStartup(repo, new HarnessRegistry([adapter]));
       expect(repo.get("running")?.status).toBe("stopped");
       expect(repo.get("starting")?.status).toBe("stopped");
-      expect(repo.get("failed-resumable")).toMatchObject({ status: "stopped", failureReason: "exit", failedAt: "now" });
+      expect(repo.get("failed-resumable")).toMatchObject({
+        status: "stopped",
+        failureReason: "exit",
+        failedAt: "now",
+      });
       expect(repo.get("failed-unknown-version")?.status).toBe("failed");
-      expect(report.preserved.map((item) => item.reason)).toEqual(["UNKNOWN_CHECKPOINT_VERSION", "UNKNOWN_ADAPTER"]);
+      expect(repo.get("failed-unknown-namespace")?.status).toBe("failed");
+      expect(report.preserved.map((item) => item.reason)).toEqual([
+        "UNKNOWN_CHECKPOINT_VERSION",
+        "UNKNOWN_CHECKPOINT_NAMESPACE",
+        "UNKNOWN_ADAPTER",
+      ]);
       expect(executions).toBe(0);
-    } finally { db.close(); await rm(dir, { recursive: true, force: true }); }
+    } finally {
+      db.close();
+      await rm(dir, { recursive: true, force: true });
+    }
   });
 });

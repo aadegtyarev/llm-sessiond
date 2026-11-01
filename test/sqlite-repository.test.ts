@@ -11,16 +11,37 @@ describe("revision-one SQLite repository", () => {
     try {
       const file = path.join(directory, "sessions.sqlite");
       let db = openSessionDatabase(file);
-      expect(db.prepare("PRAGMA journal_mode").get()).toMatchObject({ journal_mode: "wal" });
+      expect(db.prepare("PRAGMA journal_mode").get()).toMatchObject({
+        journal_mode: "wal",
+      });
       const repository = new SessionRepository(db);
-      repository.create({ id: "Opaque.Id-01", harnessId: "third-harness", cwd: "/work", status: "running", adapterOptions: { layout: "wide" }, adapterState: { namespace: "third-harness.audit", version: 3, data: { cursor: 12 } }, createdAt: "2026-01-01T00:00:00Z" });
+      repository.create({
+        id: "Opaque.Id-01",
+        harnessId: "third-harness",
+        cwd: "/work",
+        status: "running",
+        adapterOptions: { layout: "wide" },
+        adapterState: {
+          namespace: "third-harness.audit",
+          version: 3,
+          data: { cursor: 12 },
+        },
+        createdAt: "2026-01-01T00:00:00Z",
+      });
       repository.rename("Opaque.Id-01", "renamed");
       repository.setStatus("Opaque.Id-01", "stopped");
       db.close();
       db = openSessionDatabase(file);
-      expect(new SessionRepository(db).get("Opaque.Id-01")).toMatchObject({ id: "Opaque.Id-01", name: "renamed", status: "stopped", adapterState: { version: 3, data: { cursor: 12 } } });
+      expect(new SessionRepository(db).get("Opaque.Id-01")).toMatchObject({
+        id: "Opaque.Id-01",
+        name: "renamed",
+        status: "stopped",
+        adapterState: { version: 3, data: { cursor: 12 } },
+      });
       expect(new SessionRepository(db).list()).toHaveLength(1);
       db.close();
-    } finally { await rm(directory, { recursive: true, force: true }); }
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 });
