@@ -1,9 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { createPiDurableRuntime } from "../src/harness/pi-durable-runtime.js";
+import { createPiTestManager } from "./pi-durable-manager-support.js";
 import type { ProcessProvider } from "../src/core/ports.js";
-import { MemoryStore } from "./durable-memory-store.js";
 import { fixture, tempDir } from "./helpers.js";
 
 describe("Pi early settlement ordering", () => {
@@ -17,20 +16,19 @@ describe("Pi early settlement ordering", () => {
           stdio: ["pipe", "pipe", "ignore"],
         }),
     };
-    const runtime = createPiDurableRuntime({
-      store: new MemoryStore(),
-      owner: { token: "test-owner", generation: 1 },
+    const manager = createPiTestManager(
       provider,
-      id: () => `opaque-${++sequence}`,
-    });
+      () => `opaque-${++sequence}`,
+      10,
+    );
     try {
-      const session = await runtime.manager.create({ cwd });
+      const session = await manager.create({ cwd });
       const events: Array<{ inputId: string; state: string }> = [];
       let completeFirst!: () => void;
       const firstCompleted = new Promise<void>((resolve) => {
         completeFirst = resolve;
       });
-      runtime.manager.inputs.subscribe((event) => {
+      manager.inputs.subscribe((event) => {
         if ("inputId" in event)
           events.push({ inputId: event.inputId, state: event.state });
         if (
@@ -40,21 +38,23 @@ describe("Pi early settlement ordering", () => {
         )
           completeFirst();
       });
-      let firstResolved = false;
-      const first = runtime.manager.inputs
+      const first = manager.inputs
         .submit(session.id, { text: "settle-delay-ack" })
-        .then((value) => {
-          firstResolved = true;
-          return value;
-        });
+        .then(
+          (value) => ({ value }),
+          (error: unknown) => ({ error }),
+        );
+      expect(await first).toMatchObject({ error: { code: "INPUT_UNCERTAIN" } });
       await firstCompleted;
-      const second = await runtime.manager.inputs.submit(session.id, {
+      const second = await manager.inputs.submit(session.id, {
         text: "hold",
       });
       expect(second.inputId).toBe("opaque-3");
-      expect(firstResolved).toBe(false);
+      await expect(readFile(`${cwd}/late-ack`, "utf8")).rejects.toMatchObject({
+        code: "ENOENT",
+      });
       await new Promise((resolve) => setTimeout(resolve, 350));
-      expect(await first).toEqual({ inputId: "opaque-2", resumed: false });
+      expect(await readFile(`${cwd}/late-ack`, "utf8")).toBe("sent");
       expect(events).not.toContainEqual({
         inputId: "opaque-2",
         state: "accepted",
@@ -65,9 +65,9 @@ describe("Pi early settlement ordering", () => {
         state: "completed",
       });
       expect(await readFile(`${cwd}/prompt-count`, "utf8")).toBe("11");
-      await runtime.manager.stop(session.id);
+      await manager.stop(session.id);
     } finally {
-      await runtime.shutdown();
+      await manager.shutdownOwned();
     }
   });
 });

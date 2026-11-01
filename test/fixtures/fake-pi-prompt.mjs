@@ -39,18 +39,19 @@ export function handleFakePrompt(command, state) {
     return;
   }
   if (command.message === "settle-delay-ack") {
-    state.write({ type: "agent_settled" });
-    state.setPendingAck({
+    const response = {
       type: "response",
       id: command.id,
       command: "prompt",
       success: true,
       data: {},
-    });
-    const response = state.getPendingAck();
+    };
+    state.setPendingAck(response);
+    setTimeout(() => state.write({ type: "agent_settled" }), 75);
     setTimeout(() => {
       if (state.getPendingAck() === response) {
         state.setPendingAck(undefined);
+        appendFileSync(`${process.cwd()}/late-ack`, "sent");
         state.write(response);
       }
     }, 250);
