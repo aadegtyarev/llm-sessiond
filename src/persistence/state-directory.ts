@@ -1,4 +1,3 @@
-import { chmod, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { SafeValidationError } from "../core/generic-json.js";
@@ -23,9 +22,4 @@ export function resolveStateDirectory(
   if (!path.isAbsolute(selected))
     throw new SafeValidationError("INVALID_STATE_DIRECTORY");
   return path.resolve(selected);
-}
-export async function prepareStateDirectory(directory: string): Promise<void> {
-  await mkdir(directory, { recursive: true, mode: 0o700 });
-  if (process.platform !== "win32")
-    await chmod(directory, 0o700).catch(() => undefined);
 }
