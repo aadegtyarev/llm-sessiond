@@ -20,6 +20,16 @@ export function connectSessionEvents(
     }
     if (type === "session.error") {
       record.status = "failed";
+      record.runtimeGeneration++;
+      record.pendingSubmit = undefined;
+      if (record.currentInput) {
+        events.publish(record.id, "input.state", {
+          inputId: record.currentInput,
+          state: "uncertain",
+          reason: "session failed before input completion",
+        });
+        record.currentInput = undefined;
+      }
       record.failure = {
         code: String(data.code),
         at: new Date().toISOString(),
@@ -35,7 +45,11 @@ export function connectSessionEvents(
       record.status = "uncertain";
       publishStatus(record);
     }
-    if (type === "input.state" && data.state === "completed")
+    if (
+      type === "input.state" &&
+      (data.state === "completed" || data.state === "failed") &&
+      data.inputId === record.currentInput
+    )
       record.currentInput = undefined;
     if (type === "turn.completed" && record.status === "uncertain") {
       record.status = "running";

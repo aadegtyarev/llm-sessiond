@@ -41,7 +41,7 @@ describe("API bounds", () => {
       await closeApi(server, service);
     }
   });
-  it("rejects noncanonical base64 padding bits", async () => {
+  it.each(["AB==", "AAB="])("rejects noncanonical base64 %s", async (data) => {
     const { service, server, base } = await startApi();
     try {
       const made = await json(
@@ -53,7 +53,7 @@ describe("API bounds", () => {
       const id = String((made.session as Record<string, unknown>).id);
       const response = await postJson(base, `/api/v1/sessions/${id}/inputs`, {
         text: "",
-        images: [{ mimeType: "image/png", data: "AB==" }],
+        images: [{ mimeType: "image/png", data }],
       });
       expect(response.status).toBe(400);
       expect(await json(response)).toMatchObject({

@@ -14,6 +14,9 @@ export function handleFakeAbort(command, mode, held, setHeld, write) {
   if (mode === "abort-delay-settle") {
     ack(true);
     setTimeout(settle, 100);
+  } else if (mode === "abort-settle-before-ack") {
+    setTimeout(settle, 10);
+    setTimeout(() => ack(true), 30);
   } else if (mode === "abort-settle-before-reject") {
     setTimeout(settle, 10);
     setTimeout(() => ack(false), 30);

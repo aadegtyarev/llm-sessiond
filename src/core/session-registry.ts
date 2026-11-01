@@ -4,8 +4,7 @@ import type { SessionRecord } from "./types.js";
 import type { EventBus } from "./event-bus.js";
 import { ApiError } from "./api-error.js";
 import { assertValidCwd } from "./cwd-validator.js";
-import { connectSessionEvents } from "./session-runtime-events.js";
-import { watchSessionExit } from "./session-exit.js";
+import { startSession } from "./session-start.js";
 
 export class SessionRegistry {
   readonly sessions = new Map<string, SessionRecord>();
@@ -37,30 +36,14 @@ export class SessionRegistry {
     return record;
   }
   async start(record: SessionRecord, nativeId?: string): Promise<void> {
-    const generation = ++record.runtimeGeneration;
-    const runtime = await this.adapter.launch(record, nativeId);
-    if (generation !== record.runtimeGeneration) {
-      await runtime.stop();
-      return;
-    }
-    this.runtimes.set(record.id, runtime);
-    record.child = runtime.child;
-    record.nativeSessionId = runtime.nativeSessionId;
-    record.status = "running";
-    this.status(record);
-    connectSessionEvents(
+    return startSession(
+      this.adapter,
       record,
-      runtime,
+      this.runtimes,
       this.events,
       (session) => this.status(session),
-      () => record.runtimeGeneration === generation,
-    );
-    watchSessionExit(
-      record,
-      runtime,
-      generation,
       (session) => this.publishInterruptedInput(session),
-      (session) => this.status(session),
+      nativeId,
     );
   }
   get(id: string): SessionRecord {
