@@ -15,8 +15,8 @@ const adapter: HarnessAdapter = {
   migrateCheckpoint: (from, data) =>
     from === 1 ? { namespace: "synthetic.audit", version: 3, data } : undefined,
 };
-describe("versioned adapter payloads", () => {
-  it("migrates checkpoints and extensions through registered hooks", () => {
+describe("versioned adapter checkpoints", () => {
+  it("migrates checkpoints through the registered adapter hook", () => {
     expect(
       validateCheckpoint(
         { namespace: "synthetic.audit", version: 1, data: {} },

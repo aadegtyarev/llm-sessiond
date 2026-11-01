@@ -12,12 +12,8 @@ export class HarnessRegistry {
     readonly defaultId?: string,
   ) {
     for (const adapter of adapters) this.register(adapter);
-    if (
-      defaultId &&
-      !this.adapters.has(this.resolve(defaultId).descriptor.id)
-    ) {
+    if (defaultId !== undefined && !this.aliases.has(defaultId))
       throw new SafeValidationError("UNKNOWN_DEFAULT_ADAPTER");
-    }
   }
   register(adapter: HarnessAdapter): void {
     const descriptor = descriptorSchema.safeParse(adapter.descriptor);

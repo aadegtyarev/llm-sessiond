@@ -20,7 +20,7 @@
           { "name": "inspect", "effect": "read", "guardRequired": false },
           { "name": "apply", "effect": "write", "guardRequired": true }
         ],
-        "events": ["audit.finished"]
+        "events": ["audit.finished", "audit.started"]
       }
     ]
   },

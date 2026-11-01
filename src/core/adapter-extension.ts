@@ -8,8 +8,10 @@ export function validateExtensionPayload(
   version: number,
   kind: "request" | "result" | "event",
   name: string,
-  value: JsonValue,
+  value: unknown,
 ): { version: number; value: JsonValue } {
+  if (!Number.isSafeInteger(version) || version < 1)
+    throw new SafeValidationError("UNKNOWN_EXTENSION_VERSION");
   validateJson(value, 65536, 20);
   const descriptor = adapter.descriptor.extensions?.find(
     (entry) => entry.namespace === namespace,
@@ -26,12 +28,17 @@ export function validateExtensionPayload(
       throw new SafeValidationError("UNKNOWN_EXTENSION_VERSION");
     let migrated: { version: number; value: JsonValue } | undefined;
     try {
-      migrated = adapter.migrateExtension(namespace, version, kind, value);
+      migrated = adapter.migrateExtension(
+        namespace,
+        version,
+        kind,
+        name,
+        value,
+      );
     } catch {
       throw new SafeValidationError("EXTENSION_MIGRATION_FAILED");
     }
-    if (!migrated || migrated.version !== descriptor.version)
-      throw new SafeValidationError("EXTENSION_MIGRATION_FAILED");
+    validateMigrationEnvelope(migrated, descriptor.version);
     current = migrated;
   }
   let valid = false;
@@ -41,6 +48,7 @@ export function validateExtensionPayload(
         namespace,
         current.version,
         kind,
+        name,
         current.value,
       ) ?? false;
   } catch {
@@ -48,4 +56,19 @@ export function validateExtensionPayload(
   }
   if (!valid) throw new SafeValidationError("INVALID_EXTENSION_PAYLOAD");
   return current;
+}
+function validateMigrationEnvelope(
+  value: unknown,
+  expectedVersion: number,
+): asserts value is { version: number; value: JsonValue } {
+  if (!value || typeof value !== "object" || Array.isArray(value))
+    throw new SafeValidationError("EXTENSION_MIGRATION_FAILED");
+  validateJson(value, 65536, 20);
+  const row = value as Record<string, unknown>;
+  if (
+    Object.keys(row).sort().join(",") !== "value,version" ||
+    !Number.isSafeInteger(row.version) ||
+    row.version !== expectedVersion
+  )
+    throw new SafeValidationError("EXTENSION_MIGRATION_FAILED");
 }

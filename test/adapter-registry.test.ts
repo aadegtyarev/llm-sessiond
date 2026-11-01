@@ -47,6 +47,15 @@ describe("generic adapter registry", () => {
       namespaced,
     );
   });
+  it("rejects empty and unknown configured defaults at construction", async () => {
+    const adapter = await adapterFromFixture();
+    expect(() => new HarnessRegistry([adapter], "")).toThrow(
+      "UNKNOWN_DEFAULT_ADAPTER",
+    );
+    expect(() => new HarnessRegistry([adapter], "missing")).toThrow(
+      "UNKNOWN_DEFAULT_ADAPTER",
+    );
+  });
   it("rejects duplicate IDs, alias collisions, and malformed fixture descriptors", async () => {
     const adapter = await adapterFromFixture();
     expect(() => new HarnessRegistry([adapter, adapter])).toThrow(

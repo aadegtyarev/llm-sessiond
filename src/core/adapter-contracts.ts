@@ -60,12 +60,14 @@ export interface HarnessAdapter {
     namespace: string,
     version: number,
     kind: "request" | "result" | "event",
+    name: string,
     value: JsonValue,
   ): boolean;
   migrateExtension?(
     namespace: string,
     from: number,
     kind: "request" | "result" | "event",
+    name: string,
     value: JsonValue,
   ): { version: number; value: JsonValue } | undefined;
 }
