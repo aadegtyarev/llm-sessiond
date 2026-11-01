@@ -19,6 +19,12 @@ describe("checkpoint owner generation", () => {
         harnessId: "third",
         cwd: "/work",
         status: "stopped",
+        nativeSessionId: "before-native",
+        adapterState: {
+          namespace: "third.audit",
+          version: 1,
+          data: { before: true },
+        },
         createdAt: "now",
       });
       const first = await OwnedStoreLease.acquire(dir, db);
@@ -40,7 +46,10 @@ describe("checkpoint owner generation", () => {
           oldGeneration,
         ),
       ).toThrow("STALE_OWNER_GENERATION");
-      expect(repository.get("s1")?.nativeSessionId).toBeUndefined();
+      expect(repository.get("s1")?.nativeSessionId).toBe("before-native");
+      expect(repository.get("s1")?.adapterState?.data).toEqual({
+        before: true,
+      });
       repository.updateExecution(
         "s1",
         "native",
@@ -59,6 +68,25 @@ describe("checkpoint owner generation", () => {
           second.generation,
         ),
       ).toThrow("SESSION_NOT_FOUND");
+      repository.updateExecution(
+        "s1",
+        undefined,
+        { namespace: "third.audit", version: 1, data: { keep: true } },
+        second.generation,
+      );
+      expect(repository.get("s1")?.nativeSessionId).toBeUndefined();
+      expect(repository.get("s1")?.adapterState?.data).toEqual({ keep: true });
+      repository.updateExecution(
+        "s1",
+        "keep-native",
+        undefined,
+        second.generation,
+      );
+      expect(repository.get("s1")?.nativeSessionId).toBe("keep-native");
+      expect(repository.get("s1")?.adapterState).toBeUndefined();
+      repository.updateExecution("s1", undefined, undefined, second.generation);
+      expect(repository.get("s1")?.nativeSessionId).toBeUndefined();
+      expect(repository.get("s1")?.adapterState).toBeUndefined();
       await second.release();
     } finally {
       db.close();

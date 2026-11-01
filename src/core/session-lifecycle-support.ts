@@ -26,15 +26,6 @@ export function requireCapability(
   if (!adapter.descriptor.capabilities.includes(name))
     throw new ControlPlaneError("UNSUPPORTED_CAPABILITY");
 }
-export function markFailed(
-  context: DurableManagerContext,
-  id: string,
-  code: string,
-): void {
-  assertCurrentOwner(context);
-  context.owned.delete(id);
-  context.store.setStatus(id, "failed", code, new Date().toISOString());
-}
 export function checkedCheckpoint(
   adapter: HarnessAdapter,
   value: DurableSession["adapterState"],

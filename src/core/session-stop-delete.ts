@@ -1,4 +1,5 @@
 import { ControlPlaneError } from "./control-plane-error.js";
+import { boundedExecutionStop } from "./bounded-execution-stop.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import type { DurableManagerContext } from "./durable-manager-context.js";
 import {
@@ -22,21 +23,8 @@ export async function stopSession(
   requireCapability(adapter, "harness.stop");
   const execution = context.owned.get(id);
   if (!execution) throw new ControlPlaneError("SESSION_UNAVAILABLE");
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    await Promise.race([
-      execution.stop(),
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () => reject(new ControlPlaneError("OPERATION_TIMEOUT")),
-          context.stopTimeoutMs,
-        );
-      }),
-    ]);
-    assertCurrentOwner(context);
-    context.owned.delete(id);
-    context.store.setStatus(id, "stopped");
-  } catch (error) {
+  const result = await boundedExecutionStop(context, execution);
+  if (!result.stopped) {
     assertCurrentOwner(context);
     context.store.setStatus(
       id,
@@ -44,14 +32,32 @@ export async function stopSession(
       "STOP_FAILED",
       new Date().toISOString(),
     );
-    if (
-      error instanceof ControlPlaneError &&
-      error.code === "OPERATION_TIMEOUT"
-    )
-      throw error;
-    throw new ControlPlaneError("OPERATION_FAILED");
-  } finally {
-    if (timer) clearTimeout(timer);
+    throw new ControlPlaneError(
+      result.timedOut ? "OPERATION_TIMEOUT" : "OPERATION_FAILED",
+    );
+  }
+  assertCurrentOwner(context);
+  context.owned.delete(id);
+  context.store.setStatus(id, "stopped");
+}
+export async function shutdownOwnedExecution(
+  context: DurableManagerContext,
+  id: string,
+): Promise<void> {
+  const execution = context.owned.get(id);
+  if (!execution) return;
+  const result = await boundedExecutionStop(context, execution);
+  if (result.stopped) context.owned.delete(id);
+  try {
+    assertCurrentOwner(context);
+    context.store.setStatus(
+      id,
+      result.stopped ? "stopped" : "uncertain",
+      result.stopped ? null : "STOP_FAILED",
+      result.stopped ? null : new Date().toISOString(),
+    );
+  } catch {
+    /* shutdown cleanup must not overwrite another owner's row */
   }
 }
 export function deleteSession(

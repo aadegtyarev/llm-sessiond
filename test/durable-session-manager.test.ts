@@ -3,7 +3,10 @@ import { setup } from "./durable-manager-support.js";
 describe("durable generic lifecycle manager", () => {
   it("resolves default and alias, launches and resumes with exact persisted identity", async () => {
     const { manager, store, calls } = setup();
-    const created = await manager.create({ cwd: process.cwd() });
+    const created = await manager.create({
+      cwd: process.cwd(),
+      options: { profile: "unit" },
+    });
     expect(created.harnessId).toBe("synthetic");
     expect(created.status).toBe("running");
     expect(manager.descriptor("third").id).toBe("synthetic");
@@ -12,6 +15,8 @@ describe("durable generic lifecycle manager", () => {
     expect(calls[0]).toBe("launch:starting");
     expect(calls[2]).toContain('"nativeSessionId":"native"');
     expect(calls[2]).toContain('"cursor":4');
+    expect(calls[2]).toContain(`"cwd":"${process.cwd()}"`);
+    expect(calls[2]).toContain('"options":{"profile":"unit"}');
     expect(store.get(created.id)?.status).toBe("running");
     expect(store.get(created.id)?.nativeSessionId).toBe("native-2");
     expect(store.get(created.id)?.adapterState?.data).toEqual({ cursor: 5 });

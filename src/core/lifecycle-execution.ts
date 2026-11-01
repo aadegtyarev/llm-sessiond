@@ -11,6 +11,8 @@ export interface LifecycleExecution {
     options?: JsonValue;
   }): Promise<LifecycleLaunchResult>;
   resume(input: {
+    cwd: string;
+    options?: JsonValue;
     checkpoint?: AdapterCheckpoint;
     nativeSessionId?: string;
   }): Promise<LifecycleLaunchResult>;

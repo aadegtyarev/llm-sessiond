@@ -53,15 +53,23 @@ describe("durable manager boundaries", () => {
     });
     expect(calls.filter((call) => call.startsWith("launch"))).toHaveLength(1);
   });
-  it("rejects stale store owners before creating or launching", async () => {
-    const { manager, store, calls } = setup({
-      owner: { token: "stale", generation: 2 },
+  it("memory store clears optional execution identity like SQLite", () => {
+    const { store } = setup();
+    store.create({
+      id: "s",
+      harnessId: "synthetic",
+      cwd: "/work",
+      status: "stopped",
+      createdAt: "then",
+      nativeSessionId: "n",
+      adapterState: { namespace: "synthetic.audit", version: 3, data: {} },
     });
-    await expect(manager.create({ cwd: process.cwd() })).rejects.toMatchObject({
-      code: "STALE_OWNER",
+    store.updateExecution("s", undefined, undefined, {
+      token: "test-owner",
+      generation: 1,
     });
-    expect(store.list()).toEqual([]);
-    expect(calls).toEqual([]);
+    expect(store.get("s")?.nativeSessionId).toBeUndefined();
+    expect(store.get("s")?.adapterState).toBeUndefined();
   });
   it("constructs without invoking adapter execution", () => {
     const { calls } = setup();

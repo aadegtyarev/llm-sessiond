@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdtemp, realpath, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
@@ -35,17 +35,58 @@ describe("durable manager SQLite persistence", () => {
         lease.generation,
         () => "sqlite-session",
       );
-      const created = await manager.create({ cwd: process.cwd() });
+      const cwd = await realpath(process.cwd());
+      const created = await manager.create({
+        cwd,
+        options: { profile: "persisted" },
+      });
       expect(created.status).toBe("running");
+      await manager.stop(created.id);
       await lease.release();
       db.close();
       const reopened = openSessionDatabase(path.join(dir, "state.sqlite"));
+      const nextLease = await OwnedStoreLease.acquire(dir, reopened);
       try {
-        const row = new SessionRepository(reopened).get("sqlite-session");
-        expect(row?.status).toBe("running");
-        expect(row?.nativeSessionId).toBe("native");
-        expect(row?.adapterState?.data).toEqual({ key: "v" });
+        const repository = new SessionRepository(reopened);
+        const row = repository.get("sqlite-session");
+        expect(row?.status).toBe("stopped");
+        expect(row?.cwd).toBe(cwd);
+        expect(row?.adapterOptions).toEqual({ profile: "persisted" });
+        const resumeCalls: unknown[] = [];
+        let launches = 0;
+        const reopenedManager = new DurableSessionManager(
+          repository,
+          new HarnessRegistry([synthetic], "third"),
+          {
+            create: () => ({
+              launch: async () => {
+                launches++;
+                return {};
+              },
+              resume: async (input) => {
+                resumeCalls.push(input);
+                return {
+                  ...(input.checkpoint ? { checkpoint: input.checkpoint } : {}),
+                  ...(input.nativeSessionId
+                    ? { nativeSessionId: input.nativeSessionId }
+                    : {}),
+                };
+              },
+              stop: async () => {},
+            }),
+          },
+          nextLease.generation,
+        );
+        await reopenedManager.resume("sqlite-session");
+        expect(launches).toBe(0);
+        expect(resumeCalls[0]).toMatchObject({
+          cwd,
+          options: { profile: "persisted" },
+          nativeSessionId: "native",
+          checkpoint: { data: { key: "v" } },
+        });
       } finally {
+        await nextLease.release();
         reopened.close();
       }
     } finally {

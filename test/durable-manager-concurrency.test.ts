@@ -48,7 +48,7 @@ describe("durable lifecycle per-session serialization", () => {
     gate.resolve();
     await first;
     await expect(second).rejects.toMatchObject({
-      code: "SESSION_NOT_RESUMABLE",
+      code: "SESSION_UNAVAILABLE",
     });
     expect(resumes).toBe(1);
   });

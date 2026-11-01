@@ -7,7 +7,11 @@ import { createSession } from "./session-launch.js";
 import { resumeSession } from "./session-resume.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import { validateLifecycleCwd } from "./lifecycle-cwd-validation.js";
-import { deleteSession, stopSession } from "./session-stop-delete.js";
+import {
+  deleteSession,
+  shutdownOwnedExecution,
+  stopSession,
+} from "./session-stop-delete.js";
 import {
   assertCurrentOwner,
   resolveAdapter,
@@ -56,14 +60,16 @@ export class DurableSessionManager {
     name?: string;
     options?: JsonValue;
   }): Promise<DurableSession> {
-    await validateLifecycleCwd(input.cwd);
+    const cwd = await validateLifecycleCwd(input.cwd);
     const id = this.id();
     try {
       validateSessionId(id);
     } catch {
       throw new ControlPlaneError("INVALID_SESSION_ID");
     }
-    return this.locks.run(id, () => createSession(this.context, id, input));
+    return this.locks.run(id, () =>
+      createSession(this.context, id, { ...input, cwd }),
+    );
   }
   rename(id: string, name: string | null): Promise<DurableSession> {
     return this.locks.run(id, async () => {
@@ -82,5 +88,12 @@ export class DurableSessionManager {
   }
   resume(id: string): Promise<DurableSession> {
     return this.locks.run(id, () => resumeSession(this.context, id));
+  }
+  async shutdownOwned(): Promise<void> {
+    await Promise.all(
+      [...this.context.owned.keys()].map((id) =>
+        this.locks.run(id, () => shutdownOwnedExecution(this.context, id)),
+      ),
+    );
   }
 }

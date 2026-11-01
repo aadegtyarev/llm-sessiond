@@ -6,7 +6,6 @@ import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import {
   assertCurrentOwner,
   checkedCheckpoint,
-  markFailed,
   markRunning,
   requireCapability,
   resolveAdapter,
@@ -16,6 +15,7 @@ import type {
   LifecycleExecution,
   LifecycleLaunchResult,
 } from "./lifecycle-execution.js";
+import { finalizeExecutionFailure } from "./session-execution-finalizer.js";
 export async function createSession(
   context: DurableManagerContext,
   id: string,
@@ -46,10 +46,11 @@ export async function createSession(
   };
   assertCurrentOwner(context);
   context.store.create(row);
-  let execution: LifecycleExecution;
+  let execution: LifecycleExecution | undefined;
   let result: LifecycleLaunchResult;
   try {
     execution = context.factory.create(adapter);
+    context.owned.set(id, execution);
     result = await execution.launch({
       cwd: row.cwd,
       ...(row.adapterOptions !== undefined
@@ -57,22 +58,27 @@ export async function createSession(
         : {}),
     });
   } catch {
-    markFailed(context, id, "LAUNCH_FAILED");
+    await finalizeExecutionFailure(context, row, execution, "LAUNCH_FAILED");
     return DurableSessionManagerRead.get(context.store, id);
   }
   let savedCheckpoint;
   try {
     savedCheckpoint = checkedCheckpoint(adapter, result.checkpoint);
   } catch {
-    markFailed(context, id, "LAUNCH_FAILED");
+    await finalizeExecutionFailure(context, row, execution, "LAUNCH_FAILED");
     return DurableSessionManagerRead.get(context.store, id);
   }
-  markRunning(
-    context,
-    row,
-    execution,
-    result,
-    savedCheckpoint ?? row.adapterState,
-  );
+  try {
+    markRunning(
+      context,
+      row,
+      execution!,
+      result,
+      savedCheckpoint ?? row.adapterState,
+    );
+  } catch {
+    await finalizeExecutionFailure(context, row, execution, "LAUNCH_FAILED");
+    throw new ControlPlaneError("OPERATION_FAILED");
+  }
   return DurableSessionManagerRead.get(context.store, id);
 }

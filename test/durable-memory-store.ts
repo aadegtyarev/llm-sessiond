@@ -4,8 +4,11 @@ import type {
   OwnerGeneration,
 } from "../src/persistence/session-record.js";
 export class MemoryStore implements DurableSessionStore {
+  stale = false;
+  failExecutionUpdate = false;
+  failRunningStatus = false;
   assertOwner(owner: OwnerGeneration) {
-    if (owner.token !== "test-owner" || owner.generation !== 1)
+    if (this.stale || owner.token !== "test-owner" || owner.generation !== 1)
       throw new Error("stale");
   }
   rows = new Map<string, DurableSession>();
@@ -30,6 +33,10 @@ export class MemoryStore implements DurableSessionStore {
     reason: string | null = null,
     at: string | null = null,
   ) {
+    if (status === "running" && this.failRunningStatus) {
+      this.failRunningStatus = false;
+      throw new Error("persistence secret");
+    }
     const row = this.rows.get(id)!;
     row.status = status;
     if (reason) row.failureReason = reason;
@@ -44,9 +51,15 @@ export class MemoryStore implements DurableSessionStore {
     owner: OwnerGeneration,
   ) {
     this.assertOwner(owner);
+    if (this.failExecutionUpdate) {
+      this.failExecutionUpdate = false;
+      throw new Error("identity secret");
+    }
     const row = this.rows.get(id)!;
-    if (nativeId) row.nativeSessionId = nativeId;
-    if (checkpoint) row.adapterState = checkpoint;
+    if (nativeId !== undefined) row.nativeSessionId = nativeId;
+    else delete row.nativeSessionId;
+    if (checkpoint !== undefined) row.adapterState = checkpoint;
+    else delete row.adapterState;
   }
   delete(id: string) {
     this.rows.delete(id);

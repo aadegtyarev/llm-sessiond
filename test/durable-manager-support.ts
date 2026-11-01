@@ -40,8 +40,10 @@ export function setup(
     },
     resume:
       overrides.resume ??
-      (async ({ checkpoint: saved, nativeSessionId }) => {
-        calls.push(JSON.stringify({ checkpoint: saved, nativeSessionId }));
+      (async ({ cwd, options, checkpoint: saved, nativeSessionId }) => {
+        calls.push(
+          JSON.stringify({ cwd, options, checkpoint: saved, nativeSessionId }),
+        );
         return {
           nativeSessionId: "native-2",
           checkpoint: { ...saved!, data: { cursor: 5 } },
