@@ -33,6 +33,13 @@ export class LeaseState {
         op.bindingId,
         op.callbackId,
         this.live.has(op.connectionId),
+        (sessionId, connectionId, bindingId) => {
+          const lease = this.leases.get(sessionId);
+          return (
+            lease?.connectionId === connectionId &&
+            lease.bindingId === bindingId
+          );
+        },
       );
     if (op.op === "cancel") return this.callbacks.cancel(op.callbackId);
     if (op.op === "unbind") return this.unbind(op.connectionId, op.bindingId);
@@ -68,6 +75,7 @@ export class LeaseState {
       lease.bindingId,
       callbackId,
       timeoutSeconds,
+      sessionId,
     );
     this.sessions.set(sessionId, "running/process-owned");
     return "pending";
@@ -78,6 +86,7 @@ export class LeaseState {
     );
     if (!found || found[1].connectionId !== connectionId)
       return "stale-binding";
+    this.callbacks.invalidateBinding(connectionId, bindingId);
     this.leases.delete(found[0]);
     return "unbound";
   }

@@ -10,6 +10,7 @@ export function validateSnapshotTranscript(frames: unknown[]): boolean {
         (frame as { sequence: number }).sequence <= cursor
       )
         return false;
+      cursor = (frame as { sequence: number }).sequence;
       continue;
     }
     if (!snapshotFrame.safeParse(frame).success) return false;

@@ -28,6 +28,10 @@ describe("v2 event and snapshot wire fixtures", () => {
     expect(
       validateSnapshotTranscript(load("snapshot-interleaved.json").frames),
     ).toBe(false);
+    const live = load("snapshot-live-sequence.json");
+    expect(validateSnapshotTranscript(live.valid)).toBe(true);
+    expect(validateSnapshotTranscript(live.duplicate)).toBe(false);
+    expect(validateSnapshotTranscript(live.regressing)).toBe(false);
     expect(f.restart).toMatchObject({
       cursorReplay: "unsupported",
       clientAction: "new-handshake-snapshot-no-replay",

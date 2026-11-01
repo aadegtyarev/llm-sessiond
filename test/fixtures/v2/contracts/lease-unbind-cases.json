@@ -1,0 +1,59 @@
+{
+  "noRebind": [
+    { "op": "connect", "connectionId": "C1" },
+    { "op": "bind", "connectionId": "C1", "sessionId": "S1" },
+    {
+      "op": "request",
+      "connectionId": "C1",
+      "sessionId": "S1",
+      "callbackId": "old",
+      "timeoutSeconds": 20
+    },
+    { "op": "unbind", "connectionId": "C1", "bindingId": "B1" },
+    {
+      "op": "result",
+      "connectionId": "C1",
+      "bindingId": "B1",
+      "callbackId": "old"
+    }
+  ],
+  "sameConnectionRebind": [
+    { "op": "connect", "connectionId": "C1" },
+    { "op": "bind", "connectionId": "C1", "sessionId": "S1" },
+    {
+      "op": "request",
+      "connectionId": "C1",
+      "sessionId": "S1",
+      "callbackId": "old",
+      "timeoutSeconds": 20
+    },
+    { "op": "unbind", "connectionId": "C1", "bindingId": "B1" },
+    { "op": "bind", "connectionId": "C1", "sessionId": "S1" },
+    {
+      "op": "result",
+      "connectionId": "C1",
+      "bindingId": "B1",
+      "callbackId": "old"
+    }
+  ],
+  "transferWhileOldLive": [
+    { "op": "connect", "connectionId": "C1" },
+    { "op": "bind", "connectionId": "C1", "sessionId": "S1" },
+    {
+      "op": "request",
+      "connectionId": "C1",
+      "sessionId": "S1",
+      "callbackId": "old",
+      "timeoutSeconds": 20
+    },
+    { "op": "unbind", "connectionId": "C1", "bindingId": "B1" },
+    { "op": "connect", "connectionId": "C2" },
+    { "op": "bind", "connectionId": "C2", "sessionId": "S1" },
+    {
+      "op": "result",
+      "connectionId": "C1",
+      "bindingId": "B1",
+      "callbackId": "old"
+    }
+  ]
+}

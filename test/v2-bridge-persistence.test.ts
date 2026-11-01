@@ -46,7 +46,7 @@ describe("v2 bridge scenarios and persistence fixtures", () => {
       "acknowledged",
       "disconnected-invalidated",
       "rejected-before-write",
-      "unknown-after-write",
+      "uncertain-no-replay",
     ]);
   });
   it("validates migration, reconciliation, checkpoints, and bounds", () => {

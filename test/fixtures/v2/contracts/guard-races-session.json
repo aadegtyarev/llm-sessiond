@@ -1,0 +1,49 @@
+{
+  "beforeAck": [
+    { "op": "select", "contextId": "c", "generation": 1, "sessionId": "S1" },
+    { "op": "ack", "contextId": "c", "generation": 1 },
+    {
+      "op": "write",
+      "contextId": "c",
+      "generation": 1,
+      "sessionId": "S1",
+      "boundary": "pre"
+    },
+    { "op": "select", "contextId": "c", "generation": 2, "sessionId": "S2" },
+    {
+      "op": "write",
+      "contextId": "c",
+      "generation": 1,
+      "sessionId": "S1",
+      "boundary": "post"
+    },
+    { "op": "ack", "contextId": "c", "generation": 2 },
+    {
+      "op": "write",
+      "contextId": "c",
+      "generation": 1,
+      "sessionId": "S1",
+      "boundary": "post"
+    }
+  ],
+  "afterAck": [
+    { "op": "select", "contextId": "c", "generation": 1, "sessionId": "S1" },
+    { "op": "ack", "contextId": "c", "generation": 1 },
+    {
+      "op": "write",
+      "contextId": "c",
+      "generation": 1,
+      "sessionId": "S1",
+      "boundary": "pre"
+    },
+    { "op": "select", "contextId": "c", "generation": 2, "sessionId": "S2" },
+    { "op": "ack", "contextId": "c", "generation": 2 },
+    {
+      "op": "write",
+      "contextId": "c",
+      "generation": 1,
+      "sessionId": "S1",
+      "boundary": "post"
+    }
+  ]
+}

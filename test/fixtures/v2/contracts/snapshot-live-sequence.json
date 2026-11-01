@@ -1,0 +1,77 @@
+{
+  "valid": [
+    {
+      "apiVersion": "v2",
+      "type": "snapshot.begin",
+      "snapshotId": "s",
+      "afterSequence": 5
+    },
+    { "apiVersion": "v2", "type": "snapshot.end", "snapshotId": "s" },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "i",
+      "sequence": 6,
+      "at": "2026-10-31T12:00:00Z",
+      "event": { "kind": "session.deleted", "sessionId": "S1" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "i",
+      "sequence": 7,
+      "at": "2026-10-31T12:00:01Z",
+      "event": { "kind": "session.deleted", "sessionId": "S2" }
+    }
+  ],
+  "duplicate": [
+    {
+      "apiVersion": "v2",
+      "type": "snapshot.begin",
+      "snapshotId": "s",
+      "afterSequence": 5
+    },
+    { "apiVersion": "v2", "type": "snapshot.end", "snapshotId": "s" },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "i",
+      "sequence": 6,
+      "at": "2026-10-31T12:00:00Z",
+      "event": { "kind": "session.deleted", "sessionId": "S1" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "i",
+      "sequence": 6,
+      "at": "2026-10-31T12:00:01Z",
+      "event": { "kind": "session.deleted", "sessionId": "S2" }
+    }
+  ],
+  "regressing": [
+    {
+      "apiVersion": "v2",
+      "type": "snapshot.begin",
+      "snapshotId": "s",
+      "afterSequence": 5
+    },
+    { "apiVersion": "v2", "type": "snapshot.end", "snapshotId": "s" },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "i",
+      "sequence": 7,
+      "at": "2026-10-31T12:00:00Z",
+      "event": { "kind": "session.deleted", "sessionId": "S1" }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "i",
+      "sequence": 6,
+      "at": "2026-10-31T12:00:01Z",
+      "event": { "kind": "session.deleted", "sessionId": "S2" }
+    }
+  ]
+}

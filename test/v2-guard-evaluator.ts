@@ -22,12 +22,17 @@ type Guard = {
 export function evaluateGuards(ops: Op[]): string[] {
   const guards = new Map<string, Guard>();
   const outcomes: string[] = [];
+  const dispatched = new Set<string>();
+  const uncertain = new Set<string>();
   let connected = true;
   for (const op of ops) {
     if (op.op === "disconnect") {
       connected = false;
+      for (const id of dispatched) uncertain.add(id);
       guards.clear();
-      outcomes.push("disconnected-invalidated");
+      outcomes.push(
+        uncertain.size ? "uncertain-no-replay" : "disconnected-invalidated",
+      );
       continue;
     }
     const current = guards.get(op.contextId);
@@ -40,24 +45,40 @@ export function evaluateGuards(ops: Op[]): string[] {
           sessionId: op.sessionId,
           acknowledged: false,
         });
-        outcomes.push("awaiting-invalidate-ack");
+        if (dispatched.has(op.contextId)) uncertain.add(op.contextId);
+        outcomes.push(
+          uncertain.has(op.contextId)
+            ? "uncertain-no-replay"
+            : "awaiting-invalidate-ack",
+        );
       }
     } else if (op.op === "ack") {
       if (current?.generation === op.generation) {
         current.acknowledged = true;
         outcomes.push("acknowledged");
       } else outcomes.push("stale-ack");
-    } else if (!connected)
-      outcomes.push(
-        op.boundary === "pre" ? "rejected-before-write" : "unknown-after-write",
-      );
-    else if (
+    } else if (!connected) {
+      if (dispatched.has(op.contextId) || op.boundary === "post") {
+        uncertain.add(op.contextId);
+        outcomes.push("uncertain-no-replay");
+      } else outcomes.push("rejected-before-write");
+    } else if (
       !current?.acknowledged ||
       current.generation !== op.generation ||
       current.sessionId !== op.sessionId
-    )
-      outcomes.push("rejected-before-write");
-    else outcomes.push("write-dispatched");
+    ) {
+      if (
+        dispatched.has(op.contextId) ||
+        uncertain.has(op.contextId) ||
+        op.boundary === "post"
+      ) {
+        uncertain.add(op.contextId);
+        outcomes.push("uncertain-no-replay");
+      } else outcomes.push("rejected-before-write");
+    } else {
+      dispatched.add(op.contextId);
+      outcomes.push("write-dispatched");
+    }
   }
   return outcomes;
 }
