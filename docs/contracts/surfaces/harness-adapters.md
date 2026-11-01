@@ -12,6 +12,10 @@ When a standard capability is insufficient, extension descriptor is `{namespace,
 
 Namespaced values remain versioned and strict. Generic core validates namespace and size but does not parse adapter data. Generic clients preserve payloads without coercion; specialized UI projection is optional and separate.
 
+## Built-in Claude lifecycle
+
+Claude is registered as `claude-code` (alias `claude`) with only launch, resume, and stop capabilities in this stage. Its `claude.session` v1 checkpoint contains exactly `{sessionId:UUID}`. Resume preserves exact UUID spelling and fails closed on malformed/unknown state or a saved native-ID mismatch. The adapter's private initialize handshake is not a public protocol/raw-control capability; no prompt or transcript data is stored.
+
 ## Checkpoints and errors
 
 Persist adapter resume metadata as `{namespace,version,data:JsonValue}`; adapter owns validation, interpretation, and version migration hook. Core enforces generic bounds and supplies exact checkpoint to registered adapter. Missing adapter or unknown checkpoint version preserves record and fails explicit; never switches harness. See [persistence](persistence.md).

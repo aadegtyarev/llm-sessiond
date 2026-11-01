@@ -13,7 +13,7 @@ Only additive transactional migrations; `PRAGMA user_version`, WAL. Unknown newe
 
 ## Adapter checkpoint
 
-`adapter_state={namespace,version,data:JsonValue}` is bounded (initial max 64 KiB), non-secret resume metadata, never prompts/history/credentials. Registered adapter validates, interprets, and may migrate versions; core validates generic bound/namespace only. Resume gets exact checkpoint; generic core does not require native ID for every harness. Built-in adapters retain exact native-ID protections. Unknown adapter/version preserves record and fails explicitly, never changes harness. Launch/resume/options replacement may update checkpoint; optional writes are gated by current-instance generation so stale daemon instances cannot overwrite it.
+`adapter_state={namespace,version,data:JsonValue}` is bounded (initial max 64 KiB), non-secret resume metadata, never prompts/history/credentials. Registered adapter validates, interprets, and may migrate versions; core validates generic bound/namespace only. Resume gets exact checkpoint; generic core does not require native ID for every harness. Claude's `claude.session` v1 data is only `{sessionId:UUID}` and does not promise an empty transcript can be resumed. Built-in adapters retain exact native-ID protections. Unknown adapter/version preserves record and fails explicitly, never changes harness. Launch/resume/options replacement may update checkpoint; optional writes are gated by current-instance generation so stale daemon instances cannot overwrite it.
 
 ## Startup and recovery
 

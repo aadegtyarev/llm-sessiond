@@ -1,8 +1,12 @@
-# Session and Pi process lifecycle
+# Session and harness process lifecycle
 
 ## Boundary and ownership
 
-The service owns one Pi RPC process per in-memory session through `HarnessAdapter` and `ProcessProvider` ports. Pi is launched with `--mode rpc` and `shell:false`; executable is configured through `PI_EXECUTABLE` (default `pi`). Resume starts a new process with `--session <exact previously returned native ID>` and verifies `get_state` reports that same ID.
+The service owns harness processes through `HarnessAdapter` and `ProcessProvider` ports. Pi's v1 lifecycle remains as specified below. The v2 Claude lifecycle uses the durable manager and adapter checkpoint.
+
+## Claude lifecycle (API v2)
+
+The `claude-code` adapter (alias `claude`) starts Claude CLI in stream-json print mode with a daemon-generated UUID passed as `--session-id`. It sends only a private correlated `initialize` control request; a valid correlated success response establishes readiness. No prompt, model turn, or synthetic initialization event is sent. Optional `system/init` metadata must match the exact UUID. Resume requires the exact `claude.session` v1 checkpoint and starts `--resume <UUID>` without fallback; absence of a saved transcript fails explicitly. Stop is bounded and succeeds only after child exit is confirmed. Only launch, resume, and stop are advertised; no empty transcript resumability guarantee is made.
 
 ## Observable flow
 
@@ -20,4 +24,4 @@ The service keeps state only in memory. Restart recovery, durable history, and e
 
 ## Non-goals and related contracts
 
-No Claude adapter, models/tools/approvals/files API, service restart recovery, TLS, auth, or client migration. See [API v1](api-v1.md) and the harnessd Pi RPC compatibility source/test (`harnessd/src/harness/pi-rpc-harness.ts`, `harnessd/test/pi-rpc-harness.test.ts`).
+No additional Claude models/tools/approvals/files capabilities, service restart process recovery, TLS, auth, or client migration. See [API v1](api-v1.md), [adapter checkpoints](harness-adapters.md), and the harnessd Pi RPC compatibility source/test (`harnessd/src/harness/pi-rpc-harness.ts`, `harnessd/test/pi-rpc-harness.test.ts`).
