@@ -1,0 +1,29 @@
+{
+  "snapshot": {
+    "begin": {
+      "type": "snapshot.begin",
+      "snapshotId": "snap-1",
+      "afterSequence": 5
+    },
+    "sessions": [
+      {
+        "type": "snapshot.session",
+        "snapshotId": "snap-1",
+        "session": {
+          "id": "S1",
+          "harnessId": "third-harness",
+          "cwd": "/tmp/work",
+          "status": "running"
+        }
+      }
+    ],
+    "end": { "type": "snapshot.end", "snapshotId": "snap-1" },
+    "ordering": "post-boundary-events-after-snapshot.end"
+  },
+  "restart": {
+    "oldInstanceId": "boot-Alpha",
+    "newInstanceId": "boot-Beta",
+    "cursorReplay": "unsupported",
+    "clientAction": "new-handshake-snapshot-no-replay"
+  }
+}

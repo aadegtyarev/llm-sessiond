@@ -1,0 +1,31 @@
+{
+  "routes": [
+    "GET /api/v1/health",
+    "GET /api/v1/harnesses",
+    "GET /api/v1/sessions",
+    "POST /api/v1/sessions",
+    "GET /api/v1/sessions/:id",
+    "POST /api/v1/sessions/:id/inputs",
+    "POST /api/v1/sessions/:id/cancel",
+    "POST /api/v1/sessions/:id/stop",
+    "POST /api/v1/sessions/:id/resume"
+  ],
+  "websocket": "/api/v1/events",
+  "sentinels": [
+    "harnessId:\"pi\"",
+    "nativeSessionId?",
+    "status:\"starting\"|\"running\"|\"stopped\"|\"failed\"|\"uncertain\"",
+    "eventId:positive-integer",
+    "before `bufferedAmount` exceeds 256 KiB",
+    "HTTP JSON body ≤24 MiB",
+    "decoded image bytes total ≤20 MiB"
+  ],
+  "compatibility": {
+    "memoryBacked": true,
+    "sessionId": "uuid",
+    "inputId": "uuid",
+    "eventReplay": false,
+    "durableRecovery": false,
+    "v2IsolatedNamespace": true
+  }
+}

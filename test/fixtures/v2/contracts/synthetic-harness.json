@@ -1,0 +1,52 @@
+{
+  "descriptor": {
+    "id": "third-harness",
+    "aliases": ["third", "alt-third"],
+    "capabilities": ["input.submit", "harness.stop"],
+    "metadata": { "family": "synthetic" },
+    "options": [
+      {
+        "key": "layout",
+        "label": "Layout",
+        "values": ["compact", "wide"],
+        "defaultValue": "compact"
+      }
+    ],
+    "extensions": [
+      {
+        "namespace": "third-harness.audit",
+        "version": 7,
+        "operations": [
+          { "name": "inspect", "effect": "read", "guardRequired": false },
+          { "name": "apply", "effect": "write", "guardRequired": true }
+        ],
+        "events": ["audit.finished"]
+      }
+    ]
+  },
+  "checkpoint": {
+    "namespace": "third-harness.audit",
+    "version": 3,
+    "data": { "resumeKey": "opaque-5", "cursor": 12 }
+  },
+  "extension": {
+    "version": 7,
+    "input": { "scope": "current" },
+    "output": { "items": 2 },
+    "event": {
+      "kind": "extension",
+      "namespace": "third-harness.audit",
+      "version": 7,
+      "name": "audit.finished",
+      "data": { "count": 2 }
+    }
+  },
+  "schemaConstraint": {
+    "requiredCapabilities": ["input.submit", "harness.stop"],
+    "forbiddenFixedEnums": ["pi", "claude"],
+    "forbiddenDatabaseFields": ["pi_*", "claude_*"],
+    "forbiddenDtoCases": ["PiSession", "ClaudeSession"],
+    "forbiddenRouteAdditions": true,
+    "registrationAccepted": true
+  }
+}

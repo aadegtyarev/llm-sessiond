@@ -1,0 +1,87 @@
+{
+  "routes": [
+    [
+      "GET",
+      "/sessions/S1/status",
+      200,
+      null,
+      {
+        "session": {
+          "id": "S1",
+          "harnessId": "third-harness",
+          "cwd": "/tmp/work",
+          "status": "running"
+        },
+        "live": { "usage": { "contextTokens": null, "contextPercent": null } }
+      }
+    ],
+    [
+      "GET",
+      "/sessions/S1/models",
+      200,
+      null,
+      {
+        "models": [{ "provider": "fixture", "id": "m1", "name": "Model One" }],
+        "current": { "provider": "fixture", "id": "m1", "name": "Model One" }
+      }
+    ],
+    [
+      "POST",
+      "/sessions/S1/model",
+      200,
+      { "provider": "fixture", "modelId": "m2", "effort": "high" },
+      {
+        "model": { "provider": "fixture", "id": "m2", "name": "Model Two" },
+        "effort": "high",
+        "effortConfirmed": false
+      }
+    ],
+    [
+      "GET",
+      "/sessions/S1/efforts",
+      200,
+      null,
+      { "levels": ["low", "high"], "current": "low" }
+    ],
+    ["POST", "/sessions/S1/effort", 204, { "level": "high" }, null],
+    [
+      "GET",
+      "/sessions/S1/options",
+      200,
+      null,
+      {
+        "descriptors": [
+          { "key": "layout", "label": "Layout", "values": ["compact", "wide"] }
+        ],
+        "defaults": { "layout": "compact" },
+        "overrides": {},
+        "effective": { "layout": "compact" }
+      }
+    ],
+    [
+      "PATCH",
+      "/sessions/S1/options",
+      200,
+      { "resetKeys": ["layout"] },
+      {
+        "session": {
+          "id": "S1",
+          "harnessId": "third-harness",
+          "cwd": "/tmp/work",
+          "status": "running"
+        }
+      }
+    ],
+    [
+      "GET",
+      "/sessions/S1/commands",
+      200,
+      null,
+      { "commands": [{ "name": "audit", "description": "Run audit" }] }
+    ]
+  ],
+  "usageVariants": [
+    { "usage": {} },
+    { "usage": { "contextTokens": null, "contextPercent": null } }
+  ]
+}

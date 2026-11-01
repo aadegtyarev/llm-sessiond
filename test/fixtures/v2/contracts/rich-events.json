@@ -1,0 +1,93 @@
+{
+  "instanceId": "boot-Alpha",
+  "events": [
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-Alpha",
+      "sequence": 1,
+      "at": "2026-10-31T12:00:00Z",
+      "event": {
+        "kind": "session.changed",
+        "session": {
+          "id": "S1",
+          "harnessId": "third-harness",
+          "cwd": "/tmp/work",
+          "status": "running"
+        }
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-Alpha",
+      "sequence": 2,
+      "at": "2026-10-31T12:00:01Z",
+      "event": {
+        "kind": "harness.event",
+        "sessionId": "S1",
+        "event": {
+          "type": "anomaly",
+          "kind": "tool",
+          "action": "blocked",
+          "ref": "r1",
+          "running": false,
+          "stopRequested": false,
+          "recordType": "policy",
+          "command": "audit",
+          "bytes": 12,
+          "detail": "redacted"
+        }
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-Alpha",
+      "sequence": 3,
+      "at": "2026-10-31T12:00:02Z",
+      "event": {
+        "kind": "harness.event",
+        "sessionId": "S1",
+        "event": {
+          "type": "input.state",
+          "inputId": "input.0042",
+          "state": "uncertain",
+          "reason": "write outcome unknown"
+        }
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-Alpha",
+      "sequence": 4,
+      "at": "2026-10-31T12:00:03Z",
+      "event": {
+        "kind": "harness.event",
+        "sessionId": "S1",
+        "event": {
+          "type": "tool_summary",
+          "toolCallId": "t-1",
+          "toolName": "audit",
+          "outcome": "completed"
+        }
+      }
+    },
+    {
+      "apiVersion": "v2",
+      "type": "event",
+      "instanceId": "boot-Alpha",
+      "sequence": 5,
+      "at": "2026-10-31T12:00:04Z",
+      "event": {
+        "kind": "extension",
+        "namespace": "third-harness.audit",
+        "version": 1,
+        "name": "audit.finished",
+        "data": { "count": 2 }
+      }
+    }
+  ],
+  "forbiddenPublicFields": ["anomaly.head", "diagnosticTail", "rawReasoning"]
+}

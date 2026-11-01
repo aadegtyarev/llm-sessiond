@@ -1,0 +1,41 @@
+{
+  "health": {
+    "apiVersion": "v2",
+    "protocolRevision": 1,
+    "status": "ready",
+    "serviceVersion": "0.2.0",
+    "instanceId": "boot-Alpha",
+    "supportedApiVersions": ["v1", "v2"],
+    "features": [
+      "sessions.durable",
+      "events.live",
+      "bridge.callbacks",
+      "bridge.guards",
+      "adapters.namespaced"
+    ]
+  },
+  "opaqueIds": {
+    "sessionId": "S.id-A_7",
+    "inputId": "input.0042",
+    "caseDistinct": ["Id-Case", "id-case"],
+    "grammar": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+  },
+  "registry": {
+    "defaultHarnessId": "third-harness",
+    "harnesses": [
+      {
+        "id": "third-harness",
+        "aliases": ["third", "alt-third"],
+        "capabilities": ["input.submit", "harness.stop"],
+        "metadata": { "family": "fixture" }
+      }
+    ]
+  },
+  "instanceMismatch": {
+    "header": "X-Llm-Sessiond-Instance",
+    "sent": "boot-old",
+    "current": "boot-Alpha",
+    "expectedStatus": 503,
+    "expectedOutcome": "not-applied"
+  }
+}

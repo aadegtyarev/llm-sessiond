@@ -1,0 +1,18 @@
+{
+  "partialSubmit": {
+    "status": 409,
+    "error": {
+      "code": "INPUT_UNCERTAIN",
+      "outcome": "unknown",
+      "resumed": true,
+      "inputId": "opaque.input-2"
+    }
+  },
+  "extension": {
+    "method": "POST",
+    "path": "/sessions/S1/extensions/third-harness.audit/inspect",
+    "request": { "version": 1, "input": { "scope": "current" } },
+    "status": 200,
+    "response": { "version": 1, "output": { "items": 2 } }
+  }
+}

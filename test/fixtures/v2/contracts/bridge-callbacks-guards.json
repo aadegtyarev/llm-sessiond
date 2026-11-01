@@ -1,0 +1,67 @@
+{
+  "lease": {
+    "bind": { "requestId": "r1", "sessionId": "S1", "bindingId": "B1" },
+    "conflict": {
+      "connectionId": "C2",
+      "sessionId": "S1",
+      "status": 409,
+      "effect": "no-steal"
+    },
+    "disconnect": {
+      "lease": "released",
+      "session": "continues",
+      "process": "continues",
+      "pendingCallback": "not-reassigned"
+    }
+  },
+  "callbacks": [
+    {
+      "kind": "tool.permission",
+      "callbackId": "cb-p",
+      "bindingId": "B1",
+      "deadlineSeconds": 60,
+      "uiDeadlineSeconds": 55,
+      "timeoutResult": { "behavior": "deny" },
+      "lateAfterCancel": "ignored"
+    },
+    {
+      "kind": "agent.file.send",
+      "callbackId": "cb-f",
+      "bindingId": "B1",
+      "overallDeadlineSeconds": 300,
+      "perRecipientUploadSeconds": 120,
+      "partial": { "fileName": "result.txt", "delivered": 1, "recipients": 2 },
+      "lostAfterDispatch": "unknown",
+      "cancelRevertsDelivery": false,
+      "payload": { "path": "/work/result.txt", "caption": "done" }
+    }
+  ],
+  "guards": [
+    {
+      "generation": 1,
+      "contextId": "ctx-A",
+      "sessionId": "S1",
+      "invalidateAckBeforeSelectionChange": true
+    },
+    {
+      "generation": 2,
+      "contextId": "ctx-A",
+      "sessionId": null,
+      "queuedWrite": "reject-before-write"
+    },
+    {
+      "generation": 3,
+      "contextId": "ctx-A",
+      "sessionId": "S1",
+      "disconnect": "invalidate",
+      "beforeWrite": "reject",
+      "afterWrite": "unknown-no-replay"
+    },
+    {
+      "cancelControl": {
+        "outcomes": ["not-dispatched", "unknown"],
+        "isInputCancel": false
+      }
+    }
+  ]
+}
