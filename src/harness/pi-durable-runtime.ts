@@ -13,11 +13,17 @@ export function createPiDurableRuntime(input: {
   provider?: ProcessProvider;
   id?: () => string;
   stopTimeoutMs?: number;
+  readinessTimeoutMs?: number;
 }) {
   const provider = input.provider ?? new NodeProcessProvider();
   const adapter = new PiLifecycleAdapter();
   const registry = new HarnessRegistry([adapter], "pi");
-  const factory = new PiLifecycleExecutionFactory(adapter, provider);
+  const factory = new PiLifecycleExecutionFactory(
+    adapter,
+    provider,
+    undefined,
+    input.readinessTimeoutMs,
+  );
   const manager = new DurableSessionManager(
     input.store,
     registry,

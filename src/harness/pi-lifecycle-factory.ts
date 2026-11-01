@@ -12,6 +12,7 @@ export class PiLifecycleExecutionFactory implements LifecycleExecutionFactory {
     readonly adapter: PiLifecycleAdapter,
     private readonly provider: ProcessProvider,
     private readonly executable = process.env.PI_EXECUTABLE ?? "pi",
+    private readonly readinessTimeoutMs = 15_000,
   ) {}
   create(adapter: HarnessAdapter): LifecycleExecution {
     if (adapter !== this.adapter) throw new Error("UNSUPPORTED_ADAPTER");
@@ -19,6 +20,7 @@ export class PiLifecycleExecutionFactory implements LifecycleExecutionFactory {
       this.adapter,
       this.provider,
       this.executable,
+      this.readinessTimeoutMs,
     );
   }
 }

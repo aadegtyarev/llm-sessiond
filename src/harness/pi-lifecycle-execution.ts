@@ -5,6 +5,7 @@ import type {
   LifecycleLaunchResult,
 } from "../core/lifecycle-execution.js";
 import type { AdapterCheckpoint } from "../core/adapter-contracts.js";
+import type { JsonValue } from "../core/generic-json.js";
 import { piCheckpoint, PiLifecycleAdapter } from "./pi-lifecycle-adapter.js";
 import { startPiProcess } from "./pi-startup.js";
 import type { PiRpcProcess } from "./pi-process.js";
@@ -12,16 +13,16 @@ import { terminateChild } from "../process/terminate-child.js";
 export class PiLifecycleExecution implements LifecycleExecution {
   private child?: ChildProcess;
   private rpcProcess?: PiRpcProcess;
-  private started = false;
   private stopped = false;
   constructor(
     private readonly adapter: PiLifecycleAdapter,
     private readonly provider: ProcessProvider,
     private readonly executable: string,
+    private readonly readinessTimeoutMs: number,
   ) {}
   async launch(input: {
     cwd: string;
-    options?: import("../core/generic-json.js").JsonValue;
+    options?: JsonValue;
   }): Promise<LifecycleLaunchResult> {
     this.rejectOptions(input.options);
     const process = await this.start(input.cwd, []);
@@ -32,12 +33,11 @@ export class PiLifecycleExecution implements LifecycleExecution {
   }
   async resume(input: {
     cwd: string;
-    options?: import("../core/generic-json.js").JsonValue;
+    options?: JsonValue;
     checkpoint?: AdapterCheckpoint;
     nativeSessionId?: string;
   }): Promise<LifecycleLaunchResult> {
     this.rejectOptions(input.options);
-    const data = input.checkpoint?.data;
     if (
       !input.checkpoint ||
       input.checkpoint.namespace !== this.adapter.checkpoint.namespace ||
@@ -45,12 +45,11 @@ export class PiLifecycleExecution implements LifecycleExecution {
       !this.adapter.validateCheckpoint(input.checkpoint.data)
     )
       throw new Error("INVALID_CHECKPOINT");
-    const sessionId = (data as { sessionId?: unknown }).sessionId;
+    const sessionId = (input.checkpoint!.data as { sessionId: string })
+      .sessionId;
     if (
-      typeof sessionId !== "string" ||
-      !sessionId ||
-      (input.nativeSessionId !== undefined &&
-        input.nativeSessionId !== sessionId)
+      input.nativeSessionId !== undefined &&
+      input.nativeSessionId !== sessionId
     )
       throw new Error("SESSION_ID_MISMATCH");
     const process = await this.start(
@@ -74,9 +73,8 @@ export class PiLifecycleExecution implements LifecycleExecution {
     args: string[],
     expectedId?: string,
   ): Promise<PiRpcProcess> {
-    if (this.started || this.stopped)
+    if (this.child || this.stopped)
       throw new Error("EXECUTION_ALREADY_STARTED");
-    this.started = true;
     const child = this.provider.launch(
       this.executable,
       ["--mode", "rpc", ...args],
@@ -84,16 +82,18 @@ export class PiLifecycleExecution implements LifecycleExecution {
     );
     this.child = child;
     try {
-      this.rpcProcess = await startPiProcess(child, expectedId);
+      this.rpcProcess = await startPiProcess(
+        child,
+        expectedId,
+        this.readinessTimeoutMs,
+      );
       return this.rpcProcess;
     } catch {
       await this.stop();
       throw new Error("PI_STARTUP_FAILED");
     }
   }
-  private rejectOptions(
-    options: import("../core/generic-json.js").JsonValue | undefined,
-  ): void {
+  private rejectOptions(options: JsonValue | undefined): void {
     if (options !== undefined) throw new Error("UNSUPPORTED_OPTIONS");
   }
 }
