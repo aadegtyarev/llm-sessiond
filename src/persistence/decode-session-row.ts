@@ -1,3 +1,8 @@
+import {
+  validateCheckpointEnvelope,
+  validateHarnessId,
+  validateSessionId,
+} from "../core/durable-validation.js";
 import { validateJson } from "../core/json-bounds.js";
 import { SafeValidationError, type JsonValue } from "../core/generic-json.js";
 import type { AdapterCheckpoint } from "../core/adapter-contracts.js";
@@ -25,6 +30,12 @@ export function decodeSessionRow(row: Record<string, unknown>): DurableSession {
   );
   optionalText(row.failure_reason, (value) => (result.failureReason = value));
   optionalText(row.failed_at, (value) => (result.failedAt = value));
+  try {
+    validateSessionId(result.id);
+    validateHarnessId(result.harnessId);
+  } catch {
+    throw new SafeValidationError("CORRUPT_SESSION_RECORD");
+  }
   if (row.adapter_options !== null)
     result.adapterOptions = parseJson(row.adapter_options, 8192, 5);
   if (row.adapter_state !== null)
@@ -42,31 +53,27 @@ function optionalText(value: unknown, set: (value: string) => void): void {
 function parseJson(value: unknown, bytes: number, depth: number): JsonValue {
   if (typeof value !== "string")
     throw new SafeValidationError("CORRUPT_SESSION_RECORD");
-  let parsed: unknown;
+  const parsed = parseJsonText(value);
+  validateJson(parsed, bytes, depth);
+  return parsed as JsonValue;
+}
+function parseJsonText(value: unknown): unknown {
+  if (typeof value !== "string")
+    throw new SafeValidationError("CORRUPT_SESSION_RECORD");
   try {
-    parsed = JSON.parse(value);
+    return JSON.parse(value) as unknown;
   } catch {
     throw new SafeValidationError("CORRUPT_SESSION_RECORD");
   }
-  validateJson(parsed, bytes, depth);
-  return parsed;
 }
 function parseCheckpoint(value: unknown): AdapterCheckpoint {
-  const parsed = parseJson(value, 65536, 20);
-  if (
-    !parsed ||
-    typeof parsed !== "object" ||
-    Array.isArray(parsed) ||
-    Object.keys(parsed).sort().join(",") !== "data,namespace,version"
-  )
+  if (typeof value !== "string" || Buffer.byteLength(value) > 65536)
     throw new SafeValidationError("CORRUPT_SESSION_RECORD");
-  const row = parsed as Record<string, JsonValue>;
-  if (
-    typeof row.namespace !== "string" ||
-    typeof row.version !== "number" ||
-    !Number.isSafeInteger(row.version) ||
-    row.version < 1
-  )
+  const parsed = parseJsonText(value);
+  try {
+    validateCheckpointEnvelope(parsed);
+  } catch {
     throw new SafeValidationError("CORRUPT_SESSION_RECORD");
-  return { namespace: row.namespace, version: row.version, data: row.data! };
+  }
+  return parsed;
 }

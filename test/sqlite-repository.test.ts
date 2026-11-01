@@ -6,6 +6,35 @@ import { openSessionDatabase } from "../src/persistence/sqlite-database.js";
 import { SessionRepository } from "../src/persistence/session-repository.js";
 
 describe("revision-one SQLite repository", () => {
+  it("round-trips a checkpoint at the full-envelope 64 KiB boundary", async () => {
+    const directory = await mkdtemp(
+      path.join(os.tmpdir(), "sessiond-checkpoint-limit-"),
+    );
+    const file = path.join(directory, "sessions.sqlite");
+    let db = openSessionDatabase(file);
+    try {
+      const empty = { namespace: "third.audit", version: 1, data: "" };
+      const overhead = Buffer.byteLength(JSON.stringify(empty));
+      const checkpoint = { ...empty, data: "x".repeat(65536 - overhead) };
+      expect(Buffer.byteLength(JSON.stringify(checkpoint))).toBe(65536);
+      new SessionRepository(db).create({
+        id: "S-boundary",
+        harnessId: "third",
+        cwd: "/work",
+        status: "stopped",
+        adapterState: checkpoint,
+        createdAt: "now",
+      });
+      db.close();
+      db = openSessionDatabase(file);
+      expect(new SessionRepository(db).get("S-boundary")?.adapterState).toEqual(
+        checkpoint,
+      );
+    } finally {
+      db.close();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
   it("round-trips opaque IDs, options, and checkpoints across reopen in WAL mode", async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), "sessiond-store-"));
     try {
