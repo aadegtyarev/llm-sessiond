@@ -1,6 +1,6 @@
 # Pi command catalog
 
-- Status: Approved for implementation
+- Status: Implemented; pending independent review
 - Feature contract: `docs/contracts/features/pi-command-catalog.md`
 
 ## Goal and behavior

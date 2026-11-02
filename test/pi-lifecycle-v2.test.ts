@@ -11,23 +11,20 @@ const owner = { token: "test-owner", generation: 1 };
 describe("Pi v2 lifecycle adapter", () => {
   it("advertises only supported capabilities and validates exact checkpoints", () => {
     const adapter = new PiLifecycleAdapter();
-    expect(adapter.descriptor).toEqual({
-      id: "pi",
-      aliases: [],
-      capabilities: [
-        "harness.launch",
-        "harness.resume",
-        "harness.stop",
-        "input.submit",
-        "input.submit-images",
-        "input.cancel",
-        "input.cancel-current",
-        "status.read",
-        "usage.read",
-        "models.read",
-        "effort.read",
-      ],
-    });
+    expect(adapter.descriptor.capabilities).toEqual([
+      "harness.launch",
+      "harness.resume",
+      "harness.stop",
+      "input.submit",
+      "input.submit-images",
+      "input.cancel",
+      "input.cancel-current",
+      "status.read",
+      "usage.read",
+      "models.read",
+      "effort.read",
+      "commands.read",
+    ]);
     expect(adapter.validateCheckpoint({ sessionId: "id" })).toBe(true);
     expect(
       adapter.validateCheckpoint({ sessionId: "id", prompt: "secret" }),

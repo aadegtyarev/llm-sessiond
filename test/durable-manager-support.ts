@@ -61,6 +61,9 @@ export function setup(
     ...(overrides.effortCatalog
       ? { effortCatalog: overrides.effortCatalog }
       : {}),
+    ...(overrides.commandCatalog
+      ? { commandCatalog: overrides.commandCatalog }
+      : {}),
   });
   const manager = new DurableSessionManager(
     store,

@@ -4,6 +4,7 @@ import type { ExecutionInputPort } from "./execution-input-port.js";
 import type { LiveStatusExecutionPort } from "./live-status.js";
 import type { ModelCatalogExecutionPort } from "./model-catalog.js";
 import type { EffortCatalogExecutionPort } from "./effort-catalog.js";
+import type { CommandCatalogExecutionPort } from "./command-catalog.js";
 
 export interface LifecycleLaunchResult {
   nativeSessionId?: string;
@@ -14,6 +15,7 @@ export interface LifecycleExecution {
   readonly liveStatus?: LiveStatusExecutionPort | undefined;
   readonly modelCatalog?: ModelCatalogExecutionPort | undefined;
   readonly effortCatalog?: EffortCatalogExecutionPort | undefined;
+  readonly commandCatalog?: CommandCatalogExecutionPort | undefined;
   launch(input: {
     cwd: string;
     options?: JsonValue;

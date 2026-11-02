@@ -17,6 +17,7 @@ export const piDescriptor = {
     "usage.read",
     "models.read",
     "effort.read",
+    "commands.read",
   ],
 };
 

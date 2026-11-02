@@ -46,6 +46,9 @@ class TrackedExecution implements LifecycleExecution {
   get effortCatalog() {
     return this.execution.effortCatalog;
   }
+  get commandCatalog() {
+    return this.execution.commandCatalog;
+  }
   launch(input: Parameters<LifecycleExecution["launch"]>[0]) {
     return this.execution.launch(input);
   }

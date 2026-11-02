@@ -22,6 +22,9 @@ export class PiLifecycleExecution implements LifecycleExecution {
   get effortCatalog() {
     return { readEffortCatalog: () => this.process.readEffortCatalog() };
   }
+  get commandCatalog() {
+    return { readCommandCatalog: () => this.process.readCommandCatalog() };
+  }
   constructor(
     private readonly adapter: PiLifecycleAdapter,
     private readonly provider: ProcessProvider,

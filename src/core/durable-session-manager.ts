@@ -70,6 +70,7 @@ export class DurableSessionManager {
   readLiveStatus = (id: string) => q.readDurableLiveStatus(this.context, id);
   readModelCatalog = (id: string) => q.readModelCatalog(this.context, id);
   readEffortCatalog = (id: string) => q.readEffortCatalog(this.context, id);
+  readCommandCatalog = (id: string) => q.readCommandCatalog(this.context, id);
   create(input: {
     cwd: string;
     harnessId?: string;

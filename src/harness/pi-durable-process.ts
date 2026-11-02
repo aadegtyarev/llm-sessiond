@@ -6,6 +6,11 @@ import { PiDurableRpcLink } from "./pi-durable-rpc-link.js";
 import { PiDurableInputPort } from "./pi-durable-input-port.js";
 import { startOwnedPi } from "./pi-durable-startup-query.js";
 import * as durableReadQueries from "./pi-durable-read-queries.js";
+import {
+  readDurablePiCommandCatalog as readCommands,
+  readDurablePiEffortCatalog as readEffort,
+  readDurablePiModelCatalog as readModels,
+} from "./pi-durable-read-queries.js";
 export class PiDurableProcess {
   readonly inputs = new PiDurableInputPort();
   private child?: ChildProcess;
@@ -54,25 +59,20 @@ export class PiDurableProcess {
       () => this.isQueryCurrent(link),
     );
   }
-  readModelCatalog() {
-    return durableReadQueries.readDurablePiModelCatalog(this.link, (link) =>
-      this.isQueryCurrent(link),
-    );
-  }
-  readEffortCatalog() {
-    return durableReadQueries.readDurablePiEffortCatalog(this.link, (link) =>
-      this.isQueryCurrent(link),
-    );
-  }
-  private isQueryCurrent(link: PiDurableRpcLink): boolean {
-    return durableReadQueries.isDurablePiQueryCurrent(
+  readModelCatalog = () =>
+    readModels(this.link, (link) => this.isQueryCurrent(link));
+  readEffortCatalog = () =>
+    readEffort(this.link, (link) => this.isQueryCurrent(link));
+  readCommandCatalog = () =>
+    readCommands(this.link, (link) => this.isQueryCurrent(link));
+  private isQueryCurrent = (link: PiDurableRpcLink): boolean =>
+    durableReadQueries.isDurablePiQueryCurrent(
       this.link,
       link,
       this.child,
       this.stopRequested,
       this.stopped,
     );
-  }
   stop(): Promise<void> {
     this.stopRequested = true;
     this.inputs.end();
