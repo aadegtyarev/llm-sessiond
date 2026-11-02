@@ -38,21 +38,21 @@ export class OwnerLock {
     return this.releasePromise;
   }
   private async releaseOwnedLock(): Promise<void> {
+    const file = path.join(this.directory, "owner.json");
+    let owner: Partial<Owner>;
     try {
-      const file = path.join(this.directory, "owner.json");
-      let owner: Partial<Owner>;
-      try {
-        owner = JSON.parse(await readFile(file, "utf8")) as Partial<Owner>;
-      } catch {
-        return;
-      }
-      if (owner.pid !== process.pid || owner.token !== this.token) return;
-      const keys = Object.keys(owner).sort().join(",");
-      if (keys !== "pid,token") return;
-      await unlink(file);
-      await rmdir(this.directory);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+      owner = JSON.parse(await readFile(file, "utf8")) as Partial<Owner>;
+    } catch {
+      throw new SafeValidationError("OWNER_LOCK_CHANGED");
     }
+    const keys = Object.keys(owner).sort().join(",");
+    if (
+      owner.pid !== process.pid ||
+      owner.token !== this.token ||
+      keys !== "pid,token"
+    )
+      throw new SafeValidationError("OWNER_LOCK_CHANGED");
+    await unlink(file);
+    await rmdir(this.directory);
   }
 }

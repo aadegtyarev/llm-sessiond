@@ -77,7 +77,7 @@ describe("cross-process owner lock", () => {
         path.join(lockDir, "owner.json"),
         JSON.stringify({ pid: process.pid, token: "different" }),
       );
-      await owner.release();
+      await expect(owner.release()).rejects.toThrow("OWNER_LOCK_CHANGED");
       expect(
         await readFile(path.join(lockDir, "owner.json"), "utf8"),
       ).toContain("different");
