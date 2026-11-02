@@ -5,7 +5,7 @@ import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import {
   assertCurrentOwner,
   assertExecutionAdmissionOpen,
-  checkedCheckpoint,
+  captureLifecycleResult,
   markRunning,
   requireCapability,
   resolveAdapter,
@@ -74,22 +74,16 @@ export async function resumeSession(
     await finalizeExecutionFailure(context, row, execution, "RESUME_FAILED");
     return DurableSessionManagerRead.get(context.store, id);
   }
-  let savedCheckpoint;
+  let capturedResult;
   try {
-    savedCheckpoint = checkedCheckpoint(adapter, result.checkpoint);
+    capturedResult = captureLifecycleResult(adapter, row, result);
   } catch {
     await finalizeExecutionFailure(context, row, execution, "RESUME_FAILED");
     return DurableSessionManagerRead.get(context.store, id);
   }
   try {
     assertExecutionAdmissionOpen(context);
-    markRunning(
-      context,
-      row,
-      execution!,
-      result,
-      savedCheckpoint ?? row.adapterState,
-    );
+    markRunning(context, row, execution!, capturedResult);
   } catch {
     await finalizeExecutionFailure(context, row, execution, "RESUME_FAILED");
     throw new ControlPlaneError("OPERATION_FAILED");

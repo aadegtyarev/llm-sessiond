@@ -39,22 +39,39 @@ export function checkedCheckpoint(
 ) {
   return value ? validateCheckpoint(value, adapter) : undefined;
 }
-export function markRunning(
-  context: DurableManagerContext,
+export interface CapturedLifecycleResult {
+  nativeSessionId?: string;
+  checkpoint?: DurableSession["adapterState"];
+}
+export function captureLifecycleResult(
+  adapter: HarnessAdapter,
   row: DurableSession,
-  execution: LifecycleExecution,
   result: {
     nativeSessionId?: string;
     checkpoint?: DurableSession["adapterState"];
   },
-  checkpoint: DurableSession["adapterState"],
+): CapturedLifecycleResult {
+  const nativeSessionId = result.nativeSessionId ?? row.nativeSessionId;
+  const checkpoint =
+    checkedCheckpoint(adapter, result.checkpoint) ?? row.adapterState;
+  return {
+    ...(nativeSessionId !== undefined ? { nativeSessionId } : {}),
+    ...(checkpoint ? { checkpoint: structuredClone(checkpoint) } : {}),
+  };
+}
+export function markRunning(
+  context: DurableManagerContext,
+  row: DurableSession,
+  execution: LifecycleExecution,
+  result: CapturedLifecycleResult,
 ): void {
   context.store.updateExecution(
     row.id,
-    result.nativeSessionId ?? row.nativeSessionId,
-    checkpoint,
+    result.nativeSessionId,
+    result.checkpoint,
     context.owner,
   );
+  assertExecutionAdmissionOpen(context);
   context.store.setStatus(row.id, "running", null, null);
   context.owned.set(row.id, execution);
 }
