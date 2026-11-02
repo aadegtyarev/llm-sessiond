@@ -5,6 +5,8 @@ export interface ExecutionInputSource {
   execution: LifecycleExecution;
   generation: number;
   live: boolean;
+  executionLive: boolean;
+  stopping: boolean;
   subscribed: boolean;
   closed: boolean;
   unsubscribe?: () => void;
@@ -29,11 +31,20 @@ export class ExecutionInputSources {
       execution,
       generation,
       live: true,
+      executionLive: true,
+      stopping: false,
       subscribed: false,
       closed: false,
     };
     this.current.set(sessionId, source);
-    const port = execution.inputs;
+    let port;
+    try {
+      port = execution.inputs;
+    } catch {
+      source.executionLive = false;
+      source.live = false;
+      return source;
+    }
     if (!port) {
       source.live = false;
       return source;
@@ -48,6 +59,7 @@ export class ExecutionInputSources {
       source.subscribed = true;
     } catch {
       source.live = false;
+      source.executionLive = false;
     }
     return source;
   }

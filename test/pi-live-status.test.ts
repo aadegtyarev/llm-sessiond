@@ -29,7 +29,23 @@ describe("Pi live status projection", () => {
       },
     });
   });
-  it("rejects malformed known native values", () => {
+  it("preserves a missing or valid model name and rejects malformed names", () => {
+    expect(
+      projectPiLiveStatus({ model: { provider: "p", id: "m" } }, {}).model,
+    ).toEqual({ provider: "p", id: "m", name: "m" });
+    expect(
+      projectPiLiveStatus(
+        { model: { provider: "p", id: "m", name: "Shown" } },
+        {},
+      ).model?.name,
+    ).toBe("Shown");
+    for (const name of [123, null, {}]) {
+      expect(() =>
+        projectPiLiveStatus({ model: { provider: "p", id: "m", name } }, {}),
+      ).toThrow("INVALID_LIVE_STATUS");
+    }
+  });
+  it("rejects other malformed known native values", () => {
     expect(() => projectPiLiveStatus({ model: "bad" }, {})).toThrow(
       "INVALID_LIVE_STATUS",
     );

@@ -19,6 +19,7 @@ export class InputOperationEventReceiver {
     const operation = this.active.get(source.sessionId);
     if (event.kind === "execution-ended") {
       source.live = false;
+      source.executionLive = false;
       if (operation?.source === source) {
         operation.executionEnded = true;
         this.uncertain(operation);

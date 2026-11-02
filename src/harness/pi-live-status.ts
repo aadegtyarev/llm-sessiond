@@ -18,10 +18,13 @@ function model(value: unknown): LiveStatus["model"] {
     typeof native.id !== "string"
   )
     throw new Error("INVALID_LIVE_STATUS");
+  const name = native.name;
+  if (Object.hasOwn(native, "name") && typeof name !== "string")
+    throw new Error("INVALID_LIVE_STATUS");
   return {
     provider: native.provider,
     id: native.id,
-    name: typeof native.name === "string" ? native.name : native.id,
+    name: Object.hasOwn(native, "name") ? (name as string) : native.id,
   };
 }
 function usage(value: unknown): LiveUsage | undefined {

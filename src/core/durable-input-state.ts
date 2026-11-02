@@ -62,7 +62,9 @@ export class DurableInputState {
   }
   markStopping(sessionId: string, execution: LifecycleExecution): void {
     const source = this.source(sessionId, execution);
-    if (source) this.ledger.markStopping(sessionId, source);
+    if (!source) return;
+    source.stopping = true;
+    this.ledger.markStopping(sessionId, source);
   }
   confirmExecution(sessionId: string, execution: LifecycleExecution): boolean {
     const source = this.source(sessionId, execution);

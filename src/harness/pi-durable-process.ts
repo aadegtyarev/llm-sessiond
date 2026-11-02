@@ -5,8 +5,7 @@ import { terminateChild } from "../process/terminate-child.js";
 import { PiDurableRpcLink } from "./pi-durable-rpc-link.js";
 import { PiDurableInputPort } from "./pi-durable-input-port.js";
 import { startDurablePi } from "./pi-durable-startup.js";
-import { projectPiLiveStatus } from "./pi-live-status.js";
-
+import { readPiLiveStatus } from "./pi-live-status-query.js";
 export class PiDurableProcess {
   readonly inputs = new PiDurableInputPort();
   private child?: ChildProcess;
@@ -56,30 +55,17 @@ export class PiDurableProcess {
   }
   async readLiveStatus() {
     const link = this.link;
-    if (!link || this.stopRequested || this.stopped || !link.writable)
-      throw new Error("RPC_UNAVAILABLE");
-    const [stateReply, statsReply] = await Promise.all([
-      link.command("get_state", {}),
-      link.command("get_session_stats", {}),
-    ]);
-    if (this.link !== link || this.stopRequested || this.stopped)
-      throw new Error("RPC_UNAVAILABLE");
-    const state = this.controlData(stateReply);
-    const stats = this.controlData(statsReply);
-    if (state.sessionId !== this.nativeSessionId)
-      throw new Error("INVALID_LIVE_STATUS");
-    return projectPiLiveStatus(state, stats);
-  }
-  private controlData(reply: Record<string, unknown>): Record<string, unknown> {
-    const data = reply.data;
-    if (
-      reply.success !== true ||
-      typeof data !== "object" ||
-      data === null ||
-      Array.isArray(data)
-    )
-      throw new Error("INVALID_LIVE_STATUS");
-    return data as Record<string, unknown>;
+    if (!link) throw new Error("RPC_UNAVAILABLE");
+    return readPiLiveStatus(
+      link,
+      this.nativeSessionId,
+      () =>
+        this.link === link &&
+        !this.stopRequested &&
+        !this.stopped &&
+        this.child?.exitCode === null &&
+        this.child.signalCode === null,
+    );
   }
   stop(): Promise<void> {
     this.stopRequested = true;

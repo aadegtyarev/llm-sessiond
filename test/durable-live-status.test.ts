@@ -1,20 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { ControlPlaneError } from "../src/core/control-plane-error.js";
-import { setup, synthetic } from "./durable-manager-support.js";
+import { setup } from "./durable-manager-support.js";
+import { statusAdapter } from "./durable-live-status-support.js";
 
 describe("durable live status routing", () => {
   it("uses an optional port for any registered running execution", async () => {
-    const adapter = {
-      ...synthetic,
-      descriptor: {
-        ...synthetic.descriptor,
-        capabilities: [
-          ...synthetic.descriptor.capabilities,
-          "status.read",
-          "usage.read",
-        ],
-      },
-    };
+    const adapter = statusAdapter;
     const readLiveStatus = vi.fn(async () => ({
       model: { provider: "p", id: "m", name: "Model" },
       usage: { totalTokens: 0 },
@@ -40,7 +31,7 @@ describe("durable live status routing", () => {
     );
     expect(readLiveStatus).not.toHaveBeenCalled();
   });
-  it("does not expose a reply after the owned execution is replaced", async () => {
+  it("does not expose a reply after stop starts", async () => {
     let release!: (value: { effort: string }) => void;
     const readLiveStatus = vi.fn(
       () =>
@@ -49,17 +40,7 @@ describe("durable live status routing", () => {
         }),
     );
     const { manager } = setup({
-      adapter: {
-        ...synthetic,
-        descriptor: {
-          ...synthetic.descriptor,
-          capabilities: [
-            ...synthetic.descriptor.capabilities,
-            "status.read",
-            "usage.read",
-          ],
-        },
-      },
+      adapter: statusAdapter,
       liveStatus: { readLiveStatus },
     });
     const session = await manager.create({ cwd: process.cwd() });
@@ -71,17 +52,7 @@ describe("durable live status routing", () => {
   });
   it("rejects extra DTO fields", async () => {
     const { manager } = setup({
-      adapter: {
-        ...synthetic,
-        descriptor: {
-          ...synthetic.descriptor,
-          capabilities: [
-            ...synthetic.descriptor.capabilities,
-            "status.read",
-            "usage.read",
-          ],
-        },
-      },
+      adapter: statusAdapter,
       liveStatus: {
         readLiveStatus: async () => ({ secret: "hidden" }) as never,
       },

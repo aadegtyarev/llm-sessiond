@@ -55,6 +55,7 @@ export function setup(
       (async () => {
         calls.push("stop");
       }),
+    ...(overrides.inputs ? { inputs: overrides.inputs } : {}),
     ...(overrides.liveStatus ? { liveStatus: overrides.liveStatus } : {}),
   });
   const manager = new DurableSessionManager(
