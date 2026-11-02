@@ -4,7 +4,9 @@
 
 The service owns harness processes through `HarnessAdapter` and `ProcessProvider` ports. Pi's v1 lifecycle remains as specified below. The v2 Claude lifecycle uses the durable manager and adapter checkpoint.
 
-The default `main.ts` composition remains the v1 service and does not activate durable-runtime HTTP discovery. An embedding caller may inject an already prepared durable runtime into the existing API server for the two v2 discovery GETs only. The server neither creates nor owns that runtime, acquires its store/owner lock, starts providers, nor shuts it down. Discovery readiness is fenced by the runtime's current store ownership and synchronous closing state; it does not assert full v2 lifecycle readiness.
+The default `main.ts` composition remains the v1 service and does not activate durable-runtime HTTP routes. An embedding caller may inject an already prepared durable runtime into the existing API server for health/harness discovery and the basic four-route session cycle when a manager is present. Discovery-only injection profiles remain valid. The server neither creates nor owns that runtime, acquires its store/owner lock, starts providers, nor shuts it down. Readiness is fenced by current store ownership and synchronous closing state; it does not assert full v2 lifecycle readiness.
+
+Terminal runtime shutdown closes the existing manager's create/resume admission synchronously. In-flight preflight, lock waits, execution-method capture, and native-result publication are fenced so closure cannot admit a late row/launch or publish a new `running` state. Work admitted before closure remains tracked for drain/unconfirmed shutdown reporting. Stop and physical cleanup remain available; failed cleanup is retained rather than represented as stopped.
 
 ## Claude lifecycle (API v2)
 

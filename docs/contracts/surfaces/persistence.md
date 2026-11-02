@@ -23,7 +23,7 @@ Startup reconciliation does not launch, resume, or replay. `running|starting` be
 
 Daemon: readiness off, begin close, invalidate guards/callbacks, bounded drain/stop/join owned instances, then close transports/store. Client shutdown/disconnect only detaches: it does not stop daemon sessions/processes. Hard crash does not prove OS descendants disappeared; no orphan-cleanup/reattach guarantee from rows.
 
-Prepared-runtime HTTP discovery checks the existing store owner generation and the runtime's synchronously recorded closing state. Injecting it does not open a database, acquire an owner lock, change schema/recovery, or transfer store/runtime shutdown ownership to the HTTP server.
+Prepared-runtime HTTP discovery and the injected basic session cycle check the existing store owner generation and the runtime's synchronously recorded closing state. List/detail expose durable-row snapshots, not proof of a live native process; create reports the manager's actual persisted status and stop reports success only after confirmed cleanup. Injecting the runtime does not open a database, acquire an owner lock, change schema/recovery, or transfer store/runtime shutdown ownership to the HTTP server. Terminal shutdown closes create/resume admission before draining owned work; it does not claim cleanup for work that may still escape.
 
 Store path precedence: `LLM_SESSIOND_STATE_DIR`, `$XDG_STATE_HOME/llm-sessiond`, then home state directory. POSIX private ownership/mode; Windows requires fully qualified drive/UNC path without claiming specific ACL behavior. Cwd is validated via daemon OS realpath/access; reject relative/drive-relative paths. Windows drive/UNC paths are not client-converted to POSIX/URI. Cwd is not a sandbox.
 

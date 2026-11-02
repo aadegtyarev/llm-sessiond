@@ -10,7 +10,9 @@ Core owns generic session lifecycle, persistence, registry, and capability routi
 
 Registry descriptor: `{id,aliases:string[],capabilities:string[],metadata?:Record<string,string>,options?:OptionDescriptor[],extensions?:ExtensionDescriptor[]}`. Option descriptor is `{key,label,values,allowCustom?,defaultValue?,dangerousValues?}`. Registry states each adapter's true capability subset; no synthetic parity (for example, no Pi-only feature implied for Claude).
 
-The optional HTTP discovery slice projects descriptors from the prepared runtime registry in registry order, resolving the configured default alias to its canonical descriptor ID. It snapshots plain public data and revalidates the standard strict descriptor shape; mutated or malformed registrations fail closed. Descriptor capabilities report backend adapter support, not which API mutation routes are currently exposed. Discovery does not add capability routing or session operations.
+The optional HTTP discovery slice projects descriptors from the prepared runtime registry in registry order, resolving the configured default alias to its canonical descriptor ID. It snapshots plain public data and revalidates the standard strict descriptor shape; mutated or malformed registrations fail closed. Descriptor capabilities report backend adapter support, not which API mutation routes are currently exposed.
+
+The injected basic HTTP session cycle uses the existing durable manager for create/list/detail/stop only. Its public DTO is the generic `Session` whitelist; reads report durable metadata and do not assert native-process liveness. Create preserves the actual returned lifecycle status, including failed/uncertain startup, while stop succeeds only after confirmed cleanup. It does not implement configuration, callbacks, resume, inputs, queries, or route-driven capability discovery; see [API v2](api-v2.md).
 
 ## Standard capabilities
 
