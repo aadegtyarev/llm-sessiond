@@ -9,7 +9,7 @@ import { createDurableRuntime } from "../src/harness/durable-runtime.js";
 import { OwnedStoreLease } from "../src/persistence/owned-store.js";
 import { openSessionDatabase } from "../src/persistence/sqlite-database.js";
 import { SessionRepository } from "../src/persistence/session-repository.js";
-import { close, listen } from "./v2-http-discovery-support.js";
+import { close, expectSafeError, listen } from "./v2-http-discovery-support.js";
 
 describe("v2 discovery owner loss", () => {
   it("returns safe unavailable after the prepared store loses its lease", async () => {
@@ -44,9 +44,12 @@ describe("v2 discovery owner loss", () => {
     const base = await listen(server);
     try {
       await lease.release();
-      const response = await fetch(`${base}/api/v2/health`);
-      expect(response.status).toBe(503);
-      expect(await response.text()).not.toContain(lease.generation.token);
+      const error = await expectSafeError(
+        await fetch(`${base}/api/v2/health`),
+        503,
+        "unavailable",
+      );
+      expect(JSON.stringify(error)).not.toContain(lease.generation.token);
     } finally {
       await close(server);
       await runtime.shutdown().catch(() => undefined);

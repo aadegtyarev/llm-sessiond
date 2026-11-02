@@ -9,7 +9,13 @@ import { createDurableRuntime } from "../src/harness/durable-runtime.js";
 import { OwnedStoreLease } from "../src/persistence/owned-store.js";
 import { openSessionDatabase } from "../src/persistence/sqlite-database.js";
 import { SessionRepository } from "../src/persistence/session-repository.js";
-import { assertLegacyV1, close, listen } from "./v2-http-discovery-support.js";
+import {
+  assertFreshBootAndClosing,
+  assertLegacyV1,
+  close,
+  expectSafeError,
+  listen,
+} from "./v2-http-discovery-support.js";
 
 describe("prepared-runtime v2 HTTP discovery", () => {
   it("serves real registry discovery and readiness only when injected", async () => {
@@ -67,29 +73,23 @@ describe("prepared-runtime v2 HTTP discovery", () => {
         defaultHarnessId: "third-party",
         harnesses: [adapter.descriptor],
       });
-      expect((await fetch(`${base}/api/v2/unsupported`)).status).toBe(404);
-      expect(
-        (await fetch(`${base}/api/v2/health`, { method: "POST" })).status,
-      ).toBe(404);
-      Object.defineProperty(adapter.descriptor, "id", {
-        get: () => {
-          throw Error("private failure");
-        },
-      });
-      const badDescriptor = await fetch(`${base}/api/v2/harnesses`);
-      expect(badDescriptor.status).toBe(503);
-      expect(await badDescriptor.text()).not.toContain("private failure");
-      Object.defineProperty(adapter.descriptor, "id", { value: "third-party" });
+      await expectSafeError(
+        await fetch(`${base}/api/v2/unsupported`),
+        404,
+        "not-found",
+      );
+      await expectSafeError(
+        await fetch(`${base}/api/v2/health`, { method: "POST" }),
+        404,
+        "not-found",
+      );
       await assertLegacyV1(service);
-      const restarted = createApiServer(service, "127.0.0.1", runtime);
-      const newBase = await listen(restarted);
-      const newHealth = await (await fetch(`${newBase}/api/v2/health`)).json();
-      expect(newHealth.instanceId).not.toBe(health.instanceId);
-      await close(restarted);
-      const shutting = runtime.shutdown();
-      expect((await fetch(`${base}/api/v2/health`)).status).toBe(503);
-      await shutting;
-      await lease.release();
+      await assertFreshBootAndClosing(
+        service,
+        runtime,
+        base,
+        health.instanceId,
+      );
     } finally {
       await close(server);
       await lease.release();

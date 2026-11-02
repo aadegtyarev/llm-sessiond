@@ -1,27 +1,14 @@
 import { randomUUID } from "node:crypto";
 import type { ServerResponse } from "node:http";
-import { z } from "zod";
 import type { HarnessRegistry } from "../core/adapter-registry.js";
-import { validateJson } from "../core/json-bounds.js";
+import { SERVICE_VERSION } from "./service-version.js";
+import { snapshotDiscoveryDescriptor } from "./v2-discovery-descriptor.js";
 import { sendJson } from "./http-support.js";
 
 export interface V2DiscoveryRuntime {
   registry: HarnessRegistry;
   assertReady(): void;
 }
-
-const descriptorSchema = z.strictObject({
-  id: z.string(),
-  aliases: z.array(z.string()),
-  capabilities: z.array(z.string()),
-  metadata: z.record(z.string(), z.string()).optional(),
-  options: z.array(z.record(z.string(), z.unknown())).optional(),
-  extensions: z.array(z.record(z.string(), z.unknown())).optional(),
-});
-const harnessesSchema = z.strictObject({
-  defaultHarnessId: z.string(),
-  harnesses: z.array(descriptorSchema),
-});
 
 export function createV2Discovery(runtime: V2DiscoveryRuntime) {
   const instanceId = randomUUID();
@@ -30,14 +17,13 @@ export function createV2Discovery(runtime: V2DiscoveryRuntime) {
     method: string,
     response: ServerResponse,
   ): Promise<boolean> {
-    if (path !== "/api/v2" && !path.startsWith("/api/v2/")) return false;
-    runtime.assertReady();
     if (method === "GET" && path === "/api/v2/health") {
+      runtime.assertReady();
       sendJson(response, 200, {
         apiVersion: "v2",
         protocolRevision: 1,
         status: "ready",
-        serviceVersion: process.env.npm_package_version ?? "0.1.0",
+        serviceVersion: SERVICE_VERSION,
         instanceId,
         supportedApiVersions: ["v1", "v2"],
         features: [],
@@ -45,16 +31,19 @@ export function createV2Discovery(runtime: V2DiscoveryRuntime) {
       return true;
     }
     if (method === "GET" && path === "/api/v2/harnesses") {
-      const defaultHarnessId = runtime.registry.resolve(
+      runtime.assertReady();
+      const defaultAdapter = runtime.registry.resolve(
         runtime.registry.defaultId,
-      ).descriptor.id;
-      const harnesses = runtime.registry.list().map((adapter) => {
-        const source: unknown = adapter.descriptor;
-        validateJson(source, 65536, 20);
-        return descriptorSchema.parse(source);
-      });
+      );
+      const adapters = runtime.registry.list();
+      const defaultIndex = adapters.indexOf(defaultAdapter);
+      if (defaultIndex < 0)
+        throw new TypeError("default harness is not registered");
+      const harnesses = adapters.map((adapter) =>
+        snapshotDiscoveryDescriptor(adapter.descriptor),
+      );
+      const defaultHarnessId = harnesses[defaultIndex]!.id;
       const value = { defaultHarnessId, harnesses };
-      harnessesSchema.parse(value);
       runtime.assertReady();
       sendJson(response, 200, value);
       return true;

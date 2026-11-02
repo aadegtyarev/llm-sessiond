@@ -5,6 +5,7 @@ import { sendJson } from "./http-support.js";
 import { errorSchema } from "./schemas.js";
 import { route } from "./routes.js";
 import { attachWebSocket } from "./ws-server.js";
+import { sendV2Error } from "./v2-error.js";
 import { createV2Discovery, type V2DiscoveryRuntime } from "./v2-discovery.js";
 export function createApiServer(
   service: SessionService,
@@ -15,20 +16,17 @@ export function createApiServer(
   const discover = v2Runtime ? createV2Discovery(v2Runtime) : undefined;
   const server = createServer(async (request, response) => {
     try {
-      await route(service, request, response, discover);
+      const result = await route(service, request, response, discover);
+      if (result === "v2-not-found") {
+        sendV2Error(response, 404);
+        return;
+      }
     } catch (error) {
       const path = new URL(request.url ?? "/", "http://127.0.0.1").pathname;
       const isV2 =
         !!discover && (path === "/api/v2" || path.startsWith("/api/v2/"));
       if (isV2) {
-        const unavailable = !(error instanceof ApiError);
-        const status = unavailable ? 503 : error.status;
-        sendJson(response, status, {
-          code: unavailable ? "UNAVAILABLE" : error.code,
-          message: unavailable ? "service unavailable" : error.message,
-          category: unavailable ? "unavailable" : "not-found",
-          outcome: "not-applied",
-        });
+        sendV2Error(response, 503);
         return;
       }
       const api =

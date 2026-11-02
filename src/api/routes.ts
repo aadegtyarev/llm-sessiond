@@ -5,6 +5,7 @@ import { harnessesResponseSchema, healthResponseSchema } from "./schemas.js";
 import { sendJson } from "./http-support.js";
 import { sessionRoute } from "./session-routes.js";
 
+export type RouteResult = "v2-not-found" | undefined;
 export async function route(
   service: SessionService,
   request: IncomingMessage,
@@ -14,17 +15,17 @@ export async function route(
     method: string,
     response: ServerResponse,
   ) => Promise<boolean>,
-): Promise<void> {
+): Promise<RouteResult> {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const method = request.method ?? "GET";
   const path = url.pathname;
   if (v2Discover && (path === "/api/v2" || path.startsWith("/api/v2/"))) {
     const handled = await v2Discover(path, method, response);
-    if (!handled) throw new ApiError(404, "NOT_FOUND", "route not found");
+    if (!handled) return "v2-not-found";
     return;
   }
-  if (method === "GET" && path === "/api/v1/health")
-    return sendJson(
+  if (method === "GET" && path === "/api/v1/health") {
+    sendJson(
       response,
       200,
       {
@@ -34,8 +35,10 @@ export async function route(
       },
       healthResponseSchema,
     );
-  if (method === "GET" && path === "/api/v1/harnesses")
-    return sendJson(
+    return;
+  }
+  if (method === "GET" && path === "/api/v1/harnesses") {
+    sendJson(
       response,
       200,
       {
@@ -54,7 +57,11 @@ export async function route(
       },
       harnessesResponseSchema,
     );
-  if (path.startsWith("/api/v1/sessions"))
-    return sessionRoute(service, request, response, path);
+    return;
+  }
+  if (path.startsWith("/api/v1/sessions")) {
+    await sessionRoute(service, request, response, path);
+    return;
+  }
   throw new ApiError(404, "NOT_FOUND", "route not found");
 }

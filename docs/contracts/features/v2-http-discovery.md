@@ -22,3 +22,11 @@ Affected contracts: [API v2](../surfaces/api-v2.md), [control plane](../surfaces
 Exercise both GETs through a real ephemeral-loopback HTTP server with an actually prepared durable runtime, plus no-injection v1 compatibility and readiness loss/close/error privacy. Cover aliases, canonical default, descriptor snapshot safety, stable/fresh boot identity, actual service version, empty features, third-party registry entry, and no native child launch.
 
 Run Node 24 tests, typecheck, build, lint, format, version, audit, package dry-run, diff checks, and the 100-physical-line authored-file limit. No claim of full API v2 or production daemon readiness.
+
+## Review-required boundary invariants
+
+- Copy descriptor fields and nested JSON into independent plain data before strict validation; preserve source order and declared values, run the final owner/readiness fence after validation, and never emit source references or hooks.
+- Apply the existing strict adapter descriptor schema after snapshot, including options, extension operations/events, IDs, aliases, and capabilities. Keep established option bounds; invent no public limits.
+- Every exception from prepared runtime/registry/descriptors is untrusted and maps to fixed unavailable 503. Unknown route/method is an explicit safe 404 result, not a trusted backend exception. Preserve legacy v1 error behavior.
+- V2 404/503 use the full strict safe error DTO with opaque reference and outcome `not-applied`; never expose backend error fields.
+- Health service version is captured from this service's package metadata at module/boot initialization, independent of caller environment and stable across requests; v1 version behavior is unchanged.
