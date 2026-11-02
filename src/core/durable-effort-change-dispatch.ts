@@ -1,6 +1,5 @@
 import { EffortChangeError } from "./effort-change-error.js";
 import type { DurableManagerContext } from "./durable-manager-context.js";
-import type { LifecycleIntent } from "./durable-lifecycle-intents.js";
 import type { LifecycleExecution } from "./lifecycle-execution.js";
 import type { EffortChangeCallContext } from "./effort-change-port.js";
 import { createEffortChangeFence } from "./durable-effort-change-fence.js";
@@ -15,7 +14,6 @@ export async function dispatchDurableEffortChange(
   manager: DurableManagerContext,
   id: string,
   level: string,
-  intent: LifecycleIntent,
   deadline: number,
   isActive: () => boolean,
   markMutationPossible: () => void,
@@ -28,12 +26,6 @@ export async function dispatchDurableEffortChange(
     throw new EffortChangeError("SESSION_NOT_RUNNING", "not-applied");
   const adapter = resolveAdapter(manager.registry, session.harnessId);
   requireCapability(adapter, "effort.change");
-  const intents = manager.lifecycleIntents.get(id);
-  if (
-    manager.pending.has(id) ||
-    [...(intents ?? [])].some((token) => token !== intent.token)
-  )
-    throw new EffortChangeError("SESSION_UNAVAILABLE", "not-applied");
   const execution = manager.owned.get(id);
   if (!execution)
     throw new EffortChangeError("SESSION_UNAVAILABLE", "not-applied");
@@ -64,7 +56,6 @@ export async function dispatchDurableEffortChange(
     execution,
     source,
     generation,
-    intent,
     deadline,
     isActive,
     markMutationPossible,
@@ -86,6 +77,11 @@ export async function dispatchDurableEffortChange(
       mutationPossible() ? "unknown" : "not-applied",
     );
   const outcome = readEffortChangeOutcome(result);
+  if (!callContext.isCurrent())
+    throw new EffortChangeError(
+      "SESSION_UNAVAILABLE",
+      mutationPossible() ? "unknown" : "not-applied",
+    );
   if (outcome === "not-applied" && !mutationPossible())
     throw new EffortChangeError("OPERATION_FAILED", "not-applied");
   if (outcome !== "applied" || !mutationPossible())

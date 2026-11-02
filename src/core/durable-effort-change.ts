@@ -1,11 +1,7 @@
 import { ControlPlaneError } from "./control-plane-error.js";
 import { EffortChangeError } from "./effort-change-error.js";
 import type { DurableManagerContext } from "./durable-manager-context.js";
-import {
-  beginLifecycleIntent,
-  endLifecycleIntent,
-  hasLifecycleIntent,
-} from "./durable-lifecycle-intents.js";
+import { hasLifecycleIntent } from "./durable-lifecycle-intents.js";
 import { dispatchDurableEffortChange } from "./durable-effort-change-dispatch.js";
 
 const EFFORT_CHANGE_TIMEOUT_MS = 30_000;
@@ -24,7 +20,6 @@ export function changeDurableEffort(
       new EffortChangeError("SESSION_UNAVAILABLE", "not-applied"),
     );
   const deadline = Date.now() + EFFORT_CHANGE_TIMEOUT_MS;
-  const intent = beginLifecycleIntent(manager, [id]);
   let active = true;
   let mutationPossible = false;
   let settled = false;
@@ -35,7 +30,6 @@ export function changeDurableEffort(
       settled = true;
       active = false;
       clearTimeout(timer);
-      endLifecycleIntent(manager, intent);
       if (error !== undefined)
         reject(safeFailure(error, mutationPossible, deadline));
       else resolve(result!);
@@ -52,7 +46,6 @@ export function changeDurableEffort(
       manager,
       id,
       level,
-      intent,
       deadline,
       () => active,
       () => {
