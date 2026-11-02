@@ -27,10 +27,9 @@ input.on("line", (line) => {
       is_error: mode === "text-error",
       ...(mode === "text-error" ? {} : { result: "ok" }),
     };
-    process.stdout.write(`${JSON.stringify(replay)}\n`);
-    if (mode === "text-error")
-      setTimeout(() => process.stdout.write(`${JSON.stringify(result)}\n`), 20);
-    else process.stdout.write(`${JSON.stringify(result)}\n`);
+    process.stdout.write(
+      `${JSON.stringify(replay)}\n${JSON.stringify(result)}\n`,
+    );
     return;
   }
   if (request.type !== "control_request") return;

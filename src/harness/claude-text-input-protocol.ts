@@ -1,6 +1,12 @@
 export type ClaudeInputRecord =
   "ack" | "success" | "failure" | "ignore" | "invalid";
 
+const MAX_RECORD_BYTES = 1024 * 1024;
+export function claudeUserWire(text: string): string | undefined {
+  const wire = `${JSON.stringify({ type: "user", message: { role: "user", content: text } })}\n`;
+  return Buffer.byteLength(wire) <= MAX_RECORD_BYTES ? wire : undefined;
+}
+
 // CLI stream-json exposes no proven daemon-input correlation ID; root replay/result
 // association relies on one active input and native ordered turn delivery.
 export function classifyClaudeInputRecord(

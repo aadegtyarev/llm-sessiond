@@ -19,22 +19,26 @@ export function inputSubmitResult(
       operation.id,
       operation.resumed,
     );
-  if (operation.terminal === "failed")
-    throw new InputRuntimeError(
-      "INPUT_REJECTED",
-      operation.id,
-      operation.resumed,
-      operation.failureReason,
-    );
   if (
     operation.terminal === "stopped" ||
     operation.stopInvalidated ||
-    operation.executionEnded
+    operation.executionEnded ||
+    !operation.source.live
   )
     throw new InputRuntimeError(
       "INPUT_UNCERTAIN",
       operation.id,
       operation.resumed,
+    );
+  if (
+    operation.terminal === "failed" &&
+    operation.failureReason === "prompt_rejected"
+  )
+    throw new InputRuntimeError(
+      "INPUT_REJECTED",
+      operation.id,
+      operation.resumed,
+      operation.failureReason,
     );
   return { inputId: operation.id, resumed: operation.resumed };
 }

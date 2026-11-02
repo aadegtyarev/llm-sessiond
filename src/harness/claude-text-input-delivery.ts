@@ -1,37 +1,40 @@
 import type { InputCommandOutcome } from "../core/execution-input-port.js";
-import { classifyClaudeInputRecord } from "./claude-text-input-protocol.js";
+import { claudeUserWire } from "./claude-text-input-protocol.js";
+import {
+  ClaudeTextInputDeliveryRecords,
+  type ClaudeDeliveryRecord,
+} from "./claude-text-input-delivery-records.js";
+import { ClaudeTextInputDeliveryFence } from "./claude-text-input-delivery-fence.js";
 import type {
   ClaudeInputEvent,
   ClaudeTextWriter,
 } from "./claude-text-input-types.js";
-type ClaudeDeliveryRecord =
-  ReturnType<typeof classifyClaudeInputRecord> | "out-of-order";
-
-const MAX_RECORD_BYTES = 1024 * 1024;
 export class ClaudeTextInputDelivery {
-  private resolve?: (outcome: InputCommandOutcome) => void;
   private timer?: ReturnType<typeof setTimeout>;
-  private ack = false;
+  private readonly records: ClaudeTextInputDeliveryRecords;
+  private readonly fence: ClaudeTextInputDeliveryFence;
   private written = false;
-  private accepted = false;
-  private finished = false;
-  private outcome?: "success" | "failure";
   constructor(
     private readonly id: string,
     private readonly text: string,
-    private readonly sessionId: string,
+    sessionId: string,
     private readonly writer: ClaudeTextWriter,
     private readonly timeoutMs: number,
     private readonly emit: (event: ClaudeInputEvent) => void,
     private readonly clearCurrent: () => void,
     private readonly failClosed: () => void,
-  ) {}
+  ) {
+    this.records = new ClaudeTextInputDeliveryRecords(sessionId, text);
+    this.fence = new ClaudeTextInputDeliveryFence(() =>
+      clearTimeout(this.timer),
+    );
+  }
   start(): Promise<InputCommandOutcome> {
-    const wire = `${JSON.stringify({ type: "user", message: { role: "user", content: this.text } })}\n`;
-    if (Buffer.byteLength(wire) > MAX_RECORD_BYTES)
+    const wire = claudeUserWire(this.text);
+    if (!wire)
       return Promise.resolve({ kind: "rejected", reason: "prompt_rejected" });
     return new Promise((resolve) => {
-      this.resolve = resolve;
+      this.fence.setResolver(resolve);
       this.timer = setTimeout(() => this.uncertain(), this.timeoutMs);
       try {
         this.writer(wire, (error) => this.writeCompleted(error));
@@ -42,27 +45,21 @@ export class ClaudeTextInputDelivery {
     });
   }
   record(line: string): ClaudeDeliveryRecord {
-    const record = classifyClaudeInputRecord(line, this.sessionId, this.text);
-    if (record === "ack") {
-      this.ack = true;
-      this.acceptIfConfirmed();
-    } else if (record === "success" || record === "failure") {
-      if (!this.ack) return "out-of-order";
-      this.outcome = record;
-      this.settleIfReady();
-    }
+    if (this.fence.fenced) return "ignore";
+    const record = this.records.record(line);
+    if (record === "ack") this.acceptIfConfirmed();
+    else if (record === "success" || record === "failure") this.settleIfReady();
     return record;
   }
   stopIntent(): void {
-    if (this.accepted) this.emit({ inputId: this.id, state: "uncertain" });
-    else if (!this.finished) this.uncertain();
+    this.fence.stopIntent(this.id, this.emit);
   }
   terminal(): void {
-    if (!this.finished) this.uncertain();
+    this.fence.terminal(this.id, this.emit);
     this.clearCurrent();
   }
   private writeCompleted(error?: Error | null): void {
-    if (this.finished) return;
+    if (this.fence.fenced) return;
     if (error) {
       this.uncertain();
       this.failClosed();
@@ -73,26 +70,26 @@ export class ClaudeTextInputDelivery {
     this.settleIfReady();
   }
   private acceptIfConfirmed(): void {
-    if (!this.ack || !this.written || this.finished) return;
-    this.finished = this.accepted = true;
-    clearTimeout(this.timer);
-    this.resolve?.({ kind: "accepted" });
-    this.emit({ inputId: this.id, state: "accepted" });
+    if (
+      !this.records.ack ||
+      !this.written ||
+      this.fence.fenced ||
+      this.fence.accepted
+    )
+      return;
+    this.fence.accept(this.id, this.emit);
   }
   private settleIfReady(): void {
-    if (!this.outcome || !this.ack || !this.written) return;
-    if (!this.finished) this.acceptIfConfirmed();
+    if (!this.records.outcome || !this.fence.accepted || this.fence.fenced)
+      return;
+    this.fence.fence();
     this.clearCurrent();
     this.emit({
       inputId: this.id,
-      state: this.outcome === "success" ? "completed" : "failed",
+      state: this.records.outcome === "success" ? "completed" : "failed",
     });
   }
   private uncertain(): void {
-    if (this.finished) return;
-    this.finished = true;
-    clearTimeout(this.timer);
-    this.resolve?.({ kind: "uncertain" });
-    this.emit({ inputId: this.id, state: "uncertain" });
+    this.fence.uncertain(this.id, this.emit);
   }
 }

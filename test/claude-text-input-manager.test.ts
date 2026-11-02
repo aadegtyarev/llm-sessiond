@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { ProcessProvider } from "../src/core/ports.js";
 import { createBuiltinDurableRuntime } from "../src/harness/builtin-durable-runtime.js";
 import { MemoryStore } from "./durable-memory-store.js";
+import { waitForInputState } from "./claude-text-input-manager-wait.js";
 
 const owner = { token: "test-owner", generation: 1 };
 const nativeId = "12345678-abcd-4abc-8abc-1234567890ab";
@@ -54,17 +55,24 @@ describe("Claude manager text input", () => {
       await expect(
         runtime.manager.inputs.cancel(row.id, "not-current"),
       ).rejects.toMatchObject({ code: "INPUT_NOT_CURRENT" });
-      const events: unknown[] = [];
-      runtime.manager.inputs.subscribe((event) => events.push(event));
-      const first = await runtime.manager.inputs.submit(row.id, {
-        text: "a".repeat(256 * 1024),
-      });
-      expect(first).toMatchObject({ resumed: false });
-      expect(events).toContainEqual({
-        sessionId: row.id,
-        inputId: first.inputId,
-        state: "completed",
-      });
+      const completionWait = waitForInputState(
+        runtime.manager.inputs,
+        row.id,
+        "completed",
+      );
+      try {
+        const first = await runtime.manager.inputs.submit(row.id, {
+          text: "a".repeat(256 * 1024),
+        });
+        expect(first).toMatchObject({ resumed: false });
+        await expect(completionWait.promise).resolves.toMatchObject({
+          sessionId: row.id,
+          inputId: first.inputId,
+          state: "completed",
+        });
+      } finally {
+        completionWait.cleanup();
+      }
       await runtime.manager.stop(row.id);
       const resumed = await runtime.manager.inputs.submit(row.id, {
         text: "resume text",

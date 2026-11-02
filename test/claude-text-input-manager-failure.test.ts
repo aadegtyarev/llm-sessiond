@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import type { ProcessProvider } from "../src/core/ports.js";
 import { createBuiltinDurableRuntime } from "../src/harness/builtin-durable-runtime.js";
 import { MemoryStore } from "./durable-memory-store.js";
+import { waitForInputState } from "./claude-text-input-manager-wait.js";
 const owner = { token: "test-owner", generation: 1 };
 const nativeId = "12345678-abcd-4abc-8abc-1234567890ab";
 function provider(mode: string): ProcessProvider {
@@ -66,16 +67,21 @@ describe("Claude manager failure settlement", () => {
         cwd: process.cwd(),
         harnessId: "claude-code",
       });
-      const events: Array<{ state: string; reason?: string }> = [];
-      runtime.manager.inputs.subscribe((event) => events.push(event));
-      const submitted = await runtime.manager.inputs.submit(row.id, {
-        text: "accepted then failed",
-      });
-      expect(submitted.resumed).toBe(false);
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      const failure = events.find((event) => event.state === "failed");
-      expect(failure).toBeDefined();
-      expect(failure).not.toHaveProperty("reason");
+      const failureWait = waitForInputState(
+        runtime.manager.inputs,
+        row.id,
+        "failed",
+      );
+      try {
+        const submitted = await runtime.manager.inputs.submit(row.id, {
+          text: "accepted then failed",
+        });
+        expect(submitted.resumed).toBe(false);
+        const failure = await failureWait.promise;
+        expect(failure).not.toHaveProperty("reason");
+      } finally {
+        failureWait.cleanup();
+      }
     } finally {
       await runtime.shutdown();
     }
