@@ -6,7 +6,6 @@ import { SafeSessionStore } from "./safe-session-store.js";
 import { resumeSession } from "./session-resume.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import { deleteSession } from "./session-stop-delete.js";
-import { stopManagedSession } from "./durable-manager-stop.js";
 import {
   assertCurrentOwner,
   resolveAdapter,
@@ -19,10 +18,13 @@ import type {
 import type { JsonValue } from "./generic-json.js";
 import type { DurableSessionStore } from "./session-manager-store.js";
 import { createManagedSession } from "./create-session-command.js";
-import { shutdownOwnedSessions } from "./shutdown-owned-sessions.js";
 import { DurableInputRuntime } from "./durable-input-runtime.js";
 import { DurableInputState } from "./durable-input-state.js";
 import { readDurableLiveStatus } from "./durable-live-status.js";
+import {
+  stopOwnedSession,
+  shutdownOwnedSessionsWithIntent,
+} from "./durable-manager-lifecycle-operations.js";
 export type { DurableSessionStore } from "./session-manager-store.js";
 export class DurableSessionManager {
   private readonly context: DurableManagerContext;
@@ -45,6 +47,7 @@ export class DurableSessionManager {
       owner,
       owned: new Map(),
       pending: new Map(),
+      lifecycleIntents: new Map(),
       stopTimeoutMs,
       inputState: this.inputState,
     };
@@ -85,13 +88,12 @@ export class DurableSessionManager {
     return this.locks.run(id, async () => deleteSession(this.context, id));
   }
   stop(id: string): Promise<DurableSession> {
-    return stopManagedSession(this.context, this.locks, id);
+    return stopOwnedSession(this.context, this.locks, id);
   }
   resume(id: string): Promise<DurableSession> {
     return this.locks.run(id, () => resumeSession(this.context, id));
   }
   shutdownOwned(): Promise<void> {
-    assertCurrentOwner(this.context);
-    return shutdownOwnedSessions(this.context, this.locks);
+    return shutdownOwnedSessionsWithIntent(this.context, this.locks);
   }
 }

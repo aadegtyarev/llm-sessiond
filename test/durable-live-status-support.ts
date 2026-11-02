@@ -14,9 +14,11 @@ export const statusAdapter = {
 };
 export function internals(manager: DurableSessionManager) {
   return manager as unknown as {
+    locks: { run<T>(id: string, action: () => Promise<T>): Promise<T> };
     context: {
       owned: Map<string, object>;
       pending: Map<string, object>;
+      lifecycleIntents: Map<string, Set<object>>;
       inputState: {
         trackExecution(id: string, execution: object): unknown;
       };

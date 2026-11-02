@@ -14,6 +14,7 @@ export interface DurableManagerContext {
   owner: OwnerGeneration;
   owned: Map<string, LifecycleExecution>;
   pending: Map<string, PendingFinalization>;
+  lifecycleIntents: Map<string, Set<object>>;
   stopTimeoutMs: number;
   inputState: DurableInputState;
 }
