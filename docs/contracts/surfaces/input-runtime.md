@@ -16,6 +16,6 @@ The manager exposes `inputs.submit`, exact `inputs.cancel`, `inputs.cancelCurren
 
 ## Limits and non-goals
 
-This is an internal backend foundation, not HTTP or WebSocket wiring. Pi v2 advertises text, image, exact cancellation, and current cancellation. Claude v2 advertises only `input.submit`; images and cancellation remain unsupported. Other built-in adapters remain lifecycle-only. No prompt/history persistence, input replay after uncertainty, rich harness activity mapping, raw adapter errors, or cross-session input routing is provided.
+This is an internal backend foundation, not HTTP or WebSocket wiring. Pi v2 advertises text, image, exact cancellation, current cancellation, and read-only status/usage. A live status query uses the execution's existing serialized RPC reader and may run while input is active; it does not alter input admission or settlement. Claude v2 advertises only `input.submit`; images and cancellation remain unsupported. Other built-in adapters remain lifecycle-only. No prompt/history persistence, input replay after uncertainty, rich harness activity mapping, raw adapter errors, or cross-session input routing is provided.
 
 Related contracts: [control plane](control-plane.md), [adapter registry](harness-adapters.md), [persistence](persistence.md), [session lifecycle](session-lifecycle.md), [API v1](api-v1.md), [API v2](api-v2.md), [bridge](bridge-v2.md), [bridge events](bridge-events.md), and [bridge messages](bridge-messages.md).

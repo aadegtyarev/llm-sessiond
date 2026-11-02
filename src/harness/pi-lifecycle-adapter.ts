@@ -13,6 +13,8 @@ export const piDescriptor = {
     "input.submit-images",
     "input.cancel",
     "input.cancel-current",
+    "status.read",
+    "usage.read",
   ],
 };
 

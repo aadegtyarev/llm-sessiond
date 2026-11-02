@@ -5,12 +5,14 @@ import { terminateChild } from "../process/terminate-child.js";
 import { PiDurableRpcLink } from "./pi-durable-rpc-link.js";
 import { PiDurableInputPort } from "./pi-durable-input-port.js";
 import { startDurablePi } from "./pi-durable-startup.js";
+import { projectPiLiveStatus } from "./pi-live-status.js";
 
 export class PiDurableProcess {
   readonly inputs = new PiDurableInputPort();
   private child?: ChildProcess;
   private stopped = false;
   private stopRequested = false;
+  private nativeSessionId: string | undefined;
   private link?: PiDurableRpcLink;
   private stopping: Promise<void> | undefined;
   constructor(
@@ -36,7 +38,13 @@ export class PiDurableProcess {
     this.link = link;
     this.inputs.attach(link);
     try {
-      return await startDurablePi(link, expectedId, this.readinessTimeoutMs);
+      const nativeSessionId = await startDurablePi(
+        link,
+        expectedId,
+        this.readinessTimeoutMs,
+      );
+      this.nativeSessionId = nativeSessionId;
+      return nativeSessionId;
     } catch {
       try {
         await this.stop();
@@ -45,6 +53,33 @@ export class PiDurableProcess {
       }
       throw new Error("PI_STARTUP_FAILED");
     }
+  }
+  async readLiveStatus() {
+    const link = this.link;
+    if (!link || this.stopRequested || this.stopped || !link.writable)
+      throw new Error("RPC_UNAVAILABLE");
+    const [stateReply, statsReply] = await Promise.all([
+      link.command("get_state", {}),
+      link.command("get_session_stats", {}),
+    ]);
+    if (this.link !== link || this.stopRequested || this.stopped)
+      throw new Error("RPC_UNAVAILABLE");
+    const state = this.controlData(stateReply);
+    const stats = this.controlData(statsReply);
+    if (state.sessionId !== this.nativeSessionId)
+      throw new Error("INVALID_LIVE_STATUS");
+    return projectPiLiveStatus(state, stats);
+  }
+  private controlData(reply: Record<string, unknown>): Record<string, unknown> {
+    const data = reply.data;
+    if (
+      reply.success !== true ||
+      typeof data !== "object" ||
+      data === null ||
+      Array.isArray(data)
+    )
+      throw new Error("INVALID_LIVE_STATUS");
+    return data as Record<string, unknown>;
   }
   stop(): Promise<void> {
     this.stopRequested = true;

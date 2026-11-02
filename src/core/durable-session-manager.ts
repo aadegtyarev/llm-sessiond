@@ -22,6 +22,7 @@ import { createManagedSession } from "./create-session-command.js";
 import { shutdownOwnedSessions } from "./shutdown-owned-sessions.js";
 import { DurableInputRuntime } from "./durable-input-runtime.js";
 import { DurableInputState } from "./durable-input-state.js";
+import { readDurableLiveStatus } from "./durable-live-status.js";
 export type { DurableSessionStore } from "./session-manager-store.js";
 export class DurableSessionManager {
   private readonly context: DurableManagerContext;
@@ -62,6 +63,9 @@ export class DurableSessionManager {
   }
   descriptor(id: string) {
     return resolveAdapter(this.context.registry, id).descriptor;
+  }
+  readLiveStatus(id: string) {
+    return readDurableLiveStatus(this.context, id);
   }
   create(input: {
     cwd: string;
