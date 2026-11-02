@@ -58,6 +58,9 @@ export function setup(
     ...(overrides.inputs ? { inputs: overrides.inputs } : {}),
     ...(overrides.liveStatus ? { liveStatus: overrides.liveStatus } : {}),
     ...(overrides.modelCatalog ? { modelCatalog: overrides.modelCatalog } : {}),
+    ...(overrides.effortCatalog
+      ? { effortCatalog: overrides.effortCatalog }
+      : {}),
   });
   const manager = new DurableSessionManager(
     store,

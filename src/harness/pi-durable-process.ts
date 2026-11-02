@@ -51,25 +51,26 @@ export class PiDurableProcess {
     return durableReadQueries.readDurablePiLiveStatus(
       link,
       this.nativeSessionId,
-      () =>
-        durableReadQueries.isDurablePiQueryCurrent(
-          this.link,
-          link,
-          this.child,
-          this.stopRequested,
-          this.stopped,
-        ),
+      () => this.isQueryCurrent(link),
     );
   }
   readModelCatalog() {
     return durableReadQueries.readDurablePiModelCatalog(this.link, (link) =>
-      durableReadQueries.isDurablePiQueryCurrent(
-        this.link,
-        link,
-        this.child,
-        this.stopRequested,
-        this.stopped,
-      ),
+      this.isQueryCurrent(link),
+    );
+  }
+  readEffortCatalog() {
+    return durableReadQueries.readDurablePiEffortCatalog(this.link, (link) =>
+      this.isQueryCurrent(link),
+    );
+  }
+  private isQueryCurrent(link: PiDurableRpcLink): boolean {
+    return durableReadQueries.isDurablePiQueryCurrent(
+      this.link,
+      link,
+      this.child,
+      this.stopRequested,
+      this.stopped,
     );
   }
   stop(): Promise<void> {
