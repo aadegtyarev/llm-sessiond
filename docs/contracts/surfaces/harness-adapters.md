@@ -14,7 +14,7 @@ Namespaced values remain versioned and strict. Generic core validates namespace 
 
 ## Built-in Claude lifecycle
 
-Claude is registered as `claude-code` (alias `claude`) with only launch, resume, and stop capabilities in this stage. Its `claude.session` v1 checkpoint contains exactly `{sessionId:UUID}`. Resume preserves exact UUID spelling and fails closed on malformed/unknown state or a saved native-ID mismatch. The adapter's private initialize handshake is not a public protocol/raw-control capability; no prompt or transcript data is stored.
+Claude is registered as `claude-code` (alias `claude`) with launch, resume, stop, and text-only `input.submit` capabilities. Images and cancellation are unsupported. Its `claude.session` v1 checkpoint contains exactly `{sessionId:UUID}`. Resume preserves exact UUID spelling and fails closed on malformed/unknown state, missing transcript, or a saved native-ID mismatch. The private initialize handshake sends no prompt and is not a public protocol/raw-control capability. Text is sent once as one native stream-json user message; the daemon input ID remains local. Only an exact matching root user replay confirms delivery, and only a subsequent matching root result settles it. Correlation relies on one active input and native ordered replay/result delivery, not optional upstream UUIDs. No prompt or transcript data is stored.
 
 ## Checkpoints and errors
 

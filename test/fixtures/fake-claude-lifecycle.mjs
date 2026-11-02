@@ -4,6 +4,34 @@ const mode = process.env.CLAUDE_V2_MODE ?? "ok";
 const input = readline.createInterface({ input: process.stdin });
 input.on("line", (line) => {
   const request = JSON.parse(line);
+  if (request.type === "user") {
+    if (mode === "text-no-replay") return;
+    const sessionId =
+      process.argv[
+        process.argv.includes("--session-id")
+          ? process.argv.indexOf("--session-id") + 1
+          : process.argv.indexOf("--resume") + 1
+      ];
+    const replay = {
+      type: "user",
+      isReplay: true,
+      session_id: sessionId,
+      parent_tool_use_id: null,
+      message: request.message,
+    };
+    const result = {
+      type: "result",
+      session_id: sessionId,
+      parent_tool_use_id: null,
+      subtype: mode === "text-error" ? "error_during_execution" : "success",
+      is_error: mode === "text-error",
+    };
+    process.stdout.write(`${JSON.stringify(replay)}\n`);
+    if (mode === "text-error")
+      setTimeout(() => process.stdout.write(`${JSON.stringify(result)}\n`), 20);
+    else process.stdout.write(`${JSON.stringify(result)}\n`);
+    return;
+  }
   if (request.type !== "control_request") return;
   if (mode === "timeout" || mode === "missing") return;
   if (mode === "malformed") return process.stdout.write("{bad-json}\n");

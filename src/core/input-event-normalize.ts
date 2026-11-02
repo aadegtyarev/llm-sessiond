@@ -47,7 +47,6 @@ export function normalizeInputEvent(
       (typeof reason !== "string" || !REASONS.has(reason as InputFailureReason))
     )
       return undefined;
-    if (state === "failed" && reason === undefined) return undefined;
     return {
       kind: "input",
       inputId,
