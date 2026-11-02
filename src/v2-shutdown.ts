@@ -25,19 +25,52 @@ async function shutdownOnce(
   sockets: Set<Socket>,
 ): Promise<void> {
   const listening = server.listening;
-  const stopped = Promise.allSettled([
-    owners.runtime.shutdown(),
-    owners.service.shutdown(),
-  ]);
-  let closed = Promise.resolve();
-  if (listening) {
-    closed = new Promise<void>((resolve) => server.close(() => resolve()));
-    server.closeAllConnections();
-  }
-  for (const socket of sockets) socket.destroy();
-  const outcomes = await stopped;
-  await closed;
+  const drains = [
+    invoke(() => owners.runtime.shutdown()),
+    invoke(() => owners.service.shutdown()),
+  ];
+  const transport = closeTransport(server, sockets, listening);
+  const outcomes = await Promise.allSettled([...drains, transport]);
   if (outcomes.some((result) => result.status === "rejected"))
-    throw new Error("PROCESS_DRAIN_UNCONFIRMED");
+    throw new Error("SHUTDOWN_UNCONFIRMED");
   await owners.lease.release();
+}
+
+function invoke(action: () => Promise<void>): Promise<void> {
+  try {
+    return Promise.resolve(action());
+  } catch {
+    return Promise.reject(new Error("PROCESS_DRAIN_UNCONFIRMED"));
+  }
+}
+
+function closeTransport(
+  server: Server,
+  sockets: Set<Socket>,
+  listening: boolean,
+): Promise<void> {
+  let closed = Promise.resolve();
+  let failed = false;
+  if (listening) {
+    try {
+      closed = new Promise<void>((resolve) => server.close(() => resolve()));
+    } catch {
+      failed = true;
+    }
+    try {
+      server.closeAllConnections();
+    } catch {
+      failed = true;
+    }
+  }
+  for (const socket of sockets) {
+    try {
+      socket.destroy();
+    } catch {
+      failed = true;
+    }
+  }
+  return closed.then(() => {
+    if (failed) throw new Error("TRANSPORT_CLOSE_UNCONFIRMED");
+  });
 }

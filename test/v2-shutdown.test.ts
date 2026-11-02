@@ -58,7 +58,7 @@ describe("v2 shutdown ownership order", () => {
       server,
       new Set(),
     );
-    await expect(close()).rejects.toThrow("PROCESS_DRAIN_UNCONFIRMED");
+    await expect(close()).rejects.toThrow("SHUTDOWN_UNCONFIRMED");
     expect(released).toBe(false);
   });
 });

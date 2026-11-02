@@ -1,4 +1,4 @@
-import { startV2 } from "./v2-bootstrap.js";
+import { isCleanStartupCancellation, startV2 } from "./v2-bootstrap.js";
 
 let stopping = false;
 let shutdown: (() => Promise<void>) | undefined;
@@ -34,8 +34,7 @@ try {
 } catch (error) {
   process.off("SIGINT", onSignal);
   process.off("SIGTERM", onSignal);
-  const cancelled =
-    error instanceof Error && error.message === "STARTUP_CANCELLED";
+  const cancelled = isCleanStartupCancellation(error);
   if (!cancelled) console.error("llm-sessiond v2 startup failed");
   process.exitCode = cancelled ? 0 : 1;
 }

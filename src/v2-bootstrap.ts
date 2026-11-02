@@ -14,6 +14,10 @@ import { NodeProcessProvider } from "./process/node-provider.js";
 import { PiHarnessAdapter } from "./harness/pi-adapter.js";
 import { createShutdown } from "./v2-shutdown.js";
 
+export function isCleanStartupCancellation(error: unknown): boolean {
+  return error instanceof Error && error.message === "STARTUP_CANCELLED";
+}
+
 export interface V2Application {
   server: ReturnType<typeof createServer>;
   shutdown(): Promise<void>;
@@ -21,14 +25,15 @@ export interface V2Application {
 
 export async function startV2(
   isStopping: () => boolean = () => false,
+  env: NodeJS.ProcessEnv = process.env,
 ): Promise<V2Application> {
-  const host = process.env.HOST ?? "127.0.0.1";
-  const rawPort = process.env.PORT ?? "4317";
+  const host = env.HOST ?? "127.0.0.1";
+  const rawPort = env.PORT ?? "4317";
   if (host !== "127.0.0.1") throw new Error("INVALID_HOST");
   if (!/^\d+$/.test(rawPort)) throw new Error("INVALID_PORT");
   const port = Number(rawPort);
   if (!Number.isInteger(port) || port > 65535) throw new Error("INVALID_PORT");
-  const state = await prepareStateDirectory(resolveStateDirectory());
+  const state = await prepareStateDirectory(resolveStateDirectory(env));
   const lease = await OwnedStoreLease.acquireOwned(state, () =>
     openSessionDatabase(path.join(state, "sessions.sqlite3")),
   );
@@ -38,11 +43,17 @@ export async function startV2(
   let runtime: ReturnType<typeof createBuiltinDurableRuntime> | undefined;
   let server: ReturnType<typeof createApiServer> | undefined;
   const sockets = new Set<import("node:net").Socket>();
+  let cancellationRequested = false;
+  const checkCancellation = (): void => {
+    if (!isStopping()) return;
+    cancellationRequested = true;
+    throw new Error("STARTUP_CANCELLED");
+  };
   try {
-    if (isStopping()) throw new Error("STARTUP_CANCELLED");
+    checkCancellation();
     runtime = createBuiltinDurableRuntime({ store, owner: lease.generation });
     reconcileStartup(store, runtime.registry);
-    if (isStopping()) throw new Error("STARTUP_CANCELLED");
+    checkCancellation();
     server = createApiServer(service, host, runtime);
     server.on("connection", (socket) => {
       sockets.add(socket);
@@ -55,13 +66,13 @@ export async function startV2(
         resolve();
       });
     });
-    if (isStopping()) throw new Error("STARTUP_CANCELLED");
+    checkCancellation();
     return {
       server,
       shutdown: createShutdown({ runtime, service, lease }, server, sockets),
     };
   } catch {
-    const cancelled = isStopping();
+    const cancelled = cancellationRequested || isStopping();
     try {
       if (runtime && server) {
         await createShutdown({ runtime, service, lease }, server, sockets)();
