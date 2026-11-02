@@ -6,6 +6,8 @@ export type InputCommandOutcome =
   | { kind: "accepted" }
   | { kind: "rejected"; reason: InputFailureReason }
   | { kind: "uncertain" };
+export type InputCancelOutcome =
+  { kind: "accepted" } | { kind: "rejected" } | { kind: "uncertain" };
 export type ExecutionInputEvent =
   | {
       inputId: string;
@@ -19,6 +21,6 @@ export interface ExecutionInputPort {
     text: string;
     images?: InputImage[];
   }): Promise<InputCommandOutcome>;
-  cancel(inputId: string): Promise<InputCommandOutcome>;
+  cancel(inputId: string): Promise<InputCancelOutcome>;
   subscribe(listener: (event: unknown) => void): () => void;
 }

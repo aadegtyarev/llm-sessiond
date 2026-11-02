@@ -1,4 +1,7 @@
-import type { InputCommandOutcome } from "./execution-input-port.js";
+import type {
+  InputCancelOutcome,
+  InputCommandOutcome,
+} from "./execution-input-port.js";
 import type { ExecutionInputSource } from "./execution-input-source.js";
 import type { ManagedInputEvent } from "./input-runtime-events.js";
 import { InputEventObservers } from "./input-runtime-events.js";
@@ -44,7 +47,7 @@ export class InputOperationLedger {
   settleCommand(operation: InputOperation, outcome: InputCommandOutcome): void {
     this.transitions.settleCommand(operation, outcome);
   }
-  settleCancel(operation: InputOperation, outcome: InputCommandOutcome): void {
+  settleCancel(operation: InputOperation, outcome: InputCancelOutcome): void {
     this.transitions.settleCancel(operation, outcome);
   }
   receive(source: ExecutionInputSource, value: unknown): void {

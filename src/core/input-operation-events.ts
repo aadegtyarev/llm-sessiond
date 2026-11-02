@@ -1,4 +1,5 @@
 import type {
+  InputCancelOutcome,
   InputCommandOutcome,
   InputFailureReason,
 } from "./execution-input-port.js";
@@ -52,7 +53,7 @@ export class InputOperationEvents {
     else if (outcome.kind === "rejected")
       this.terminal(operation, "failed", outcome.reason);
   }
-  settleCancel(operation: InputOperation, outcome: InputCommandOutcome): void {
+  settleCancel(operation: InputOperation, outcome: InputCancelOutcome): void {
     if (!this.isCurrent(operation) || operation.terminal) return;
     if (outcome.kind === "uncertain") this.uncertain(operation);
     else if (outcome.kind === "rejected" && operation.state === "canceling")

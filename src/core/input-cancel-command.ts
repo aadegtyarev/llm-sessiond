@@ -7,7 +7,7 @@ import { validateSessionId } from "./durable-validation.js";
 import { DurableInputState } from "./durable-input-state.js";
 import { InputRuntimeError } from "./input-runtime-error.js";
 import { admitInputCancel } from "./input-cancel-admission.js";
-import { observeInputCommand } from "./input-command-outcome.js";
+import { observeInputCancel } from "./input-command-outcome.js";
 
 export async function runInputCancel(
   context: DurableManagerContext,
@@ -38,8 +38,7 @@ export async function runInputCancel(
       operation,
     );
   });
-  const outcome = await observeInputCommand(command.promise, timeoutMs);
-  if (!state.isCurrent(command.operation)) return;
+  const outcome = await observeInputCancel(command.promise, timeoutMs);
   if (outcome.kind === "uncertain") {
     state.settleCancel(command.operation, outcome);
     throw new InputRuntimeError("INPUT_UNCERTAIN", command.operation.id, false);
@@ -50,7 +49,6 @@ export async function runInputCancel(
       "OPERATION_FAILED",
       command.operation.id,
       false,
-      outcome.reason,
     );
   }
 }

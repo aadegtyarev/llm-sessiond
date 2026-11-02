@@ -11,6 +11,8 @@ export const piDescriptor = {
     "harness.stop",
     "input.submit",
     "input.submit-images",
+    "input.cancel",
+    "input.cancel-current",
   ],
 };
 

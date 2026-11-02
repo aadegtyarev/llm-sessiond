@@ -1,5 +1,6 @@
 import type { LifecycleExecution } from "./lifecycle-execution.js";
 import type {
+  InputCancelOutcome,
   InputCommandOutcome,
   InputFailureReason,
 } from "./execution-input-port.js";
@@ -73,7 +74,7 @@ export class DurableInputState {
   settleCommand(operation: InputOperation, outcome: InputCommandOutcome): void {
     this.ledger.settleCommand(operation, outcome);
   }
-  settleCancel(operation: InputOperation, outcome: InputCommandOutcome): void {
+  settleCancel(operation: InputOperation, outcome: InputCancelOutcome): void {
     this.ledger.settleCancel(operation, outcome);
   }
 }

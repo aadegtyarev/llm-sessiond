@@ -1,4 +1,5 @@
 import type {
+  InputCancelOutcome,
   InputCommandOutcome,
   InputFailureReason,
 } from "./execution-input-port.js";
@@ -24,6 +25,36 @@ export function normalizeInputOutcome(value: unknown): InputCommandOutcome {
   )
     return { kind: "rejected", reason: row.reason as InputFailureReason };
   return { kind: "uncertain" };
+}
+export function normalizeInputCancelOutcome(
+  value: unknown,
+): InputCancelOutcome {
+  if (!value || typeof value !== "object") return { kind: "uncertain" };
+  const row = value as Record<string, unknown>;
+  if (
+    (row.kind === "accepted" ||
+      row.kind === "rejected" ||
+      row.kind === "uncertain") &&
+    Object.keys(row).length === 1
+  )
+    return { kind: row.kind };
+  return { kind: "uncertain" };
+}
+export async function observeInputCancel(
+  value: Promise<unknown>,
+  timeoutMs: number,
+): Promise<InputCancelOutcome> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<InputCancelOutcome>((resolve) => {
+    timer = setTimeout(() => resolve({ kind: "uncertain" }), timeoutMs);
+  });
+  const command = value.then(normalizeInputCancelOutcome, () => ({
+    kind: "uncertain" as const,
+  }));
+  void command.catch(() => {});
+  const outcome = await Promise.race([command, timeout]);
+  if (timer) clearTimeout(timer);
+  return outcome;
 }
 export async function observeInputCommand(
   value: Promise<unknown>,

@@ -1,6 +1,6 @@
 # Pi exact input cancellation
 
-- Status: Approved for implementation
+- Status: Pending review
 - Scope: one durable Pi cancellation capability seam
 
 ## Goal
@@ -24,7 +24,7 @@ No transport/API/DB changes, generic cancellation framework, stop-as-cancel, rep
 
 ## Constraints and acceptance
 
-Pi descriptor adds only `input.cancel` and `input.cancel-current`; native abort is one correlated `{id,type:"abort"}` request without an input ID. Cancellation outcomes must distinguish accepted/rejected/uncertain without fabricating submit failure. Preserve generation/source fencing, stop finality, and settlement ordering. Add deterministic direct-port and generic manager regressions for exact targeting, rejection/uncertainty, settlement races, stale results, and unchanged text/images.
+Pi descriptor adds only `input.cancel` and `input.cancel-current`; native abort is one correlated `{id,type:"abort"}` request without an input ID. Cancellation outcomes must distinguish accepted/rejected/uncertain without fabricating submit failure. This uses a narrow internal cancel outcome distinct from submit rejection; stale results remain truthful errors while all state mutation stays current/source-fenced. Preserve generation/source fencing, stop finality, and settlement ordering. Add deterministic direct-port and generic manager regressions for exact targeting, rejection/uncertainty, settlement races, stale results, and unchanged text/images.
 
 ## Validation
 

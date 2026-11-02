@@ -3,17 +3,24 @@ import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { createPiDurableRuntime } from "../src/harness/pi-durable-runtime.js";
 import { PiDurableInputPort } from "../src/harness/pi-durable-input-port.js";
+import { piDescriptor } from "../src/harness/pi-lifecycle-adapter.js";
 import type { ProcessProvider } from "../src/core/ports.js";
 import { MemoryStore } from "./durable-memory-store.js";
 import { fixture, tempDir } from "./helpers.js";
 
 const owner = { token: "test-owner", generation: 1 };
 describe("Pi durable text input", () => {
-  it("rejects cancellation without a live RPC link", async () => {
+  it("advertises only the two exact cancellation capabilities", () => {
+    expect(piDescriptor.capabilities.slice(-2)).toEqual([
+      "input.cancel",
+      "input.cancel-current",
+    ]);
+  });
+  it("rejects direct cancellation without an accepted exact input", async () => {
     const port = new PiDurableInputPort();
-    await expect(port.cancel("input-1")).rejects.toThrow(
-      "UNSUPPORTED_CAPABILITY",
-    );
+    await expect(port.cancel("input-1")).resolves.toEqual({
+      kind: "uncertain",
+    });
   });
   it("submits via lifecycle-owned port and settles the exact generic ID", async () => {
     const cwd = await tempDir();
