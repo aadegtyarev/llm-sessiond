@@ -9,10 +9,20 @@ export async function route(
   service: SessionService,
   request: IncomingMessage,
   response: ServerResponse,
+  v2Discover?: (
+    path: string,
+    method: string,
+    response: ServerResponse,
+  ) => Promise<boolean>,
 ): Promise<void> {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const method = request.method ?? "GET";
   const path = url.pathname;
+  if (v2Discover && (path === "/api/v2" || path.startsWith("/api/v2/"))) {
+    const handled = await v2Discover(path, method, response);
+    if (!handled) throw new ApiError(404, "NOT_FOUND", "route not found");
+    return;
+  }
   if (method === "GET" && path === "/api/v1/health")
     return sendJson(
       response,

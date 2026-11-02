@@ -31,10 +31,16 @@ export function createDurableRuntime(input: {
     input.id,
     input.stopTimeoutMs,
   );
+  let closing = false;
   return {
     registry,
     manager,
+    assertReady(): void {
+      if (closing) throw new Error("RUNTIME_CLOSING");
+      input.store.assertOwner(input.owner);
+    },
     async shutdown(): Promise<void> {
+      closing = true;
       let failed = false;
       try {
         await manager.shutdownOwned();
