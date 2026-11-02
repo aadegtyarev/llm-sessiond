@@ -1,7 +1,10 @@
 import type { ChildProcess } from "node:child_process";
 import type { Writable } from "node:stream";
 import { ClaudeJsonlDecoder } from "./claude-jsonl-decoder.js";
-import { isClaudeInitializeAck } from "./claude-lifecycle-protocol.js";
+import {
+  isClaudeInitializeAck,
+  validateClaudeLifetimeRecord,
+} from "./claude-lifecycle-protocol.js";
 
 export type ClaudeLifetimeTerminal =
   | "stream_error"
@@ -65,6 +68,7 @@ export class ClaudeLifetimeDispatch {
         this.ready = true;
         continue;
       }
+      validateClaudeLifetimeRecord(line, this.expectedId);
       try {
         this.hooks.onRecord?.(line);
       } catch {}

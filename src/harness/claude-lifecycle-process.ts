@@ -3,6 +3,7 @@ import type { ProcessProvider } from "../core/ports.js";
 import { ChildStop, type ChildTerminator } from "../process/child-stop.js";
 import { terminateChild } from "../process/terminate-child.js";
 import { initializeClaude } from "./claude-lifecycle-startup.js";
+import { ClaudeTextInputController } from "./claude-text-input-controller.js";
 
 export class ClaudeLifecycleProcess {
   private child?: ChildProcess;
@@ -12,7 +13,8 @@ export class ClaudeLifecycleProcess {
     private readonly provider: ProcessProvider,
     private readonly executable: string,
     private readonly readinessTimeoutMs: number,
-    private readonly terminate?: ChildTerminator,
+    private readonly terminate: ChildTerminator | undefined,
+    private readonly inputs: ClaudeTextInputController,
   ) {}
   async start(cwd: string, args: string[], expectedId: string): Promise<void> {
     if (this.child || this.stopped)
@@ -25,12 +27,19 @@ export class ClaudeLifecycleProcess {
         "stream-json",
         "--output-format",
         "stream-json",
+        "--replay-user-messages",
         "--verbose",
         ...args,
       ],
       cwd,
     );
     this.child = child;
+    this.inputs.setTerminalAction(() => {
+      child.kill("SIGTERM");
+    });
+    this.inputs.bind(expectedId, (record, callback) => {
+      child.stdin!.write(record, callback);
+    });
     child.on("error", () => {});
     this.childStop = new ChildStop(child, async (target) => {
       await (this.terminate ?? terminateChild)(target);
@@ -38,16 +47,23 @@ export class ClaudeLifecycleProcess {
         throw new Error("CLAUDE_STOP_UNCONFIRMED");
     });
     try {
-      await initializeClaude(child, expectedId, this.readinessTimeoutMs);
+      await initializeClaude(child, expectedId, this.readinessTimeoutMs, {
+        onRecord: (line) => this.inputs.onRecord(line),
+        onTerminal: (reason) =>
+          this.inputs.terminate(
+            reason !== "process_exit" && reason !== "stdout_close",
+          ),
+      });
       if (child.exitCode !== null || child.signalCode !== null)
         throw new Error("CLAUDE_STARTUP_FAILED");
-      child.stdout?.on("data", () => {});
+      this.inputs.markReady();
     } catch {
       await this.stop();
       throw new Error("CLAUDE_STARTUP_FAILED");
     }
   }
   async stop(): Promise<void> {
+    this.inputs.stopIntent();
     if (this.stopped) return;
     if (this.childStop) await this.childStop.stop();
     if (
@@ -56,6 +72,7 @@ export class ClaudeLifecycleProcess {
       this.child.signalCode === null
     )
       throw new Error("CLAUDE_STOP_UNCONFIRMED");
+    this.inputs.confirmStopped();
     this.stopped = true;
   }
 }

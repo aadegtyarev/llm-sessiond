@@ -16,19 +16,24 @@ const ack = JSON.stringify({
 
 describe("Claude startup lifetime dispatch", () => {
   it("routes post-ACK records from the same chunk and retains partial decoder state", async () => {
-    const { child, output, stdout } = fakeChild();
+    const { child, stdout } = fakeChild();
     const records: string[] = [];
     const ready = initializeClaude(child, sessionId, 500, {
       onRecord: (line) => records.push(line),
     });
-    expect(output()).toContain('"subtype":"initialize"');
     stdout.write(
       `${ack}\n${JSON.stringify({ type: "metadata", session_id: sessionId })}\n`,
     );
     await ready;
-    stdout.write('{"type":"res');
-    stdout.write('ult","session_id":"12345678-abcd-4abc-8abc-1234567890ab"}\n');
+    const tail = Buffer.from(
+      JSON.stringify({ type: "result", session_id: sessionId, result: "雪" }) +
+        "\n",
+    );
+    const split = tail.indexOf(Buffer.from("雪")) + 1;
+    stdout.write(tail.subarray(0, split));
+    stdout.write(tail.subarray(split));
     expect(records).toHaveLength(2);
+    expect(JSON.parse(records[1]!).result).toBe("雪");
     stdout.emit("end");
     child.emit("close", 0, null);
   });
@@ -52,19 +57,28 @@ describe("Claude startup lifetime dispatch", () => {
     expect(received).toBe(1);
     expect(terminals).toEqual(["process_exit"]);
   });
+  it("fails malformed lifetime JSON after readiness", async () => {
+    const { child, stdout } = fakeChild();
+    const terminals: string[] = [];
+    const ready = initializeClaude(child, sessionId, 500, {
+      onTerminal: (reason) => terminals.push(reason),
+    });
+    stdout.write(`${ack}\n`);
+    await ready;
+    stdout.write("{malformed}\n");
+    expect(terminals).toEqual(["protocol_error"]);
+    child.emit("close", 1, null);
+  });
 });
 
-function fakeChild(): {
-  child: ChildProcess;
-  output: () => string;
-  stdout: PassThrough;
-} {
+function fakeChild(): { child: ChildProcess; stdout: PassThrough } {
   const child = new EventEmitter() as EventEmitter & Record<string, unknown>;
   const stdin = new PassThrough();
   const stdout = new PassThrough();
-  let writes = "";
-  stdin.write = ((chunk: string, callback?: (error?: Error | null) => void) => {
-    writes += chunk;
+  stdin.write = ((
+    _chunk: string,
+    callback?: (error?: Error | null) => void,
+  ) => {
     callback?.();
     return true;
   }) as typeof stdin.write;
@@ -77,7 +91,6 @@ function fakeChild(): {
   });
   return {
     child: child as unknown as ChildProcess,
-    output: () => writes,
     stdout,
   };
 }

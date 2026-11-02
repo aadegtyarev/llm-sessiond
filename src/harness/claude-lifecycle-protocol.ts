@@ -20,6 +20,20 @@ export function isClaudeInitializeAck(
   return true;
 }
 
+export function validateClaudeLifetimeRecord(
+  line: string,
+  expectedId: string,
+): void {
+  const record: unknown = JSON.parse(line);
+  if (
+    !isObject(record) ||
+    typeof record.type !== "string" ||
+    record.type === "control_request" ||
+    hasMismatchedSessionId(record, expectedId)
+  )
+    throw new Error("CLAUDE_LIFETIME_PROTOCOL_FAILED");
+}
+
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }

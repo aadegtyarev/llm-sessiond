@@ -8,12 +8,14 @@ import type { ProcessProvider } from "../core/ports.js";
 import type { ChildTerminator } from "../process/child-stop.js";
 import {
   claudeCheckpoint,
-  ClaudeLifecycleAdapter,
   isClaudeSessionId,
+  type ClaudeLifecycleAdapter,
 } from "./claude-lifecycle-adapter.js";
 import { ClaudeLifecycleProcess } from "./claude-lifecycle-process.js";
+import { ClaudeTextInputController } from "./claude-text-input-controller.js";
 
 export class ClaudeLifecycleExecution implements LifecycleExecution {
+  readonly inputs = new ClaudeTextInputController();
   private lifecycleProcess?: ClaudeLifecycleProcess;
   private started = false;
   private stopped = false;
@@ -29,7 +31,7 @@ export class ClaudeLifecycleExecution implements LifecycleExecution {
     cwd: string;
     options?: JsonValue;
   }): Promise<LifecycleLaunchResult> {
-    this.rejectOptions(input.options);
+    if (input.options !== undefined) throw new Error("UNSUPPORTED_OPTIONS");
     const sessionId = this.id();
     if (!isClaudeSessionId(sessionId)) throw new Error("INVALID_SESSION_ID");
     await this.start(input.cwd, ["--session-id", sessionId], sessionId);
@@ -44,7 +46,7 @@ export class ClaudeLifecycleExecution implements LifecycleExecution {
     checkpoint?: AdapterCheckpoint;
     nativeSessionId?: string;
   }): Promise<LifecycleLaunchResult> {
-    this.rejectOptions(input.options);
+    if (input.options !== undefined) throw new Error("UNSUPPORTED_OPTIONS");
     const checkpoint = input.checkpoint;
     if (
       !checkpoint ||
@@ -66,8 +68,10 @@ export class ClaudeLifecycleExecution implements LifecycleExecution {
     };
   }
   async stop(): Promise<void> {
+    this.inputs.stopIntent();
     if (this.stopped) return;
     if (!this.lifecycleProcess) {
+      this.inputs.confirmStopped();
       this.stopped = true;
       return;
     }
@@ -87,10 +91,8 @@ export class ClaudeLifecycleExecution implements LifecycleExecution {
       this.executable,
       this.readinessTimeoutMs,
       this.terminate,
+      this.inputs,
     );
     await this.lifecycleProcess.start(cwd, args, expectedId);
-  }
-  private rejectOptions(options: JsonValue | undefined): void {
-    if (options !== undefined) throw new Error("UNSUPPORTED_OPTIONS");
   }
 }
