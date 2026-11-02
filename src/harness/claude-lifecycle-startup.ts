@@ -1,17 +1,22 @@
 import type { ChildProcess } from "node:child_process";
-import { ClaudeJsonlDecoder } from "./claude-jsonl-decoder.js";
-import { isClaudeInitializeAck } from "./claude-lifecycle-protocol.js";
+import {
+  ClaudeLifetimeDispatch,
+  type ClaudeLifetimeHooks,
+  type ClaudeLifetimeTerminal,
+  writeClaudeInitialize,
+  removeClaudeStartupListeners,
+} from "./claude-lifecycle-dispatch.js";
 
 export function initializeClaude(
   child: ChildProcess,
   expectedId: string,
   timeoutMs: number,
+  hooks: ClaudeLifetimeHooks = {},
 ): Promise<void> {
   if (!child.stdout || !child.stdin)
     return Promise.reject(new Error("CLAUDE_STARTUP_FAILED"));
   const requestId = `llm-sessiond-${expectedId}`;
-  const decoder = new ClaudeJsonlDecoder();
-  let ready = false;
+  const dispatch = new ClaudeLifetimeDispatch(expectedId, requestId, hooks);
   let settled = false;
   let resolveReady!: () => void;
   let rejectReady!: (error: Error) => void;
@@ -26,68 +31,62 @@ export function initializeClaude(
     if (error) rejectReady(new Error("CLAUDE_STARTUP_FAILED"));
     else resolveReady();
   };
-  const failProtocol = (): void => {
+  const fail = (reason: ClaudeLifetimeTerminal): void => {
+    dispatch.terminalOnce(reason);
     finish(new Error("CLAUDE_STARTUP_FAILED"));
-    if (ready) {
+  };
+  const failProtocol = (): void => {
+    fail("protocol_error");
+    if (dispatch.initialized) {
       try {
         child.kill("SIGTERM");
       } catch {}
     }
   };
   const onData = (chunk: Buffer): void => {
-    let acknowledged = false;
+    if (dispatch.isTerminal) return;
     try {
-      for (const line of decoder.push(chunk)) {
-        if (isClaudeInitializeAck(line, expectedId, requestId))
-          acknowledged = true;
-      }
-      if (acknowledged) {
-        ready = true;
-        finish();
-      }
+      if (dispatch.push(chunk)) finish();
     } catch {
       failProtocol();
     }
   };
-  const onStdinError = (): void => finish(new Error("CLAUDE_STARTUP_FAILED"));
-  const onStreamError = (): void => finish(new Error("CLAUDE_STARTUP_FAILED"));
-  const onExit = (): void => finish(new Error("CLAUDE_STARTUP_FAILED"));
+  const onStdinError = (): void => fail("stdin_error");
+  const onStreamError = (): void => fail("stream_error");
+  const onExit = (): void => fail("process_exit");
   const cleanup = (): void => {
     clearTimeout(timer);
-    child.stdout?.removeListener("data", onData);
-    child.stdout?.removeListener("error", onStreamError);
-    child.stdin?.removeListener("error", onStdinError);
-    child.removeListener("error", onStreamError);
-    child.removeListener("exit", onExit);
+    removeClaudeStartupListeners(child, {
+      data: onData,
+      end: onStdoutEnd,
+      streamError: onStreamError,
+      stdinError: onStdinError,
+      exit: onExit,
+    });
   };
+  const onStdoutEnd = (): void => fail("stdout_end");
   const onClose = (): void => {
     try {
-      decoder.finish();
-      if (!ready) finish(new Error("CLAUDE_STARTUP_FAILED"));
+      dispatch.finish();
+      if (!dispatch.initialized) finish(new Error("CLAUDE_STARTUP_FAILED"));
+      dispatch.terminalOnce("stdout_close");
     } catch {
-      finish(new Error("CLAUDE_STARTUP_FAILED"));
+      failProtocol();
     }
     cleanup();
   };
-  const timer = setTimeout(
-    () => finish(new Error("CLAUDE_STARTUP_FAILED")),
-    timeoutMs,
-  );
+  const timer = setTimeout(() => fail("readiness_timeout"), timeoutMs);
   child.stdin.on("error", onStdinError);
   child.stdout.on("error", onStreamError);
   child.on("error", onStreamError);
   child.stdout.on("data", onData);
+  child.stdout.once("end", onStdoutEnd);
   child.once("exit", onExit);
   child.once("close", onClose);
   try {
-    child.stdin.write(
-      `${JSON.stringify({ type: "control_request", request_id: requestId, request: { subtype: "initialize", hooks: null } })}\n`,
-      (error) => {
-        if (error) finish(new Error("CLAUDE_STARTUP_FAILED"));
-      },
-    );
+    writeClaudeInitialize(child.stdin, requestId, () => fail("stdin_error"));
   } catch {
-    finish(new Error("CLAUDE_STARTUP_FAILED"));
+    fail("stdin_error");
   }
   return result;
 }
