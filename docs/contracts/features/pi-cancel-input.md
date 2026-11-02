@@ -11,7 +11,7 @@ Advertise and implement Pi cancellation only for the exact currently accepted in
 
 - A correlated successful abort waits for live `agent_settled` before publishing failed/canceled.
 - Definite abort rejection leaves the original input accepted/current and allows a new explicit retry; ambiguous delivery becomes uncertain and never retries.
-- Pending, stale, stopping/dead, uncertain, or already canceling work is never aborted. Settlement and late responses cannot affect a replacement input or resumed generation.
+- Pending, stale, stopping/dead, uncertain, settled-before-cancel, or already canceling work is never newly aborted. An accepted abort ACK forbids another abort for that input until it ends. Settlement and late responses cannot affect a replacement input or resumed generation.
 - Text/image submission and v1 cancellation behavior remain unchanged.
 
 ## Non-goals

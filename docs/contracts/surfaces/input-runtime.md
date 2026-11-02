@@ -12,7 +12,7 @@ Executions return accepted, definite submit rejection with one of `prompt_reject
 
 ## Runtime events and cancellation
 
-The manager exposes `inputs.submit`, exact `inputs.cancel`, `inputs.cancelCurrent`, and `inputs.subscribe`. Events contain only session ID, input ID, normalized state (`pending|accepted|completed|failed|uncertain`), and optional whitelisted failure reason. The execution event port may also report normalized `execution-ended`; unresolved input then becomes uncertain. Exact source and input identity fence stale events. Observer exceptions detach that observer only. Pending/accepted work becomes uncertain when stopped; confirmed stop releases the transient admission slot. Cancellation targets only an accepted exact current input; acknowledgement alone does not assert terminal completion.
+The manager exposes `inputs.submit`, exact `inputs.cancel`, `inputs.cancelCurrent`, and `inputs.subscribe`. Events contain only session ID, input ID, normalized state (`pending|accepted|completed|failed|uncertain`), and optional whitelisted failure reason. The execution event port may also report normalized `execution-ended`; unresolved input then becomes uncertain. Exact source and input identity fence stale events. Observer exceptions detach that observer only. Pending/accepted work becomes uncertain when stopped; confirmed stop releases the transient admission slot. Cancellation targets only an accepted exact current input; the adapter refuses abort if settlement was already observed, and a successful abort ACK prevents further abort writes for that input. Acknowledgement alone does not assert terminal completion.
 
 ## Limits and non-goals
 

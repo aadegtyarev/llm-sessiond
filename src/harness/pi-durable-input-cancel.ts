@@ -17,16 +17,12 @@ export async function cancelPiCurrent(
   isDead: () => boolean,
   settled?: () => void,
 ): Promise<InputCancelOutcome> {
-  if (
-    isDead() ||
-    !link?.writable ||
-    !current ||
-    current.id !== inputId ||
-    !current.accepted ||
-    current.canceling ||
-    current.abortUncertain
-  )
+  if (!current || current.id !== inputId || !current.accepted)
     return { kind: "uncertain" };
+  if (isDead() || !link?.writable) return { kind: "uncertain" };
+  if (current.settled) return { kind: "rejected" };
+  if (current.abortAccepted) return { kind: "accepted" };
+  if (current.canceling || current.abortUncertain) return { kind: "uncertain" };
   current.canceling = true;
   try {
     const reply = await link.command("abort", {});
