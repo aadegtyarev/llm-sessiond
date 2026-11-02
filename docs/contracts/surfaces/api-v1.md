@@ -29,4 +29,4 @@ HTTP JSON body ≤24 MiB; prompt text ≤256 KiB UTF-8; decoded image bytes tota
 
 ## Security and non-goals
 
-No non-loopback bind, Unix sockets, TLS, bearer auth, prompt logging, full reasoning content, durable history, or restart recovery. Unsupported capabilities return explicit errors. Related: [session lifecycle](session-lifecycle.md).
+No non-loopback bind, Unix sockets, TLS, bearer auth, prompt logging, full reasoning content, durable history, or restart recovery. Unsupported capabilities return explicit errors. The optional prepared-runtime v2 discovery injection does not alter v1 routes, schemas, or error envelopes; default `main.ts` remains v1. Related: [session lifecycle](session-lifecycle.md).

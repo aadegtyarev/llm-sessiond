@@ -4,6 +4,8 @@
 
 The service owns harness processes through `HarnessAdapter` and `ProcessProvider` ports. Pi's v1 lifecycle remains as specified below. The v2 Claude lifecycle uses the durable manager and adapter checkpoint.
 
+The default `main.ts` composition remains the v1 service and does not activate durable-runtime HTTP discovery. An embedding caller may inject an already prepared durable runtime into the existing API server for the two v2 discovery GETs only. The server neither creates nor owns that runtime, acquires its store/owner lock, starts providers, nor shuts it down. Discovery readiness is fenced by the runtime's current store ownership and synchronous closing state; it does not assert full v2 lifecycle readiness.
+
 ## Claude lifecycle (API v2)
 
 The `claude-code` adapter (alias `claude`) starts Claude CLI in stream-json print mode with replayed user messages enabled and a daemon-generated UUID passed as `--session-id`. It sends only a private correlated `initialize` control request; a valid correlated success response establishes readiness. No prompt, model turn, or synthetic initialization event is sent. Any startup or lifetime metadata declaring `session_id` must match the exact UUID; a `system/init` record is not required before the initialize acknowledgement. Resume requires the exact `claude.session` v1 checkpoint and starts `--resume <UUID>` without fallback; absence of a saved transcript fails explicitly. Stop is bounded and succeeds only after child exit is confirmed. The adapter advertises launch, resume, stop, and text-only `input.submit`; no empty transcript resumability guarantee is made.
