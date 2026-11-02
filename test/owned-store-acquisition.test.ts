@@ -11,6 +11,7 @@ function fakeDatabase(
   events: string[],
   failClaim = false,
   lockDirectory?: string,
+  failClose = false,
 ): DatabaseSync {
   return {
     exec: (sql: string) => events.push(sql),
@@ -25,6 +26,7 @@ function fakeDatabase(
       events.push(
         lockDirectory && existsSync(lockDirectory) ? "close-locked" : "close",
       );
+      if (failClose) throw Error("close");
     },
   } as unknown as DatabaseSync;
 }
@@ -44,6 +46,24 @@ describe("owned store acquisition", () => {
       expect(opened).toBe(false);
     } finally {
       await lock.release();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("retains lock if failed initialization cannot close its database", async () => {
+    const dir = await mkdtemp(
+      path.join(os.tmpdir(), "owned-store-rollback-fail-"),
+    );
+    try {
+      await expect(
+        OwnedStoreLease.acquireOwned(dir, () =>
+          fakeDatabase([], true, path.join(dir, "owner.lock"), true),
+        ),
+      ).rejects.toThrow("close");
+      await expect(OwnerLock.acquire(dir)).rejects.toThrow(
+        "OWNER_ALREADY_ACTIVE",
+      );
+    } finally {
       await rm(dir, { recursive: true, force: true });
     }
   });

@@ -5,18 +5,18 @@
 
 ## Goal
 
-Provide an explicitly opt-in standalone bootstrap for the existing basic API v2 slice, while leaving default `npm start` and v1 behavior unchanged. This component establishes durable-store ownership safely before startup composition.
+Provide a separately built, opt-in `npm run start:v2` bootstrap for the existing basic API v2 slice; leave default `npm start`/`main.ts` and v1 behavior unchanged. Keep `HOST` loopback-only (`127.0.0.1`), `PORT` default 4317 / integer 0..65535, and state precedence `LLM_SESSIOND_STATE_DIR` > `XDG_STATE_HOME/llm-sessiond` > home state directory; add no config families. Example: `LLM_SESSIOND_STATE_DIR=/tmp/llm-sessiond-v2-dev PORT=4318 npm run start:v2`.
 
 ## Scenarios
 
-- Acquire exclusive lock before opening/migrating the database; a contender must never invoke the database opener.
-- On opener or generation-claim failure, clean up only resources acquired by this attempt, closing an owned database before unlocking.
-- Close once or concurrently: revoke generation, close owned database, then release lock. Unconfirmed DB cleanup retains the lock and fails explicitly.
-- Preserve callers that pass an already-open database: their lease does not own/close that database.
+- Startup validates config and private/canonical state path, acquires the single owner lock before DB open/create/migration, claims generation, reconciles existing rows without launch/resume/replay, then composes built-in Pi/Claude durable runtime and injects the existing HTTP server. V1 routes remain real and discovery advertises v1+v2; only six existing basic v2 operations are wired and `features:[]` remains.
+- A lock contender never invokes the DB opener. Startup failures roll back only acquired resources; DB-close failure retains lock and fails closed. No stale/dead PID lock stealing.
+- Readiness/admission turn off synchronously during shutdown; close listener/new admissions, confirmed bounded owned instance/provider drain, transport cleanup including idle/upgraded sockets, revoke generation while DB is open, close DB, then unlock. Duplicate close/signals do not double-release or turn failure into clean exit. Signals during async startup are handled.
+- Existing prepared-DB callers keep caller-owned DB lifetime. This component exposes acquired DB and exact generation for later runtime composition.
 
 ## Non-goals
 
-No daemon entrypoint, server, runtime/adapters, routes, schema/reconciliation changes, stale-lock stealing, retry/replay, additional configuration, or broader control-plane parity. No Windows ACL verification claim.
+No full daemon-mode/bridge readiness claim, bridge/API expansion, queue/bus/engine/framework, retries/replay/fallback, stale-lock stealing, new configuration, client/application integration, deployment/install/restart, or native/model jobs/prompts. Keep canonical revision-1 SQLite DDL and reconciliation/status/identity semantics. Windows paths follow existing rules; no real Windows/ACL verification claim.
 
 ## Affected surfaces
 
@@ -28,12 +28,12 @@ No daemon entrypoint, server, runtime/adapters, routes, schema/reconciliation ch
 
 ## Interfaces and constraints
 
-Extend the existing owned-store primitive, not a parallel owner framework. Keep the prepared-DB acquire caller compatible; add a narrow open-and-own mode that opens only after lock acquisition and exposes the database and exact claimed generation for composition. Teardown is idempotent and ordered revoke -> owned DB close -> lock release. Failed/unconfirmed cleanup cannot report successful release or unlock foreign ownership. Preserve canonical revision-1 SQLite schema and existing lock/generation semantics.
+Extend the existing owned-store primitive, not a parallel owner framework. Keep prepared-DB acquire compatible; add a narrow open-and-own mode that invokes the opener only after lock acquisition, exposes DB and exact generation, and owns DB shutdown. Teardown is idempotent: revoke -> owned DB close -> lock release. Failed/unconfirmed cleanup cannot report success or release foreign ownership. Diagnostics are static/controlled; never log raw backend error/getter/message/stack/cause. Success may report public loopback port.
 
 ## Acceptance criteria
 
-Focused tests prove contender-before-opener ordering; opener failure unlock; generation failure closes DB before unlock; DB close failure retains lock; normal revoke/close/unlock ordering; duplicate/concurrent close idempotence; and legacy prepared-DB compatibility. No changes outside persistence ownership and directly needed tests/helpers.
+Acceptance: preserve real v1 service/routes with opt-in basic v2 startup; validate lock-before-DB and startup/rollback/shutdown ownership order, readiness/admission fencing, signal races, transport cleanup, and no launch/replay on reconciliation. Store tests prove contender-before-opener; opener/claim failure rollback; DB-close failure retains lock; revoke/close/unlock order; duplicate close idempotence; malformed/foreign lock fails closed; and borrowed DB compatibility. Isolated Node daemon + client smoke must not run model turns. No parity scope expansion.
 
 ## Validation
 
-Focused persistence tests, full `npm test` including SQLite suites, typecheck, build, lint, format:check, version:check, production audit, pack dry-run, `git diff --check`, and cumulative authored-file 100-physical-line gate. Independent parent precheck is required before handoff.
+Validate focused ownership/startup tests, full `npm test` including SQLite suites, typecheck/build/lint/format/version, production audit, package dry-run, `git diff --check`, and cumulative authored-file 100-line gate. Run isolated process/client smoke without model prompts. Independent parent precheck is required before handoff.

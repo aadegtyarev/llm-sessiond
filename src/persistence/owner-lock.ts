@@ -45,6 +45,8 @@ export class OwnerLock {
     } catch {
       throw new SafeValidationError("OWNER_LOCK_CHANGED");
     }
+    if (owner === null || typeof owner !== "object" || Array.isArray(owner))
+      throw new SafeValidationError("OWNER_LOCK_CHANGED");
     const keys = Object.keys(owner).sort().join(",");
     if (
       owner.pid !== process.pid ||
