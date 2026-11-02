@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { PiDurableInputPort } from "../src/harness/pi-durable-input-port.js";
 import { PiDurableRpcLink } from "../src/harness/pi-durable-rpc-link.js";
 import { FakePiChild } from "./pi-durable-fake-child.js";
@@ -24,14 +24,24 @@ describe("Pi durable terminal fences", () => {
     const { child, link, port } = await acceptedInput();
     const events: unknown[] = [];
     port.subscribe((event) => events.push(event));
-    child.send({ type: "agent_settled" });
-    child.send({ type: "agent_settled" });
-    child.stdout.emit("end");
-    child.send({ type: "agent_settled" });
-    await new Promise<void>((resolve) => setImmediate(resolve));
-    expect(events).toEqual([{ kind: "execution-ended" }]);
-    expect(link.writable).toBe(false);
-    link.dispose();
+    let fakeTimers = false;
+    try {
+      vi.useFakeTimers();
+      fakeTimers = true;
+      child.send({ type: "agent_settled" });
+      child.send({ type: "agent_settled" });
+      expect(vi.getTimerCount()).toBe(1);
+      child.stdout.emit("end");
+      child.send({ type: "agent_settled" });
+      await vi.runAllTimersAsync();
+      expect(events).toEqual([{ kind: "execution-ended" }]);
+      expect(link.writable).toBe(false);
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      link.dispose();
+      if (fakeTimers) vi.clearAllTimers();
+      vi.useRealTimers();
+    }
   });
   it("stops same-chunk dispatch after a bad correlated response", async () => {
     const child = new FakePiChild();
