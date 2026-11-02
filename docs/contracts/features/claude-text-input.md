@@ -1,6 +1,7 @@
 # Claude text input and settlement
 
-- Status: Implemented and verified; pending independent review.
+- Status: Complete; final verification passed after independent review.
+- Review: ACCEPTED at `ac82c7ee0cbfc74a5750ce4dc704bb0d7a104a32` (claude-text-race-review.md).
 
 ## Goal
 
@@ -30,4 +31,4 @@ Tests cover initialization/handover, exact wire and root ACK guards, successful/
 
 ## Validation
 
-Run focused tests and all repository gates: tests, typecheck, build, lint, format, version, production audit, pack dry-run, diff checks, authored-file line counts, and v1 regression. Update affected durable surface contracts after verification; retain this feature contract marked pending final review.
+Final verification passed: full and focused tests, typecheck, build, lint, format, version, production audit, pack dry-run, diff checks, authored-file line counts, and v1 regression. Durable surfaces already describe the verified text-only input behavior; no further surface changes were required.
