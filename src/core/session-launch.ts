@@ -47,8 +47,8 @@ export async function createSession(
     ...(input.name !== undefined ? { name: input.name } : {}),
     ...(input.options !== undefined ? { adapterOptions: input.options } : {}),
   };
-  assertExecutionAdmissionOpen(context);
   assertCurrentOwner(context);
+  assertExecutionAdmissionOpen(context);
   context.store.create(row);
   let execution: LifecycleExecution | undefined;
   let result: LifecycleLaunchResult;
