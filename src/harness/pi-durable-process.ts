@@ -6,11 +6,11 @@ import { PiDurableRpcLink } from "./pi-durable-rpc-link.js";
 import { PiDurableInputPort } from "./pi-durable-input-port.js";
 import { startOwnedPi } from "./pi-durable-startup-query.js";
 import * as durableReadQueries from "./pi-durable-read-queries.js";
-import {
-  readDurablePiCommandCatalog as readCommands,
-  readDurablePiEffortCatalog as readEffort,
-  readDurablePiModelCatalog as readModels,
-} from "./pi-durable-read-queries.js";
+import { readDurablePiModelCatalog as readModels } from "./pi-durable-read-queries.js";
+import { readDurablePiEffortCatalog as readEffort } from "./pi-durable-read-queries.js";
+import { readDurablePiCommandCatalog as readCommands } from "./pi-durable-read-queries.js";
+import { changePiEffort } from "./pi-durable-effort-change.js";
+import type { EffortChangeCallContext } from "../core/effort-change-port.js";
 export class PiDurableProcess {
   readonly inputs = new PiDurableInputPort();
   private child?: ChildProcess;
@@ -50,21 +50,17 @@ export class PiDurableProcess {
     this.nativeSessionId = nativeSessionId;
     return nativeSessionId;
   }
-  async readLiveStatus() {
-    const link = this.link;
-    if (!link) throw new Error("RPC_UNAVAILABLE");
-    return durableReadQueries.readDurablePiLiveStatus(
-      link,
+  readLiveStatus = () =>
+    durableReadQueries.readDurablePiLiveStatus(
+      this.link,
       this.nativeSessionId,
-      () => this.isQueryCurrent(link),
+      this.isQueryCurrent,
     );
-  }
-  readModelCatalog = () =>
-    readModels(this.link, (link) => this.isQueryCurrent(link));
-  readEffortCatalog = () =>
-    readEffort(this.link, (link) => this.isQueryCurrent(link));
-  readCommandCatalog = () =>
-    readCommands(this.link, (link) => this.isQueryCurrent(link));
+  readModelCatalog = () => readModels(this.link, this.isQueryCurrent);
+  readEffortCatalog = () => readEffort(this.link, this.isQueryCurrent);
+  readCommandCatalog = () => readCommands(this.link, this.isQueryCurrent);
+  changeEffort = (level: string, context: EffortChangeCallContext) =>
+    changePiEffort(this.link, this.nativeSessionId, level, context);
   private isQueryCurrent = (link: PiDurableRpcLink): boolean =>
     durableReadQueries.isDurablePiQueryCurrent(
       this.link,

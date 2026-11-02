@@ -21,11 +21,12 @@ export function isDurablePiQueryCurrent(
   );
 }
 export function readDurablePiLiveStatus(
-  link: PiDurableRpcLink,
+  link: PiDurableRpcLink | undefined,
   nativeSessionId: string | undefined,
-  isCurrent: () => boolean,
+  isCurrent: (link: PiDurableRpcLink) => boolean,
 ) {
-  return readPiLiveStatus(link, nativeSessionId, isCurrent);
+  if (!link) throw new Error("RPC_UNAVAILABLE");
+  return readPiLiveStatus(link, nativeSessionId, () => isCurrent(link));
 }
 export function readDurablePiModelCatalog(
   link: PiDurableRpcLink | undefined,

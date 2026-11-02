@@ -23,6 +23,7 @@ describe("Pi v2 lifecycle adapter", () => {
       "usage.read",
       "models.read",
       "effort.read",
+      "effort.change",
       "commands.read",
     ]);
     expect(adapter.validateCheckpoint({ sessionId: "id" })).toBe(true);

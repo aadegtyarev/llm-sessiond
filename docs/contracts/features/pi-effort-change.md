@@ -1,6 +1,6 @@
 # Pi standalone effort mutation
 
-- Status: Approved; implementation milestone B
+- Status: Implementation complete; pending independent review
 
 ## Goal
 

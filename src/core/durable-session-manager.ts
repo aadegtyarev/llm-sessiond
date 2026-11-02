@@ -28,7 +28,6 @@ import {
 export type { DurableSessionStore } from "./session-manager-store.js";
 export class DurableSessionManager {
   private readonly context: DurableManagerContext;
-  private readonly inputState = new DurableInputState();
   readonly inputs: DurableInputRuntime;
   private readonly locks = new PerSessionLock();
   constructor(
@@ -49,7 +48,7 @@ export class DurableSessionManager {
       pending: new Map(),
       lifecycleIntents: new Map(),
       stopTimeoutMs,
-      inputState: this.inputState,
+      inputState: new DurableInputState(),
     };
     this.inputs = new DurableInputRuntime(
       this.context,
@@ -64,13 +63,14 @@ export class DurableSessionManager {
   get(id: string): DurableSession {
     return DurableSessionManagerRead.get(this.context.store, id);
   }
-  descriptor(id: string) {
-    return resolveAdapter(this.context.registry, id).descriptor;
-  }
+  descriptor = (id: string) =>
+    resolveAdapter(this.context.registry, id).descriptor;
   readLiveStatus = (id: string) => q.readDurableLiveStatus(this.context, id);
   readModelCatalog = (id: string) => q.readModelCatalog(this.context, id);
   readEffortCatalog = (id: string) => q.readEffortCatalog(this.context, id);
   readCommandCatalog = (id: string) => q.readCommandCatalog(this.context, id);
+  changeEffort = (id: string, level: unknown) =>
+    q.changeEffort(this.context, id, level);
   create(input: {
     cwd: string;
     harnessId?: string;

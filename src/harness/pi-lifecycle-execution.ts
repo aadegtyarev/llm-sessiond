@@ -22,6 +22,14 @@ export class PiLifecycleExecution implements LifecycleExecution {
   get effortCatalog() {
     return { readEffortCatalog: () => this.process.readEffortCatalog() };
   }
+  get effortChange() {
+    return {
+      changeEffort: (
+        level: string,
+        context: import("../core/effort-change-port.js").EffortChangeCallContext,
+      ) => this.process.changeEffort(level, context),
+    };
+  }
   get commandCatalog() {
     return { readCommandCatalog: () => this.process.readCommandCatalog() };
   }

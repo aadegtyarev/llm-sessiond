@@ -4,9 +4,15 @@ import type { PiDurableRpcLink } from "./pi-durable-rpc-link.js";
 export async function readPiEffortCatalog(
   link: PiDurableRpcLink,
   isCurrent: () => boolean,
+  timeoutMs: () => number = () => 15_000,
 ): Promise<EffortCatalog> {
   if (!link.writable || !isCurrent()) throw new Error("RPC_UNAVAILABLE");
-  const reply = await link.command("get_available_thinking_levels", {});
+  const reply = await link.command(
+    "get_available_thinking_levels",
+    {},
+    timeoutMs(),
+    () => isCurrent(),
+  );
   if (!link.writable || !isCurrent()) throw new Error("RPC_UNAVAILABLE");
   const success = Object.getOwnPropertyDescriptor(reply, "success");
   const responseData = Object.getOwnPropertyDescriptor(reply, "data");

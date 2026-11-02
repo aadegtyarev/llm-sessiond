@@ -11,13 +11,14 @@ import { fixture, tempDir } from "./helpers.js";
 const owner = { token: "test-owner", generation: 1 };
 describe("Pi durable text input", () => {
   it("advertises exact cancellation and read-only catalog capabilities", () => {
-    expect(piDescriptor.capabilities.slice(-7)).toEqual([
+    expect(piDescriptor.capabilities.slice(-8)).toEqual([
       "input.cancel",
       "input.cancel-current",
       "status.read",
       "usage.read",
       "models.read",
       "effort.read",
+      "effort.change",
       "commands.read",
     ]);
   });

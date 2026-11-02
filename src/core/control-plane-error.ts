@@ -19,7 +19,8 @@ export type ControlPlaneErrorCode =
   | "INPUT_BUSY"
   | "INPUT_UNCERTAIN"
   | "INPUT_NOT_CURRENT"
-  | "INPUT_REJECTED";
+  | "INPUT_REJECTED"
+  | "INVALID_EFFORT";
 const MESSAGES: Record<ControlPlaneErrorCode, string> = {
   NOT_FOUND: "session not found",
   SESSION_ID_COLLISION: "session id collision",
@@ -42,6 +43,7 @@ const MESSAGES: Record<ControlPlaneErrorCode, string> = {
   INPUT_UNCERTAIN: "input outcome is uncertain",
   INPUT_NOT_CURRENT: "input is not the accepted current input",
   INPUT_REJECTED: "input was rejected",
+  INVALID_EFFORT: "effort level is invalid",
 };
 export class ControlPlaneError extends Error {
   constructor(readonly code: ControlPlaneErrorCode) {
