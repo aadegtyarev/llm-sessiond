@@ -9,7 +9,7 @@ sessions(id,harness_id,cwd,status,name,native_session_id,adapter_options,
  adapter_state,failure_reason,failed_at,created_at)
 ```
 
-Only additive transactional migrations; `PRAGMA user_version`, WAL. Unknown newer/corrupt schema blocks startup. A cross-platform single-owner mechanism is required; SQLite locking alone does not guarantee only one process owner.
+Only additive transactional migrations; `PRAGMA user_version`, WAL. Unknown newer/corrupt schema blocks startup. A cross-platform single-owner mechanism is required; SQLite locking alone does not guarantee only one process owner. Standalone startup claims `owner.lock` before opening or migrating SQLite. If initialization fails, the lock is released only after any acquired database handle is confirmed closed; uncertain close retains the lock and startup fails closed. No stale/dead-PID lock is reclaimed automatically. See [daemon startup](daemon-startup.md).
 
 ## Adapter checkpoint
 
