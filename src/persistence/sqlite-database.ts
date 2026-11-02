@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { SafeValidationError } from "../core/generic-json.js";
 import { migrateDatabase } from "./sqlite-migrations.js";
+import { OwnedDatabaseCleanupUnconfirmed } from "./owned-store.js";
 
 export function openSessionDatabase(file: string): DatabaseSync {
   let db: DatabaseSync;
@@ -14,7 +15,11 @@ export function openSessionDatabase(file: string): DatabaseSync {
     migrateDatabase(db);
     return db;
   } catch (error) {
-    db.close();
+    try {
+      db.close();
+    } catch {
+      throw new OwnedDatabaseCleanupUnconfirmed();
+    }
     if (error instanceof SafeValidationError) throw error;
     throw new SafeValidationError("CORRUPT_DATABASE");
   }

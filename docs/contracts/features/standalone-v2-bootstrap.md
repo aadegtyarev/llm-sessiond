@@ -10,7 +10,7 @@ Provide a separately built, opt-in `npm run start:v2` bootstrap for the existing
 ## Scenarios
 
 - Startup validates config and private/canonical state path, acquires the single owner lock before DB open/create/migration, claims generation, reconciles existing rows without launch/resume/replay, then composes built-in Pi/Claude durable runtime and injects the existing HTTP server. V1 routes remain real and discovery advertises v1+v2; only six existing basic v2 operations are wired and `features:[]` remains.
-- A lock contender never invokes the DB opener. Startup failures roll back only acquired resources; DB-close failure retains lock and fails closed. No stale/dead PID lock stealing.
+- A lock contender never invokes the DB opener. Startup failures roll back only acquired resources; DB-close failure retains lock and fails closed. If database opening acquires a native handle but initialization/migration fails, only confirmed handle close permits unlocking; unconfirmed close retains the owner lock. Constructor failure before handle acquisition and confirmed-close initialization failure still release the owned lock. No stale/dead PID lock stealing.
 - Readiness/admission turn off synchronously during shutdown; close listener/new admissions, confirmed bounded owned instance/provider drain, transport cleanup including idle/upgraded sockets, revoke generation while DB is open, close DB, then unlock. Duplicate close/signals do not double-release or turn failure into clean exit. Signals during async startup are handled.
 - Existing prepared-DB callers keep caller-owned DB lifetime. This component exposes acquired DB and exact generation for later runtime composition.
 
@@ -32,7 +32,7 @@ Extend the existing owned-store primitive, not a parallel owner framework. Keep 
 
 ## Acceptance criteria
 
-Acceptance: preserve real v1 service/routes with opt-in basic v2 startup; validate lock-before-DB and startup/rollback/shutdown ownership order, readiness/admission fencing, signal races, transport cleanup, and no launch/replay on reconciliation. Store tests prove contender-before-opener; opener/claim failure rollback; DB-close failure retains lock; revoke/close/unlock order; duplicate close idempotence; malformed/foreign lock fails closed; and borrowed DB compatibility. Isolated Node daemon + client smoke must not run model turns. No parity scope expansion.
+Acceptance: preserve real v1 service/routes with opt-in basic v2 startup; validate lock-before-DB and startup/rollback/shutdown ownership order, readiness/admission fencing, signal races, transport cleanup, and no launch/replay on reconciliation. Store tests prove contender-before-opener; constructor/open failure cleanup; init/migration failure across PRAGMA, newer schema, and malformed revision-1 schema with confirmed and unconfirmed close; claim failure rollback; DB-close failure retains lock; revoke/close/unlock order; duplicate close idempotence; malformed/foreign lock fails closed; and borrowed DB compatibility. Isolated Node daemon + client smoke must not run model turns. No parity scope expansion.
 
 ## Validation
 

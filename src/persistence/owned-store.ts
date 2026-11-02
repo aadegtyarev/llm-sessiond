@@ -6,6 +6,12 @@ import {
 } from "./owner-generation.js";
 import type { OwnerGeneration } from "./session-record.js";
 
+export class OwnedDatabaseCleanupUnconfirmed extends Error {
+  constructor() {
+    super("OWNED_DATABASE_CLEANUP_UNCONFIRMED");
+  }
+}
+
 export class OwnedStoreLease {
   private closePromise: Promise<void> | undefined;
   private constructor(
@@ -38,6 +44,7 @@ export class OwnedStoreLease {
       const generation = claimOwnerGeneration(db, lock.token);
       return new OwnedStoreLease(lock, db, generation, ownsDatabase);
     } catch (error) {
+      if (error instanceof OwnedDatabaseCleanupUnconfirmed) throw error;
       if (db && ownsDatabase) db.close();
       await lock.release();
       throw error;
