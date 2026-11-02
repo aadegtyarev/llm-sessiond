@@ -1,13 +1,17 @@
 import { randomUUID } from "node:crypto";
 import type { ServerResponse } from "node:http";
 import type { HarnessRegistry } from "../core/adapter-registry.js";
+import type { DurableSessionManager } from "../core/durable-session-manager.js";
 import { SERVICE_VERSION } from "./service-version.js";
 import { snapshotDiscoveryDescriptor } from "./v2-discovery-descriptor.js";
 import { sendJson } from "./http-support.js";
+import type { IncomingMessage } from "node:http";
+import { v2SessionRoute } from "./v2-session-routes.js";
 
 export interface V2DiscoveryRuntime {
   registry: HarnessRegistry;
   assertReady(): void;
+  manager?: DurableSessionManager;
 }
 
 export function createV2Discovery(runtime: V2DiscoveryRuntime) {
@@ -16,6 +20,7 @@ export function createV2Discovery(runtime: V2DiscoveryRuntime) {
     path: string,
     method: string,
     response: ServerResponse,
+    request: IncomingMessage,
   ): Promise<boolean> {
     if (method === "GET" && path === "/api/v2/health") {
       runtime.assertReady();
@@ -29,6 +34,16 @@ export function createV2Discovery(runtime: V2DiscoveryRuntime) {
         features: [],
       });
       return true;
+    }
+    if (path === "/api/v2/sessions" || path.startsWith("/api/v2/sessions/")) {
+      return v2SessionRoute(
+        runtime,
+        instanceId,
+        path,
+        method,
+        request,
+        response,
+      );
     }
     if (method === "GET" && path === "/api/v2/harnesses") {
       runtime.assertReady();

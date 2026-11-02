@@ -40,6 +40,28 @@ const safeErrorSchema = z.strictObject({
     })
     .optional(),
 });
+export function sendV2SessionError(
+  response: ServerResponse,
+  status: number,
+  code: string,
+  message: string,
+  category:
+    | "validation"
+    | "not-found"
+    | "unsupported"
+    | "conflict"
+    | "unavailable"
+    | "uncertain"
+    | "internal",
+  outcome: "not-applied" | "applied" | "unknown",
+): void {
+  sendJson(
+    response,
+    status,
+    { code, message, category, outcome, reference: randomUUID() },
+    safeErrorSchema,
+  );
+}
 export function sendV2Error(response: ServerResponse, status: 404 | 503): void {
   const notFound = status === 404;
   sendJson(

@@ -14,13 +14,14 @@ export async function route(
     path: string,
     method: string,
     response: ServerResponse,
+    request: IncomingMessage,
   ) => Promise<boolean>,
 ): Promise<RouteResult> {
   const url = new URL(request.url ?? "/", "http://127.0.0.1");
   const method = request.method ?? "GET";
   const path = url.pathname;
   if (v2Discover && (path === "/api/v2" || path.startsWith("/api/v2/"))) {
-    const handled = await v2Discover(path, method, response);
+    const handled = await v2Discover(path, method, response, request);
     if (!handled) return "v2-not-found";
     return;
   }
