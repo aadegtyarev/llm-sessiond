@@ -88,5 +88,6 @@ function result(success: boolean): string {
     parent_tool_use_id: null,
     subtype: success ? "success" : "error",
     is_error: !success,
+    ...(success ? { result: "ok" } : {}),
   });
 }

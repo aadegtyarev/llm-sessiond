@@ -69,6 +69,7 @@ describe("Claude text input process binding", () => {
         parent_tool_use_id: null,
         subtype: "success",
         is_error: false,
+        result: "native result",
       }) + "\n",
     );
     expect(events).toContainEqual({ inputId: "opaque/id", state: "completed" });

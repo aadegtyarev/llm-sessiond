@@ -38,9 +38,12 @@ function result(
   sessionId: string,
 ): ClaudeInputRecord {
   if (root.session_id !== sessionId || nested(root)) return "ignore";
-  return root.is_error === false && root.subtype === "success"
+  if (typeof root.is_error !== "boolean" || typeof root.subtype !== "string")
+    return "invalid";
+  if (root.is_error) return "failure";
+  return root.subtype === "success" && typeof root.result === "string"
     ? "success"
-    : "failure";
+    : "invalid";
 }
 function nested(root: Record<string, unknown>): boolean {
   return (

@@ -25,6 +25,7 @@ input.on("line", (line) => {
       parent_tool_use_id: null,
       subtype: mode === "text-error" ? "error_during_execution" : "success",
       is_error: mode === "text-error",
+      ...(mode === "text-error" ? {} : { result: "ok" }),
     };
     process.stdout.write(`${JSON.stringify(replay)}\n`);
     if (mode === "text-error")
