@@ -9,15 +9,8 @@ import { fixture, tempDir } from "./helpers.js";
 
 const owner = { token: "test-owner", generation: 1 };
 describe("Pi durable text input", () => {
-  it("rejects direct image and cancel calls without a live RPC link", async () => {
+  it("rejects cancellation without a live RPC link", async () => {
     const port = new PiDurableInputPort();
-    await expect(
-      port.submit({
-        inputId: "input-1",
-        text: "text",
-        images: [{ mimeType: "image/png", data: "AA==" }],
-      }),
-    ).rejects.toThrow("UNSUPPORTED_CAPABILITY");
     await expect(port.cancel("input-1")).rejects.toThrow(
       "UNSUPPORTED_CAPABILITY",
     );
@@ -54,6 +47,7 @@ describe("Pi durable text input", () => {
       });
       const result = await runtime.manager.inputs.submit(session.id, {
         text: "opaque text",
+        images: [],
       });
       expect(result.inputId).toBe("opaque-2");
       await completed;
@@ -71,12 +65,6 @@ describe("Pi durable text input", () => {
         code: "INPUT_REJECTED",
         failureReason: "prompt_rejected",
       });
-      await expect(
-        runtime.manager.inputs.submit(session.id, {
-          text: "image request",
-          images: [{ mimeType: "image/png", data: "AA==" }],
-        }),
-      ).rejects.toThrow();
       expect(await readFile(`${cwd}/prompt-count`, "utf8")).toBe("11");
       await runtime.manager.stop(session.id);
     } finally {

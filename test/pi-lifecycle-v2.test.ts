@@ -9,7 +9,7 @@ import { fixture, tempDir } from "./helpers.js";
 
 const owner = { token: "test-owner", generation: 1 };
 describe("Pi v2 lifecycle adapter", () => {
-  it("advertises only lifecycle and validates exact minimal checkpoints", () => {
+  it("advertises only supported capabilities and validates exact checkpoints", () => {
     const adapter = new PiLifecycleAdapter();
     expect(adapter.descriptor).toEqual({
       id: "pi",
@@ -19,6 +19,7 @@ describe("Pi v2 lifecycle adapter", () => {
         "harness.resume",
         "harness.stop",
         "input.submit",
+        "input.submit-images",
       ],
     });
     expect(adapter.validateCheckpoint({ sessionId: "id" })).toBe(true);

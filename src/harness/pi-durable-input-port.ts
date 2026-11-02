@@ -33,15 +33,22 @@ export class PiDurableInputPort implements ExecutionInputPort {
     text: string;
     images?: InputImage[];
   }): Promise<InputCommandOutcome> {
-    if (input.images?.length) throw new Error("UNSUPPORTED_CAPABILITY");
     const link = this.link;
     if (this.dead || !link?.writable) return { kind: "uncertain" };
     if (this.active) return { kind: "uncertain" };
     const current = { id: input.inputId };
     this.active = current;
+    const images = input.images?.length
+      ? input.images.map(({ mimeType, data }) => ({
+          type: "image",
+          mimeType,
+          data,
+        }))
+      : undefined;
     try {
       const reply = await link.command("prompt", {
         message: input.text,
+        ...(images ? { images } : {}),
         streamingBehavior: "steer",
       });
       if (reply.success !== true) {

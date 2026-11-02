@@ -32,7 +32,7 @@ describe("durable input runtime", () => {
     expect(calls).toEqual(["submit:input.custom", "cancel:input.custom"]);
     expect(events).toEqual(["input.custom:pending", "input.custom:accepted"]);
   });
-  it("rejects unsupported images before stopped-session resume", async () => {
+  it("preflights image capability before stopped-session resume", async () => {
     const { manager } = configured(
       {
         submit: async () => ({ kind: "accepted" }),
@@ -54,19 +54,37 @@ describe("durable input runtime", () => {
   });
   it("rejects invalid payload before auto-resume or dispatch", async () => {
     let dispatches = 0;
-    const { manager } = configured({
-      submit: async () => {
-        dispatches++;
-        return { kind: "accepted" };
+    let factories = 0;
+    const { manager } = configured(
+      {
+        submit: async () => {
+          dispatches++;
+          return { kind: "accepted" };
+        },
+        cancel: async () => ({ kind: "accepted" }),
       },
-      cancel: async () => ({ kind: "accepted" }),
-    });
+      undefined,
+      5000,
+      true,
+      () => factories++,
+    );
     const row = await manager.create({ cwd: process.cwd() });
     await manager.stop(row.id);
+    const before = factories;
+    const overLimit = Buffer.alloc(20 * 1024 * 1024 + 1).toString("base64");
+    for (const images of [
+      [{ mimeType: "image/png", data: "AB==" }],
+      [{ mimeType: "image/png", data: overLimit }],
+    ]) {
+      await expect(
+        manager.inputs.submit(row.id, { text: "", images }),
+      ).rejects.toMatchObject({ code: "INVALID_INPUT" });
+    }
     await expect(
       manager.inputs.submit(row.id, { text: "x".repeat(262145) }),
     ).rejects.toMatchObject({ code: "INVALID_INPUT" });
     expect(manager.get(row.id).status).toBe("stopped");
+    expect(factories).toBe(before);
     expect(dispatches).toBe(0);
   });
 });

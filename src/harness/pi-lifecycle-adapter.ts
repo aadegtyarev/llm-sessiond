@@ -10,6 +10,7 @@ export const piDescriptor = {
     "harness.resume",
     "harness.stop",
     "input.submit",
+    "input.submit-images",
   ],
 };
 
