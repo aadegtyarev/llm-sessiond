@@ -34,6 +34,8 @@ describe("Claude text input controller", () => {
     h.write();
     await expect(submitted).resolves.toEqual({ kind: "accepted" });
     expect(h.events).toEqual([{ inputId: "Opaque.ID-1", state: "accepted" }]);
+    h.controller.onRecord(replay("a\\nb"));
+    expect(h.events).toEqual([{ inputId: "Opaque.ID-1", state: "accepted" }]);
     h.controller.onRecord(result(true));
     expect(h.events.at(-1)).toEqual({
       inputId: "Opaque.ID-1",
