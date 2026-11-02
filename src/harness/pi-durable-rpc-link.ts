@@ -24,18 +24,34 @@ export class PiDurableRpcLink extends EventEmitter {
   get writable(): boolean {
     return !this.dead && Boolean(this.child.stdin?.writable);
   }
-  command(command: string, args: Record<string, unknown>, timeoutMs = 15_000) {
-    if (this.dead || !this.child.stdin?.writable)
+  command(
+    command: string,
+    args: Record<string, unknown>,
+    timeoutMs = 15_000,
+    beforeWrite?: () => boolean | void,
+  ) {
+    const stdin = this.child.stdin;
+    const write = stdin?.write;
+    if (this.dead || !stdin?.writable || !write)
       return Promise.reject(new Error("RPC_UNAVAILABLE"));
     const request = this.pending.begin(command, timeoutMs);
+    let writeInvoked = false;
     try {
-      this.child.stdin!.write(
-        `${JSON.stringify({ type: command, id: request.id, ...args })}\n`,
-        (error) => {
-          if (error) this.fail();
-        },
-      );
+      const chunk = `${JSON.stringify({ type: command, id: request.id, ...args })}\n`;
+      if (beforeWrite?.() === false || this.dead) {
+        this.pending.abandon(request.id);
+        return request.promise;
+      }
+      writeInvoked = true;
+      Reflect.apply(write, stdin, [
+        chunk,
+        (error: Error | null | undefined) => error && this.fail(),
+      ]);
     } catch {
+      if (beforeWrite && !writeInvoked) {
+        this.pending.abandon(request.id);
+        return request.promise;
+      }
       this.fail();
     }
     return request.promise;

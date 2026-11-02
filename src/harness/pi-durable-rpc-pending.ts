@@ -6,7 +6,7 @@ export class PiDurableRpcPending {
     {
       command: string;
       resolve: (record: Record<string, unknown>) => void;
-      reject: () => void;
+      reject: (error?: Error) => void;
       timer: NodeJS.Timeout;
     }
   >();
@@ -20,11 +20,18 @@ export class PiDurableRpcPending {
       this.requests.set(id, {
         command,
         resolve,
-        reject: () => reject(new Error("RPC_UNCERTAIN")),
+        reject: (error = new Error("RPC_UNCERTAIN")) => reject(error),
         timer,
       });
     });
     return { id, promise };
+  }
+  abandon(id: string): void {
+    const request = this.requests.get(id);
+    if (!request) return;
+    clearTimeout(request.timer);
+    this.requests.delete(id);
+    request.reject(new Error("RPC_NOT_DISPATCHED"));
   }
   receive(record: Record<string, unknown>): boolean {
     if (typeof record.id !== "string") return false;
