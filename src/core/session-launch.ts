@@ -5,6 +5,7 @@ import { validateJson } from "./json-bounds.js";
 import { DurableSessionManagerRead } from "./session-read-metadata.js";
 import {
   assertCurrentOwner,
+  assertExecutionAdmissionOpen,
   checkedCheckpoint,
   markRunning,
   requireCapability,
@@ -26,6 +27,7 @@ export async function createSession(
     options?: JsonValue;
   },
 ): Promise<DurableSession> {
+  assertExecutionAdmissionOpen(context);
   const adapter = resolveAdapter(context.registry, input.harnessId);
   requireCapability(adapter, "harness.launch");
   if (context.store.get(id) || context.owned.has(id) || context.pending.has(id))
@@ -35,6 +37,7 @@ export async function createSession(
   } catch {
     throw new ControlPlaneError("INVALID_OPTIONS");
   }
+  assertExecutionAdmissionOpen(context);
   const row: DurableSession = {
     id,
     harnessId: adapter.descriptor.id,
@@ -44,6 +47,7 @@ export async function createSession(
     ...(input.name !== undefined ? { name: input.name } : {}),
     ...(input.options !== undefined ? { adapterOptions: input.options } : {}),
   };
+  assertExecutionAdmissionOpen(context);
   assertCurrentOwner(context);
   context.store.create(row);
   let execution: LifecycleExecution | undefined;
@@ -52,13 +56,19 @@ export async function createSession(
     execution = context.factory.create(adapter);
     context.owned.set(id, execution);
     context.inputState.trackExecution(id, execution);
-    result = await execution.launch({
+    const launch = execution.launch;
+    assertExecutionAdmissionOpen(context);
+    result = await launch.call(execution, {
       cwd: row.cwd,
       ...(row.adapterOptions !== undefined
         ? { options: row.adapterOptions }
         : {}),
     });
   } catch {
+    await finalizeExecutionFailure(context, row, execution, "LAUNCH_FAILED");
+    return DurableSessionManagerRead.get(context.store, id);
+  }
+  if (context.executionAdmissionClosed) {
     await finalizeExecutionFailure(context, row, execution, "LAUNCH_FAILED");
     return DurableSessionManagerRead.get(context.store, id);
   }
@@ -70,6 +80,7 @@ export async function createSession(
     return DurableSessionManagerRead.get(context.store, id);
   }
   try {
+    assertExecutionAdmissionOpen(context);
     markRunning(
       context,
       row,

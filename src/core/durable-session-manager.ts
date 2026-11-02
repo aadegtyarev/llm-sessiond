@@ -11,10 +11,8 @@ import {
   resolveAdapter,
 } from "./session-lifecycle-support.js";
 import type { LifecycleExecutionFactory } from "./lifecycle-execution.js";
-import type {
-  DurableSession,
-  OwnerGeneration,
-} from "../persistence/session-record.js";
+import type { DurableSession } from "../persistence/session-record.js";
+import type { OwnerGeneration } from "../persistence/session-record.js";
 import type { JsonValue } from "./generic-json.js";
 import type { DurableSessionStore } from "./session-manager-store.js";
 import { createManagedSession } from "./create-session-command.js";
@@ -49,6 +47,7 @@ export class DurableSessionManager {
       lifecycleIntents: new Map(),
       stopTimeoutMs,
       inputState: new DurableInputState(),
+      executionAdmissionClosed: false,
     };
     this.inputs = new DurableInputRuntime(
       this.context,
@@ -94,6 +93,7 @@ export class DurableSessionManager {
   resume(id: string): Promise<DurableSession> {
     return this.locks.run(id, () => resumeSession(this.context, id));
   }
+  closeAdmission = () => (this.context.executionAdmissionClosed = true);
   shutdownOwned(): Promise<void> {
     return shutdownOwnedSessionsWithIntent(this.context, this.locks);
   }

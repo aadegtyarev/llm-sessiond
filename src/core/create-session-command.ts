@@ -18,12 +18,20 @@ export async function createManagedSession(
     options?: JsonValue;
   },
 ): Promise<DurableSession> {
+  if (context.executionAdmissionClosed)
+    throw new ControlPlaneError("SESSION_UNAVAILABLE");
   const cwd = await validateLifecycleCwd(input.cwd);
+  if (context.executionAdmissionClosed)
+    throw new ControlPlaneError("SESSION_UNAVAILABLE");
   const id = generateId();
   try {
     validateSessionId(id);
   } catch {
     throw new ControlPlaneError("INVALID_SESSION_ID");
   }
-  return locks.run(id, () => createSession(context, id, { ...input, cwd }));
+  return locks.run(id, () => {
+    if (context.executionAdmissionClosed)
+      throw new ControlPlaneError("SESSION_UNAVAILABLE");
+    return createSession(context, id, { ...input, cwd });
+  });
 }

@@ -5,6 +5,12 @@ import type { LifecycleExecution } from "./lifecycle-execution.js";
 import type { HarnessAdapter } from "./adapter-contracts.js";
 import { validateCheckpoint } from "./adapter-checkpoint.js";
 import type { HarnessRegistry } from "./adapter-registry.js";
+export function assertExecutionAdmissionOpen(
+  context: DurableManagerContext,
+): void {
+  if (context.executionAdmissionClosed)
+    throw new ControlPlaneError("SESSION_UNAVAILABLE");
+}
 export function assertCurrentOwner(context: DurableManagerContext): void {
   try {
     context.store.assertOwner(context.owner);

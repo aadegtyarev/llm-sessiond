@@ -41,6 +41,7 @@ export function createDurableRuntime(input: {
     },
     async shutdown(): Promise<void> {
       closing = true;
+      manager.closeAdmission();
       let failed = false;
       try {
         await manager.shutdownOwned();

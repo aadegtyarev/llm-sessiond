@@ -52,11 +52,13 @@ class TrackedExecution implements LifecycleExecution {
   get effortChange() {
     return this.execution.effortChange;
   }
-  launch(input: Parameters<LifecycleExecution["launch"]>[0]) {
-    return this.execution.launch(input);
+  get launch(): LifecycleExecution["launch"] {
+    const launch = this.execution.launch;
+    return launch.bind(this.execution);
   }
-  resume(input: Parameters<LifecycleExecution["resume"]>[0]) {
-    return this.execution.resume(input);
+  get resume(): LifecycleExecution["resume"] {
+    const resume = this.execution.resume;
+    return resume.bind(this.execution);
   }
   stop(): Promise<void> {
     if (this.confirmed) return Promise.resolve();

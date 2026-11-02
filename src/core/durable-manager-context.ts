@@ -17,4 +17,5 @@ export interface DurableManagerContext {
   lifecycleIntents: Map<string, Set<object>>;
   stopTimeoutMs: number;
   inputState: DurableInputState;
+  executionAdmissionClosed: boolean;
 }
