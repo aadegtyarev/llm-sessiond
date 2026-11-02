@@ -1,6 +1,6 @@
 # Pi read-only model catalog
 
-- Status: Approved for implementation
+- Status: Implementation complete; pending review
 
 ## Goal and scenarios
 

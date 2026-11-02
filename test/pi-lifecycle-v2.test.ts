@@ -24,6 +24,7 @@ describe("Pi v2 lifecycle adapter", () => {
         "input.cancel-current",
         "status.read",
         "usage.read",
+        "models.read",
       ],
     });
     expect(adapter.validateCheckpoint({ sessionId: "id" })).toBe(true);

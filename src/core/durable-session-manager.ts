@@ -20,7 +20,7 @@ import type { DurableSessionStore } from "./session-manager-store.js";
 import { createManagedSession } from "./create-session-command.js";
 import { DurableInputRuntime } from "./durable-input-runtime.js";
 import { DurableInputState } from "./durable-input-state.js";
-import { readDurableLiveStatus } from "./durable-live-status.js";
+import * as durableSessionQueries from "./durable-session-queries.js";
 import {
   stopOwnedSession,
   shutdownOwnedSessionsWithIntent,
@@ -67,9 +67,10 @@ export class DurableSessionManager {
   descriptor(id: string) {
     return resolveAdapter(this.context.registry, id).descriptor;
   }
-  readLiveStatus(id: string) {
-    return readDurableLiveStatus(this.context, id);
-  }
+  readLiveStatus = (id: string) =>
+    durableSessionQueries.readDurableLiveStatus(this.context, id);
+  readModelCatalog = (id: string) =>
+    durableSessionQueries.readDurableModelCatalog(this.context, id);
   create(input: {
     cwd: string;
     harnessId?: string;

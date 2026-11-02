@@ -37,4 +37,19 @@ it("forwards optional input ports through tracked executions", () => {
     },
   ]);
   expect(statusTracker.create(synthetic).liveStatus).toBe(liveStatus);
+  const modelCatalog = { readModelCatalog: async () => ({ models: [] }) };
+  const catalogTracker = new TrackedLifecycleFactory([
+    {
+      adapter: synthetic,
+      factory: {
+        create: () => ({
+          modelCatalog,
+          launch: async () => ({}),
+          resume: async () => ({}),
+          stop: async () => {},
+        }),
+      },
+    },
+  ]);
+  expect(catalogTracker.create(synthetic).modelCatalog).toBe(modelCatalog);
 });

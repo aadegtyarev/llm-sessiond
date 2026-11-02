@@ -16,6 +16,9 @@ export class PiLifecycleExecution implements LifecycleExecution {
   get liveStatus() {
     return { readLiveStatus: () => this.process.readLiveStatus() };
   }
+  get modelCatalog() {
+    return { readModelCatalog: () => this.process.readModelCatalog() };
+  }
   constructor(
     private readonly adapter: PiLifecycleAdapter,
     private readonly provider: ProcessProvider,

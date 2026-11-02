@@ -1,11 +1,11 @@
 import type { ChildProcess } from "node:child_process";
 import type { ProcessProvider } from "../core/ports.js";
 import type { ChildTerminator } from "../process/child-stop.js";
-import { terminateChild } from "../process/terminate-child.js";
+import { stopPiChildTracked } from "./pi-durable-child-stop.js";
 import { PiDurableRpcLink } from "./pi-durable-rpc-link.js";
 import { PiDurableInputPort } from "./pi-durable-input-port.js";
-import { startDurablePi } from "./pi-durable-startup.js";
-import { readPiLiveStatus } from "./pi-live-status-query.js";
+import { startOwnedPi } from "./pi-durable-startup-query.js";
+import * as durableReadQueries from "./pi-durable-read-queries.js";
 export class PiDurableProcess {
   readonly inputs = new PiDurableInputPort();
   private child?: ChildProcess;
@@ -36,35 +36,40 @@ export class PiDurableProcess {
     const link = new PiDurableRpcLink(child);
     this.link = link;
     this.inputs.attach(link);
-    try {
-      const nativeSessionId = await startDurablePi(
-        link,
-        expectedId,
-        this.readinessTimeoutMs,
-      );
-      this.nativeSessionId = nativeSessionId;
-      return nativeSessionId;
-    } catch {
-      try {
-        await this.stop();
-      } catch {
-        /* Ownership remains until a confirmed retry. */
-      }
-      throw new Error("PI_STARTUP_FAILED");
-    }
+    const nativeSessionId = await startOwnedPi(
+      link,
+      expectedId,
+      this.readinessTimeoutMs,
+      () => this.stop(),
+    );
+    this.nativeSessionId = nativeSessionId;
+    return nativeSessionId;
   }
   async readLiveStatus() {
     const link = this.link;
     if (!link) throw new Error("RPC_UNAVAILABLE");
-    return readPiLiveStatus(
+    return durableReadQueries.readDurablePiLiveStatus(
       link,
       this.nativeSessionId,
       () =>
-        this.link === link &&
-        !this.stopRequested &&
-        !this.stopped &&
-        this.child?.exitCode === null &&
-        this.child.signalCode === null,
+        durableReadQueries.isDurablePiQueryCurrent(
+          this.link,
+          link,
+          this.child,
+          this.stopRequested,
+          this.stopped,
+        ),
+    );
+  }
+  readModelCatalog() {
+    return durableReadQueries.readDurablePiModelCatalog(this.link, (link) =>
+      durableReadQueries.isDurablePiQueryCurrent(
+        this.link,
+        link,
+        this.child,
+        this.stopRequested,
+        this.stopped,
+      ),
     );
   }
   stop(): Promise<void> {
@@ -78,23 +83,17 @@ export class PiDurableProcess {
       return Promise.resolve();
     }
     if (this.stopping) return this.stopping;
-    return this.stopOwnedChild(child);
-  }
-  private async stopOwnedChild(child: ChildProcess): Promise<void> {
-    const attempt = this.stopChild(child);
-    this.stopping = attempt;
-    try {
-      await attempt;
-      this.stopped = true;
-    } catch (error) {
-      if (this.stopping === attempt) this.stopping = undefined;
-      throw error;
-    }
-  }
-  private async stopChild(child: ChildProcess): Promise<void> {
-    await (this.terminate ?? terminateChild)(child);
-    if (child.exitCode === null && child.signalCode === null)
-      throw new Error("STOP_UNCONFIRMED");
-    this.link?.dispose();
+    return stopPiChildTracked(
+      child,
+      this.link,
+      this.terminate,
+      this.stopping,
+      (value) => {
+        this.stopping = value;
+      },
+      () => {
+        this.stopped = true;
+      },
+    );
   }
 }

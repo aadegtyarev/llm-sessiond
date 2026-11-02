@@ -11,11 +11,12 @@ import { fixture, tempDir } from "./helpers.js";
 const owner = { token: "test-owner", generation: 1 };
 describe("Pi durable text input", () => {
   it("advertises exact cancellation and read-only status capabilities", () => {
-    expect(piDescriptor.capabilities.slice(-4)).toEqual([
+    expect(piDescriptor.capabilities.slice(-5)).toEqual([
       "input.cancel",
       "input.cancel-current",
       "status.read",
       "usage.read",
+      "models.read",
     ]);
   });
   it("rejects direct cancellation without an accepted exact input", async () => {

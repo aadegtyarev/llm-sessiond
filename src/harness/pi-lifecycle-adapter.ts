@@ -15,6 +15,7 @@ export const piDescriptor = {
     "input.cancel-current",
     "status.read",
     "usage.read",
+    "models.read",
   ],
 };
 
