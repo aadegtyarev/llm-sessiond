@@ -12,6 +12,7 @@ import {
   rejectUnsupportedConfiguration,
   sendCreatePreflightError,
 } from "./v2-session-create-errors.js";
+import { isPayloadTooLarge } from "./v2-session-error-facts.js";
 import { snapshotV2Session } from "./v2-session-snapshot.js";
 import {
   v2SessionCreateSchema,
@@ -29,17 +30,12 @@ export async function createV2Session(
   try {
     body = parseBody(v2SessionCreateSchema, await readBody(request));
   } catch (error) {
-    const status =
-      typeof error === "object" && error !== null && "status" in error
-        ? error.status
-        : 400;
+    const tooLarge = isPayloadTooLarge(error);
     sendSessionError(
       response,
-      status === 413 ? 413 : 400,
-      status === 413 ? "LIMIT_EXCEEDED" : "VALIDATION_ERROR",
-      status === 413
-        ? "request body too large"
-        : "request does not match schema",
+      tooLarge ? 413 : 400,
+      tooLarge ? "LIMIT_EXCEEDED" : "VALIDATION_ERROR",
+      tooLarge ? "request body too large" : "request does not match schema",
       "validation",
       "not-applied",
     );

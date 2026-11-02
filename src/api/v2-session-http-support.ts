@@ -37,9 +37,19 @@ export function sendUnavailable(response: ServerResponse): void {
 export function sendCreateUnknown(response: ServerResponse): void {
   sendSessionError(
     response,
-    503,
+    409,
     "OPERATION_UNCERTAIN",
     "session creation outcome is uncertain",
+    "uncertain",
+    "unknown",
+  );
+}
+export function sendStopUnknown(response: ServerResponse): void {
+  sendSessionError(
+    response,
+    409,
+    "OPERATION_UNCERTAIN",
+    "stop outcome is uncertain",
     "uncertain",
     "unknown",
   );

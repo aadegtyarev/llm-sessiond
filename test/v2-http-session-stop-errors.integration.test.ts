@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createSessionCycleFixture } from "./v2-http-session-cycle-fixture.js";
+import { safeError } from "./v2-schema-common.js";
 
 describe("v2 session HTTP validation and stop", () => {
   let fixture: Awaited<ReturnType<typeof createSessionCycleFixture>>;
@@ -13,6 +14,19 @@ describe("v2 session HTTP validation and stop", () => {
         instanceId: string;
       }
     ).instanceId;
+    const missing = await fetch(
+      `${fixture.base}/api/v2/sessions/missing/stop`,
+      {
+        method: "POST",
+        headers: { "x-llm-sessiond-instance": id },
+        body: "{}",
+      },
+    );
+    expect(missing.status).toBe(404);
+    expect(safeError.parse(await missing.json())).toMatchObject({
+      category: "not-found",
+      outcome: "not-applied",
+    });
     for (const body of [
       '{"cwd":"x","unknown":1}',
       "{",
@@ -54,8 +68,14 @@ describe("v2 session HTTP validation and stop", () => {
         body: "{}",
       },
     );
-    expect(stopped.status).not.toBe(204);
-    expect((await stopped.json()).message).toBe("stop outcome is uncertain");
+    expect(stopped.status).toBe(409);
+    const error = safeError.parse(await stopped.json());
+    expect(error).toMatchObject({
+      code: "OPERATION_UNCERTAIN",
+      message: "stop outcome is uncertain",
+      category: "uncertain",
+      outcome: "unknown",
+    });
     expect(fixture.runtime.manager.get(created.session.id).status).toBe(
       "uncertain",
     );

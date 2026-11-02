@@ -1,12 +1,17 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { DurableSessionManager } from "../core/durable-session-manager.js";
-import { ApiError } from "../core/api-error.js";
-import { ControlPlaneError } from "../core/control-plane-error.js";
+import {
+  controlPlaneCode,
+  isPayloadTooLarge,
+} from "./v2-session-error-facts.js";
 import type { V2DiscoveryRuntime } from "./v2-discovery.js";
 import { parseBody, readBody } from "./http-support.js";
 import {
   matchesInstance,
   sendSessionError,
+  sendStopUnknown,
+  sendUnavailable,
+  sendSessionNotFound,
 } from "./v2-session-http-support.js";
 import { v2EmptySchema } from "./v2-session-schema.js";
 
@@ -22,7 +27,7 @@ export async function stopV2Session(
     const body = await readBody(request);
     if (body !== undefined) parseBody(v2EmptySchema, body);
   } catch (error) {
-    const tooLarge = error instanceof ApiError && error.status === 413;
+    const tooLarge = isPayloadTooLarge(error);
     sendSessionError(
       response,
       tooLarge ? 413 : 400,
@@ -58,40 +63,29 @@ export async function stopV2Session(
     return true;
   }
   try {
-    const session = await manager.stop(id);
+    manager.get(id);
+  } catch (error) {
+    if (controlPlaneCode(error) === "NOT_FOUND") sendSessionNotFound(response);
+    else sendUnavailable(response);
+    return true;
+  }
+  let session;
+  try {
+    session = await manager.stop(id);
+  } catch {
+    sendStopUnknown(response);
+    return true;
+  }
+  try {
     runtime.assertReady();
     if (session.status !== "stopped") {
-      sendSessionError(
-        response,
-        503,
-        "OPERATION_UNCERTAIN",
-        "stop outcome is uncertain",
-        "uncertain",
-        "unknown",
-      );
+      sendStopUnknown(response);
       return true;
     }
     response.statusCode = 204;
     response.end();
-  } catch (error) {
-    if (error instanceof ControlPlaneError && error.code === "NOT_FOUND")
-      sendSessionError(
-        response,
-        404,
-        "NOT_FOUND",
-        "session not found",
-        "not-found",
-        "not-applied",
-      );
-    else
-      sendSessionError(
-        response,
-        503,
-        "OPERATION_UNCERTAIN",
-        "stop outcome is uncertain",
-        "uncertain",
-        "unknown",
-      );
+  } catch {
+    sendStopUnknown(response);
   }
   return true;
 }

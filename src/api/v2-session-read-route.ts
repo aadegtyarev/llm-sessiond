@@ -1,8 +1,8 @@
 import type { ServerResponse } from "node:http";
-import { ControlPlaneError } from "../core/control-plane-error.js";
 import type { DurableSessionManager } from "../core/durable-session-manager.js";
 import type { V2DiscoveryRuntime } from "./v2-discovery.js";
 import { sendJson } from "./http-support.js";
+import { controlPlaneCode } from "./v2-session-error-facts.js";
 import { snapshotV2Session } from "./v2-session-snapshot.js";
 import {
   v2SessionResponseSchema,
@@ -39,8 +39,7 @@ export function getV2Session(
     runtime.assertReady();
     sendJson(response, 200, { session }, v2SessionResponseSchema);
   } catch (error) {
-    if (error instanceof ControlPlaneError && error.code === "NOT_FOUND")
-      sendSessionNotFound(response);
+    if (controlPlaneCode(error) === "NOT_FOUND") sendSessionNotFound(response);
     else sendUnavailable(response);
   }
 }

@@ -1,7 +1,74 @@
 import type { ServerResponse } from "node:http";
-import { ControlPlaneError } from "../core/control-plane-error.js";
 import { sendSessionError } from "./v2-session-http-support.js";
+import { controlPlaneCode } from "./v2-session-error-facts.js";
+import type { ControlPlaneErrorCode } from "../core/control-plane-error.js";
 
+const PREFLIGHT_ERRORS: Partial<
+  Record<
+    ControlPlaneErrorCode,
+    {
+      status: number;
+      code: string;
+      message: string;
+      category: "validation" | "unsupported" | "conflict";
+    }
+  >
+> = {
+  INVALID_CWD: {
+    status: 400,
+    code: "INVALID_CWD",
+    message: "working directory is invalid",
+    category: "validation",
+  },
+  INVALID_SESSION_ID: {
+    status: 400,
+    code: "INVALID_SESSION_ID",
+    message: "session id is invalid",
+    category: "validation",
+  },
+  INVALID_OPTIONS: {
+    status: 400,
+    code: "INVALID_OPTIONS",
+    message: "adapter options are invalid",
+    category: "validation",
+  },
+  UNSUPPORTED_CAPABILITY: {
+    status: 409,
+    code: "UNSUPPORTED_CAPABILITY",
+    message: "requested capability is unsupported",
+    category: "unsupported",
+  },
+  UNKNOWN_ADAPTER: {
+    status: 409,
+    code: "UNKNOWN_ADAPTER",
+    message: "harness is unavailable",
+    category: "conflict",
+  },
+  SESSION_ID_COLLISION: {
+    status: 409,
+    code: "SESSION_ID_COLLISION",
+    message: "session id conflicts with existing state",
+    category: "conflict",
+  },
+};
+
+export function sendCreatePreflightError(
+  error: unknown,
+  response: ServerResponse,
+): boolean {
+  const code = controlPlaneCode(error);
+  const facts = code ? PREFLIGHT_ERRORS[code] : undefined;
+  if (!facts) return false;
+  sendSessionError(
+    response,
+    facts.status,
+    facts.code,
+    facts.message,
+    facts.category,
+    "not-applied",
+  );
+  return true;
+}
 export function rejectUnsupportedConfiguration(
   body: {
     callbackConnectionId?: string | undefined;
@@ -22,35 +89,6 @@ export function rejectUnsupportedConfiguration(
     "UNSUPPORTED_CAPABILITY",
     "requested session configuration is unsupported",
     "unsupported",
-    "not-applied",
-  );
-  return true;
-}
-export function sendCreatePreflightError(
-  error: unknown,
-  response: ServerResponse,
-): boolean {
-  if (!(error instanceof ControlPlaneError)) return false;
-  const validation = [
-    "INVALID_CWD",
-    "INVALID_SESSION_ID",
-    "INVALID_OPTIONS",
-  ].includes(error.code);
-  const unsupported = error.code === "UNSUPPORTED_CAPABILITY";
-  const conflict = ["UNKNOWN_ADAPTER", "SESSION_ID_COLLISION"].includes(
-    error.code,
-  );
-  if (!validation && !unsupported && !conflict) return false;
-  sendSessionError(
-    response,
-    validation ? 400 : 409,
-    error.code,
-    validation
-      ? "session request is invalid"
-      : unsupported
-        ? "requested capability is unsupported"
-        : "session request conflicts with current state",
-    validation ? "validation" : unsupported ? "unsupported" : "conflict",
     "not-applied",
   );
   return true;

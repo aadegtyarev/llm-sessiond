@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createSessionCycleFixture } from "./v2-http-session-cycle-fixture.js";
+import { safeError } from "./v2-schema-common.js";
 
 describe("v2 session create outcomes", () => {
   let fixture: Awaited<ReturnType<typeof createSessionCycleFixture>>;
@@ -48,8 +49,8 @@ describe("v2 session create outcomes", () => {
       },
       body: JSON.stringify({ cwd: fixture.dir }),
     });
-    expect(response.status).toBe(503);
-    const error = await response.json();
+    expect(response.status).toBe(409);
+    const error = safeError.parse(await response.json());
     expect(error).toMatchObject({
       category: "uncertain",
       outcome: "unknown",

@@ -26,8 +26,9 @@ export async function createSessionCycleFixture() {
     validateCheckpoint: () => true,
     isResumable: () => false,
   };
+  const repository = new SessionRepository(db);
   const runtime = createDurableRuntime({
-    store: new SessionRepository(db),
+    store: repository,
     owner: lease.generation,
     defaultId: "test",
     id: () => "Session.Mixed-1",
@@ -61,6 +62,7 @@ export async function createSessionCycleFixture() {
     dir,
     db,
     runtime,
+    repository,
     server,
     base,
     effects: () => ({ launches, stops }),

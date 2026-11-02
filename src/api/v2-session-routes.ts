@@ -17,19 +17,25 @@ export async function v2SessionRoute(
   request: IncomingMessage,
   response: ServerResponse,
 ): Promise<boolean> {
+  const collection = path === "/api/v2/sessions";
+  const match = /^\/api\/v2\/sessions\/([^/]+)(?:\/(stop))?$/.exec(path);
+  const detail = method === "GET" && match !== null && !match[2];
+  const stop = method === "POST" && match !== null && Boolean(match[2]);
+  const list = method === "GET" && collection;
+  const create = method === "POST" && collection;
+  if (!list && !create && !detail && !stop) return false;
   const manager = runtime.manager;
   if (!manager) {
     sendUnavailable(response);
     return true;
   }
-  if (method === "GET" && path === "/api/v2/sessions") {
+  if (list) {
     listV2Sessions(runtime, manager, response);
     return true;
   }
-  if (method === "POST" && path === "/api/v2/sessions")
+  if (create)
     return createV2Session(runtime, instanceId, manager, request, response);
 
-  const match = /^\/api\/v2\/sessions\/([^/]+)(?:\/(stop))?$/.exec(path);
   if (!match) return false;
   let id: string;
   try {
