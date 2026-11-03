@@ -17,6 +17,7 @@ let daemon;
 let observer;
 let sessionId;
 let keepWork = false;
+let summary;
 const waitFor = async (predicate, timeoutMs = 10_000) => {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
@@ -79,21 +80,21 @@ try {
       return true;
     }
   });
-  console.log(
-    JSON.stringify({
-      outcome: "passed",
-      output: output.event.event.text,
-      inputIdMatched:
-        terminal.event.event.inputEvent.inputId === submitted.inputId,
-      fakeChildStopped: true,
-    }),
-  );
+  summary = output.event.event.text;
 } finally {
   observer?.close();
   if (daemon) {
-    const result = await confirmStopped(daemon);
-    if (!result) keepWork = true;
-    else if (result.code !== 0) keepWork = true;
+    try {
+      const result = await confirmStopped(daemon);
+      if (!result || result.code !== 0 || result.signal) {
+        keepWork = true;
+        throw new Error("daemon cleanup unconfirmed");
+      }
+    } catch {
+      keepWork = true;
+      throw new Error("daemon cleanup unconfirmed");
+    }
   }
   if (!keepWork) await rm(work, { recursive: true, force: true });
 }
+console.log(JSON.stringify({ outcome: "passed", output: summary }));

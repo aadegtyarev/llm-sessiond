@@ -6,7 +6,7 @@ export function assertHealthyBoot(health, previousInstanceId) {
     !health.supportedApiVersions?.includes("v1") ||
     !health.supportedApiVersions?.includes("v2") ||
     !Array.isArray(health.features) ||
-    health.features.length !== 0 ||
+    health.features.some((feature) => feature !== "events.live") ||
     typeof health.instanceId !== "string" ||
     health.instanceId.length === 0 ||
     health.instanceId === previousInstanceId

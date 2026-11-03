@@ -14,9 +14,12 @@ describe("portable smoke health proof", () => {
       status: "ready",
       instanceId: "new",
       supportedApiVersions: ["v1", "v2"],
-      features: [],
+      features: ["events.live"],
     };
     expect(assertHealthyBoot(health, "old")).toBe(health);
     expect(() => assertHealthyBoot(health, "new")).toThrow();
+    expect(() =>
+      assertHealthyBoot({ ...health, features: ["callbacks"] }, "old"),
+    ).toThrow();
   });
 });
