@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import type { ChildProcess } from "node:child_process";
 import { decodePiRpcChunk } from "./pi-durable-rpc-decoder.js";
 import { PiDurableRpcPending } from "./pi-durable-rpc-pending.js";
+import { publishPiDurableRecord } from "./pi-durable-output.js";
 
 export class PiDurableRpcLink extends EventEmitter {
   private buffer = "";
@@ -82,7 +83,7 @@ export class PiDurableRpcLink extends EventEmitter {
     for (const record of decoded.records) {
       if (this.dead) break;
       if (record.type === "response") this.response(record);
-      else this.emit("event", record);
+      else publishPiDurableRecord(this, record);
     }
   }
   private response(record: Record<string, unknown>): void {

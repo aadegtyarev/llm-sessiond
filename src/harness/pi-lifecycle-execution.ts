@@ -13,6 +13,12 @@ export class PiLifecycleExecution implements LifecycleExecution {
   get inputs() {
     return this.process.inputs;
   }
+  get events() {
+    return {
+      subscribe: (listener: (event: unknown) => void) =>
+        this.process.subscribeEvents(listener),
+    };
+  }
   get liveStatus() {
     return { readLiveStatus: () => this.process.readLiveStatus() };
   }

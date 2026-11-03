@@ -3,6 +3,7 @@ import type { ProcessProvider } from "../core/ports.js";
 import type { ChildTerminator } from "../process/child-stop.js";
 import { stopPiChildTracked } from "./pi-durable-child-stop.js";
 import { PiDurableRpcLink } from "./pi-durable-rpc-link.js";
+import { PiDurableEventObserver } from "./pi-durable-event-observer.js";
 import { PiDurableInputPort } from "./pi-durable-input-port.js";
 import { startOwnedPi } from "./pi-durable-startup-query.js";
 import * as durableReadQueries from "./pi-durable-read-queries.js";
@@ -18,6 +19,7 @@ export class PiDurableProcess {
   private stopRequested = false;
   private nativeSessionId: string | undefined;
   private link?: PiDurableRpcLink;
+  private readonly events = new PiDurableEventObserver();
   private stopping: Promise<void> | undefined;
   constructor(
     private readonly provider: ProcessProvider,
@@ -40,6 +42,7 @@ export class PiDurableProcess {
     this.child = child;
     const link = new PiDurableRpcLink(child);
     this.link = link;
+    this.events.attach(link);
     this.inputs.attach(link);
     const nativeSessionId = await startOwnedPi(
       link,
@@ -47,9 +50,10 @@ export class PiDurableProcess {
       this.readinessTimeoutMs,
       () => this.stop(),
     );
-    this.nativeSessionId = nativeSessionId;
-    return nativeSessionId;
+    return (this.nativeSessionId = nativeSessionId);
   }
+  subscribeEvents = (listener: (event: unknown) => void) =>
+    this.events.subscribe(listener);
   readLiveStatus = () =>
     durableReadQueries.readDurablePiLiveStatus(
       this.link,

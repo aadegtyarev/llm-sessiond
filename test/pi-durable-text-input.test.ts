@@ -50,6 +50,14 @@ describe("Pi durable text input", () => {
         runtime.manager.inputs.cancel(session.id, "opaque-2"),
       ).rejects.toThrow();
       const states: string[] = [];
+      const outputs: string[] = [];
+      runtime.manager.events.subscribe((event) => {
+        if (
+          event.event.kind === "harness.event" &&
+          event.event.event.kind === "output"
+        )
+          outputs.push(event.event.event.text);
+      });
       let resolveCompleted!: () => void;
       const completed = new Promise<void>((resolve) => {
         resolveCompleted = resolve;
@@ -65,6 +73,7 @@ describe("Pi durable text input", () => {
       expect(result.inputId).toBe("opaque-2");
       await completed;
       expect(states).toEqual(["pending", "accepted", "completed"]);
+      expect(outputs).toEqual(["echo:opaque text"]);
       const wire = await readFile(`${cwd}/prompt-requests.jsonl`, "utf8");
       expect(JSON.parse(wire)).toEqual({
         type: "prompt",
