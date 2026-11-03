@@ -54,11 +54,23 @@ export function sendV2SessionError(
     | "uncertain"
     | "internal",
   outcome: "not-applied" | "applied" | "unknown",
+  input?: { inputId: string; resumed: boolean; failureReason?: string },
 ): void {
   sendJson(
     response,
     status,
-    { code, message, category, outcome, reference: randomUUID() },
+    {
+      code,
+      message,
+      category,
+      outcome,
+      reference: randomUUID(),
+      ...(input ? { inputId: input.inputId } : {}),
+      ...(input?.resumed ? { resumed: true } : {}),
+      ...(input?.failureReason
+        ? { failure: { reason: input.failureReason } }
+        : {}),
+    },
     safeErrorSchema,
   );
 }

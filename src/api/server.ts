@@ -7,6 +7,7 @@ import { route } from "./routes.js";
 import { attachWebSocket } from "./ws-server.js";
 import { sendV2Error } from "./v2-error.js";
 import { createV2Discovery, type V2DiscoveryRuntime } from "./v2-discovery.js";
+import { attachV2Bridge } from "./v2-bridge-transport.js";
 export function createApiServer(
   service: SessionService,
   host = process.env.HOST ?? "127.0.0.1",
@@ -42,6 +43,15 @@ export function createApiServer(
     }
   });
   server.on("clientError", (_error, socket) => socket.destroy());
-  attachWebSocket(server, service);
+  const v2Upgrade =
+    discover && v2Runtime?.manager
+      ? attachV2Bridge(
+          server,
+          v2Runtime.manager,
+          discover.instanceId,
+          v2Runtime.assertReady,
+        )
+      : undefined;
+  attachWebSocket(server, service, v2Upgrade);
   return server;
 }

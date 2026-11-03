@@ -3,7 +3,15 @@ import type { Server } from "node:http";
 import type { SessionService } from "../core/session-service.js";
 import { exceedsWebSocketBufferLimit } from "./ws-backpressure.js";
 
-export function attachWebSocket(server: Server, service: SessionService): void {
+export function attachWebSocket(
+  server: Server,
+  service: SessionService,
+  v2Upgrade?: (
+    request: import("node:http").IncomingMessage,
+    socket: import("node:stream").Duplex,
+    head: Buffer,
+  ) => boolean,
+): void {
   const ws = new WebSocketServer({ noServer: true, maxPayload: 4096 }).on(
     "error",
     () => {},
@@ -59,7 +67,7 @@ export function attachWebSocket(server: Server, service: SessionService): void {
       return;
     }
     if (url.pathname !== "/api/v1/events") {
-      socket.destroy();
+      if (!v2Upgrade?.(request, socket, head)) socket.destroy();
       return;
     }
     try {

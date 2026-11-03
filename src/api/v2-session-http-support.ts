@@ -15,8 +15,9 @@ export function sendSessionError(
     | "uncertain"
     | "internal",
   outcome: "not-applied" | "unknown",
+  input?: { inputId: string; resumed: boolean; failureReason?: string },
 ): void {
-  sendV2SessionError(response, status, code, message, category, outcome);
+  sendV2SessionError(response, status, code, message, category, outcome, input);
 }
 export function matchesInstance(
   request: IncomingMessage,

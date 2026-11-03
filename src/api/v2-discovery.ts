@@ -16,7 +16,7 @@ export interface V2DiscoveryRuntime {
 
 export function createV2Discovery(runtime: V2DiscoveryRuntime) {
   const instanceId = randomUUID();
-  return async function discover(
+  const discover = async function discover(
     path: string,
     method: string,
     response: ServerResponse,
@@ -31,7 +31,7 @@ export function createV2Discovery(runtime: V2DiscoveryRuntime) {
         serviceVersion: SERVICE_VERSION,
         instanceId,
         supportedApiVersions: ["v1", "v2"],
-        features: [],
+        features: runtime.manager ? ["events.live"] : [],
       });
       return true;
     }
@@ -65,4 +65,5 @@ export function createV2Discovery(runtime: V2DiscoveryRuntime) {
     }
     return false;
   };
+  return Object.assign(discover, { instanceId });
 }

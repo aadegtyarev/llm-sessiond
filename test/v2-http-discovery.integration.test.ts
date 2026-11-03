@@ -62,7 +62,7 @@ describe("prepared-runtime v2 HTTP discovery", () => {
         status: "ready",
         serviceVersion: "0.1.0",
         supportedApiVersions: ["v1", "v2"],
-        features: [],
+        features: ["events.live"],
       });
       const again = await fetch(`${base}/api/v2/health`).then((r) => r.json());
       expect(again.instanceId).toBe(health.instanceId);

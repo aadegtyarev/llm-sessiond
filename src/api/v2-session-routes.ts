@@ -8,6 +8,7 @@ import {
   sendUnavailable,
 } from "./v2-session-http-support.js";
 import { getV2Session, listV2Sessions } from "./v2-session-read-route.js";
+import { submitV2Input } from "./v2-input-route.js";
 
 export async function v2SessionRoute(
   runtime: V2DiscoveryRuntime,
@@ -18,12 +19,14 @@ export async function v2SessionRoute(
   response: ServerResponse,
 ): Promise<boolean> {
   const collection = path === "/api/v2/sessions";
+  const inputMatch = /^\/api\/v2\/sessions\/([^/]+)\/inputs$/.exec(path);
   const match = /^\/api\/v2\/sessions\/([^/]+)(?:\/(stop))?$/.exec(path);
+  const input = method === "POST" && inputMatch !== null;
   const detail = method === "GET" && match !== null && !match[2];
   const stop = method === "POST" && match !== null && Boolean(match[2]);
   const list = method === "GET" && collection;
   const create = method === "POST" && collection;
-  if (!list && !create && !detail && !stop) return false;
+  if (!list && !create && !detail && !stop && !input) return false;
   const manager = runtime.manager;
   if (!manager) {
     sendUnavailable(response);
@@ -36,6 +39,28 @@ export async function v2SessionRoute(
   if (create)
     return createV2Session(runtime, instanceId, manager, request, response);
 
+  if (inputMatch) {
+    let id: string;
+    try {
+      id = decodeURIComponent(inputMatch[1] ?? "");
+    } catch {
+      sendInvalidSessionPath(response);
+      return true;
+    }
+    if (!v2SessionIdSchema.safeParse(id).success) {
+      sendInvalidSessionPath(response);
+      return true;
+    }
+    await submitV2Input(
+      manager,
+      instanceId,
+      id,
+      request,
+      response,
+      runtime.assertReady,
+    );
+    return true;
+  }
   if (!match) return false;
   let id: string;
   try {
