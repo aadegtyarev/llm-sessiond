@@ -16,6 +16,7 @@ export async function startSmokeDaemon(root, work) {
           PORT: "0",
           PI_EXECUTABLE: path.join(root, "test/fixtures/v2/fake-pi-rpc.mjs"),
           FAKE_PI_PID_FILE: path.join(work, "fake-pi.pid"),
+          FAKE_PI_PROMPT_COUNT_FILE: path.join(work, "fake-pi-count"),
         },
         stdio: ["ignore", "pipe", "ignore"],
       },

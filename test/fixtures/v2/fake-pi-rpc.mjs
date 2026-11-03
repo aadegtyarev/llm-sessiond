@@ -3,7 +3,9 @@ import { createInterface } from "node:readline";
 import { writeFileSync } from "node:fs";
 
 const idPath = process.env.FAKE_PI_PID_FILE;
-if (!idPath) process.exit(2);
+const promptCountPath = process.env.FAKE_PI_PROMPT_COUNT_FILE;
+if (!idPath || !promptCountPath) process.exit(2);
+let promptCount = 0;
 writeFileSync(idPath, String(process.pid));
 const input = createInterface({ input: process.stdin });
 const send = (record) => process.stdout.write(`${JSON.stringify(record)}\n`);
@@ -25,6 +27,7 @@ input.on("line", (line) => {
     return;
   }
   if (request.type === "prompt") {
+    writeFileSync(promptCountPath, String(++promptCount));
     send({
       type: "message_update",
       assistantMessageEvent: {

@@ -16,7 +16,6 @@ const work = await mkdtemp(path.join(os.tmpdir(), "observable-pi-turn-"));
 let daemon;
 let observer;
 let sessionId;
-let keepWork = false;
 let summary;
 const waitFor = async (predicate, timeoutMs = 10_000) => {
   const until = Date.now() + timeoutMs;
@@ -70,6 +69,8 @@ try {
   );
   if (terminal.event.event.inputEvent.state !== "completed")
     throw new Error("input did not complete");
+  if (readFileSync(path.join(work, "fake-pi-count"), "utf8") !== "1")
+    throw new Error("prompt write count mismatch");
   observer.close();
   await client.stopSession(sessionId);
   await waitFor(() => {
@@ -86,15 +87,12 @@ try {
   if (daemon) {
     try {
       const result = await confirmStopped(daemon);
-      if (!result || result.code !== 0 || result.signal) {
-        keepWork = true;
+      if (!result || result.code !== 0 || result.signal)
         throw new Error("daemon cleanup unconfirmed");
-      }
     } catch {
-      keepWork = true;
       throw new Error("daemon cleanup unconfirmed");
     }
   }
-  if (!keepWork) await rm(work, { recursive: true, force: true });
+  await rm(work, { recursive: true, force: true });
 }
 console.log(JSON.stringify({ outcome: "passed", output: summary }));
