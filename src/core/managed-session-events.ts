@@ -29,7 +29,10 @@ export interface ManagedSessionSnapshot {
   sessions: ManagedSessionView[];
 }
 export interface ManagedSessionEventFeed {
-  subscribe(listener: (record: ManagedSessionEventRecord) => void): () => void;
+  subscribe(
+    listener: (record: ManagedSessionEventRecord) => void,
+    onUnavailable?: () => void,
+  ): () => void;
   snapshot(): ManagedSessionSnapshot;
 }
 export function cloneDomainEvent(

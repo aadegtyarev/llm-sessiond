@@ -30,7 +30,7 @@ export class DurableSessionEvents {
     try {
       this.commits.commit(id, deleted, snapshot);
     } catch {
-      this.failed = true;
+      this.markFailed();
       throw new Error("SESSION_EVENT_FEED_UNAVAILABLE");
     }
   }
@@ -56,9 +56,17 @@ export class DurableSessionEvents {
   subscribe = this.delivery.subscribe.bind(this.delivery);
   publish(event: ManagedSessionEvent, valid?: () => boolean): void {
     if (this.failed) throw new Error("SESSION_EVENT_FEED_UNAVAILABLE");
-    if (!Number.isSafeInteger(this.revision + 1))
-      throw new Error("EVENT_REVISION_EXHAUSTED");
-    const captured = cloneDomainEvent(event);
+    if (!Number.isSafeInteger(this.revision + 1)) {
+      this.markFailed();
+      throw new Error("SESSION_EVENT_FEED_UNAVAILABLE");
+    }
+    let captured: ManagedSessionEvent;
+    try {
+      captured = cloneDomainEvent(event);
+    } catch {
+      this.markFailed();
+      throw new Error("SESSION_EVENT_FEED_UNAVAILABLE");
+    }
     this.delivery.publish(
       Object.freeze({
         revision: ++this.revision,
@@ -66,6 +74,11 @@ export class DurableSessionEvents {
       }),
       valid,
     );
+  }
+  private markFailed(): void {
+    if (this.failed) return;
+    this.failed = true;
+    this.delivery.fail();
   }
   private ownerIsCurrent(): boolean {
     try {

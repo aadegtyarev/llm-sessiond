@@ -17,9 +17,7 @@ export function captureDurableSessionSnapshot(
     if (before !== revision() || pendingCommits())
       throw new Error("SNAPSHOT_BOUNDARY_CHANGED");
     return { afterRevision: before, sessions };
-  } catch (error) {
-    if (error instanceof Error && error.message === "SNAPSHOT_BOUNDARY_CHANGED")
-      throw error;
+  } catch {
     throw new Error("SNAPSHOT_UNAVAILABLE");
   }
 }
