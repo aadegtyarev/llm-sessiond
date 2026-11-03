@@ -22,6 +22,21 @@ it("forwards optional input ports through tracked executions", () => {
     },
   ]);
   expect(tracker.create(synthetic).inputs).toBe(port);
+  const events = { subscribe: () => () => {} };
+  const eventTracker = new TrackedLifecycleFactory([
+    {
+      adapter: synthetic,
+      factory: {
+        create: () => ({
+          events,
+          launch: async () => ({}),
+          resume: async () => ({}),
+          stop: async () => {},
+        }),
+      },
+    },
+  ]);
+  expect(eventTracker.create(synthetic).events).toBe(events);
   const liveStatus = { readLiveStatus: async () => ({ effort: "high" }) };
   const statusTracker = new TrackedLifecycleFactory([
     {

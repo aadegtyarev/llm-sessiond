@@ -8,6 +8,7 @@ export function persistFinalization(
   status: DurableSession["status"],
   reason: string | null,
   at: string | null,
+  current?: DurableSession,
 ): boolean {
   try {
     assertCurrentOwner(context);
@@ -16,6 +17,13 @@ export function persistFinalization(
       return false;
     throw error;
   }
-  context.store.setStatus(id, status, reason, at);
+  const row = current ?? context.store.get(id);
+  if (!row) throw new ControlPlaneError("NOT_FOUND");
+  const snapshot = { ...row, status };
+  if (reason) snapshot.failureReason = reason;
+  else delete snapshot.failureReason;
+  if (at) snapshot.failedAt = at;
+  else delete snapshot.failedAt;
+  context.store.setStatus(id, status, reason, at, snapshot);
   return true;
 }

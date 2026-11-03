@@ -56,6 +56,7 @@ export async function createSession(
     execution = context.factory.create(adapter);
     context.owned.set(id, execution);
     context.inputState.trackExecution(id, execution);
+    context.executionEvents.track(id, execution);
     const launch = execution.launch;
     assertExecutionAdmissionOpen(context);
     result = await launch.call(execution, {

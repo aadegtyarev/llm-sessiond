@@ -65,13 +65,23 @@ export function markRunning(
   execution: LifecycleExecution,
   result: CapturedLifecycleResult,
 ): void {
+  const updated = { ...row };
+  if (result.nativeSessionId !== undefined)
+    updated.nativeSessionId = result.nativeSessionId;
+  else delete updated.nativeSessionId;
+  if (result.checkpoint !== undefined) updated.adapterState = result.checkpoint;
+  else delete updated.adapterState;
   context.store.updateExecution(
     row.id,
     result.nativeSessionId,
     result.checkpoint,
     context.owner,
+    updated,
   );
   assertExecutionAdmissionOpen(context);
-  context.store.setStatus(row.id, "running", null, null);
+  const running = { ...updated, status: "running" as const };
+  delete running.failureReason;
+  delete running.failedAt;
+  context.store.setStatus(row.id, "running", null, null, running);
   context.owned.set(row.id, execution);
 }

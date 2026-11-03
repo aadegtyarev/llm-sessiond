@@ -45,14 +45,14 @@ export async function stopSession(
   };
   context.pending.set(id, pending);
   if (!result.stopped) {
-    if (!persistFinalization(context, id, "uncertain", "STOP_FAILED", at))
+    if (!persistFinalization(context, id, "uncertain", "STOP_FAILED", at, row))
       throw new ControlPlaneError("STALE_OWNER");
     throw new ControlPlaneError(
       result.timedOut ? "OPERATION_TIMEOUT" : "OPERATION_FAILED",
     );
   }
   pending.stopRequired = false;
-  if (!persistFinalization(context, id, "stopped", null, at)) {
+  if (!persistFinalization(context, id, "stopped", null, at, row)) {
     context.owned.delete(id);
     context.pending.delete(id);
     throw new ControlPlaneError("STALE_OWNER");

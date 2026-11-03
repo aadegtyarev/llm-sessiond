@@ -7,6 +7,8 @@ import type { DurableSessionStore } from "./session-manager-store.js";
 import type { OwnerGeneration } from "../persistence/session-record.js";
 import type { PendingFinalization } from "./pending-finalization.js";
 import type { DurableInputState } from "./durable-input-state.js";
+import type { DurableSessionEvents } from "./durable-session-events.js";
+import type { ExecutionEventSources } from "./execution-event-sources.js";
 export interface DurableManagerContext {
   store: DurableSessionStore;
   registry: HarnessRegistry;
@@ -17,5 +19,7 @@ export interface DurableManagerContext {
   lifecycleIntents: Map<string, Set<object>>;
   stopTimeoutMs: number;
   inputState: DurableInputState;
+  events: DurableSessionEvents;
+  executionEvents: ExecutionEventSources;
   executionAdmissionClosed: boolean;
 }

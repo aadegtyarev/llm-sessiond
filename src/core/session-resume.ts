@@ -53,6 +53,7 @@ export async function resumeSession(
     "starting",
     row.failureReason ?? null,
     row.failedAt ?? null,
+    { ...row, status: "starting" },
   );
   let execution: LifecycleExecution | undefined = preparedExecution,
     result: LifecycleLaunchResult;
@@ -60,6 +61,7 @@ export async function resumeSession(
     execution ??= context.factory.create(adapter);
     context.owned.set(id, execution);
     context.inputState.trackExecution(id, execution);
+    context.executionEvents.track(id, execution);
     const resume = execution.resume;
     assertExecutionAdmissionOpen(context);
     result = await resume.call(execution, {

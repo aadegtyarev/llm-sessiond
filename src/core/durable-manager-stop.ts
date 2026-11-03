@@ -18,8 +18,14 @@ export function stopManagedSession(
     await stopSession(
       context,
       id,
-      (execution) => context.inputState.markStopping(id, execution),
-      (execution) => context.inputState.confirmExecution(id, execution),
+      (execution) => {
+        context.inputState.markStopping(id, execution);
+        context.executionEvents.markStopping(id, execution);
+      },
+      (execution) => {
+        context.inputState.confirmExecution(id, execution);
+        context.executionEvents.close(id);
+      },
     );
     return DurableSessionManagerRead.get(context.store, id);
   });

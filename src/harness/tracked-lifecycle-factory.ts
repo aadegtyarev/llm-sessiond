@@ -37,6 +37,9 @@ class TrackedExecution implements LifecycleExecution {
   get inputs() {
     return this.execution.inputs;
   }
+  get events() {
+    return this.execution.events;
+  }
   get liveStatus() {
     return this.execution.liveStatus;
   }

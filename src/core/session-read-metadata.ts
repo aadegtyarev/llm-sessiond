@@ -12,8 +12,11 @@ export class DurableSessionManagerRead {
     id: string,
     name: string | null,
   ): DurableSession {
-    this.get(store, id);
-    store.rename(id, name);
+    const row = this.get(store, id);
+    const snapshot = { ...row };
+    if (name === null) delete snapshot.name;
+    else snapshot.name = name;
+    store.rename(id, name, snapshot);
     return this.get(store, id);
   }
 }

@@ -5,18 +5,20 @@ export interface DurableSessionStore {
   create(session: DurableSession): void;
   get(id: string): DurableSession | undefined;
   list(): DurableSession[];
-  rename(id: string, name: string | null): void;
+  rename(id: string, name: string | null, snapshot?: DurableSession): void;
   setStatus(
     id: string,
     status: DurableSession["status"],
     reason?: string | null,
     at?: string | null,
+    snapshot?: DurableSession,
   ): void;
   updateExecution(
     id: string,
     nativeId: string | undefined,
     checkpoint: DurableSession["adapterState"],
     owner: OwnerGeneration,
+    snapshot?: DurableSession,
   ): void;
   delete(id: string): void;
 }

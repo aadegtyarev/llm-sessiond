@@ -19,7 +19,7 @@ The client receives validated snapshot/live frames, submits text, and observes t
 
 ## Internal domain observation API
 
-The durable manager exposes `events.subscribe(listener)` for committed, normalized domain records and synchronous `events.snapshot()` returning `{afterRevision,sessions}`. Revisions are ephemeral commit ordinals, not durable cursors or transport sequence. The strict generic session whitelist is `id,harnessId,cwd,status,name?,nativeSessionId?,adapterOptions?,failureReason?,failedAt?`. Events are `session.changed`, `session.deleted`, and `harness.event` containing only assistant output text or normalized input state. Execution producers may optionally subscribe to validated output events; lifecycle-only adapters remain valid. This is an internal domain API, not HTTP/WS schema or transport wiring.
+The durable manager exposes `events.subscribe(listener)` for committed, normalized domain records and synchronous `events.snapshot()` returning `{afterRevision,sessions}`. Subscribers receive no replay; captured records are delivered FIFO outside lifecycle locks. Revisions are ephemeral commit ordinals, not durable cursors or transport sequence. The strict generic session whitelist is `id,harnessId,cwd,status,name?,nativeSessionId?,adapterOptions?,failureReason?,failedAt?`. Events are `session.changed`, `session.deleted`, and `harness.event` containing only assistant output text or normalized input state. Execution producers may optionally subscribe to validated output events; lifecycle-only adapters remain valid. This is an internal domain API, not HTTP/WS schema or transport wiring.
 
 ## Non-goals
 

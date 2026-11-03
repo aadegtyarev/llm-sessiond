@@ -20,6 +20,9 @@ export const checkpoint = (cursor: number) => ({
   version: 3,
   data: { cursor },
 });
+export function flushEvents(): Promise<void> {
+  return new Promise((resolve) => setImmediate(resolve));
+}
 export function setup(
   overrides: Partial<LifecycleExecution> & {
     factory?: () => LifecycleExecution;
@@ -56,6 +59,7 @@ export function setup(
         calls.push("stop");
       }),
     ...(overrides.inputs ? { inputs: overrides.inputs } : {}),
+    ...(overrides.events ? { events: overrides.events } : {}),
     ...(overrides.liveStatus ? { liveStatus: overrides.liveStatus } : {}),
     ...(overrides.modelCatalog ? { modelCatalog: overrides.modelCatalog } : {}),
     ...(overrides.effortCatalog

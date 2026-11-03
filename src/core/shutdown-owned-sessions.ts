@@ -11,10 +11,14 @@ export async function shutdownOwnedSessions(
       locks.run(id, async () => {
         const execution =
           context.owned.get(id) ?? context.pending.get(id)?.execution;
-        if (execution) context.inputState.markStopping(id, execution);
-        await shutdownOwnedExecution(context, id, (_id, stoppedExecution) =>
-          context.inputState.confirmExecution(id, stoppedExecution),
-        );
+        if (execution) {
+          context.inputState.markStopping(id, execution);
+          context.executionEvents.markStopping(id, execution);
+        }
+        await shutdownOwnedExecution(context, id, (_id, stoppedExecution) => {
+          context.inputState.confirmExecution(id, stoppedExecution);
+          context.executionEvents.close(id);
+        });
       }),
     ),
   );
