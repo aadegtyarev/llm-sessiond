@@ -37,6 +37,9 @@ async function resumeOnce(
           ...(session.checkpoint === undefined
             ? {}
             : { checkpoint: structuredClone(session.checkpoint) }),
+          ...(session.nativeSessionId === undefined
+            ? {}
+            : { nativeSessionId: session.nativeSessionId }),
           ...(session.adapterOptions === undefined
             ? {}
             : { adapterOptions: structuredClone(session.adapterOptions) }),

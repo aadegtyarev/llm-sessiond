@@ -1,9 +1,11 @@
 import type {
   EffortCatalog,
+  CommandCatalog,
   LiveStatus,
   ModelCatalog,
 } from "../interfaces/runtime-ports.js";
 import type { RuntimeState } from "./runtime-state.js";
+import { projectCommands } from "./command-catalog-projection.js";
 import {
   projectEfforts,
   projectModels,
@@ -30,12 +32,18 @@ export function queryEfforts(
 ): Promise<EffortCatalog> {
   return query(state, id, "efforts") as Promise<EffortCatalog>;
 }
+export function queryCommands(
+  state: RuntimeState,
+  id: string,
+): Promise<CommandCatalog> {
+  return query(state, id, "commands") as Promise<CommandCatalog>;
+}
 
 async function query(
   state: RuntimeState,
   id: string,
-  kind: "status" | "models" | "efforts",
-): Promise<LiveStatus | ModelCatalog | EffortCatalog> {
+  kind: "status" | "models" | "efforts" | "commands",
+): Promise<LiveStatus | ModelCatalog | EffortCatalog | CommandCatalog> {
   if (!current(state)) throw new Error("Runtime unavailable");
   id = sessionId(id);
   const session = read(state, id);
@@ -50,7 +58,13 @@ async function query(
   const required =
     kind === "status"
       ? ["status.read", "usage.read"]
-      : [kind === "models" ? "models.read" : "effort.read"];
+      : [
+          kind === "models"
+            ? "models.read"
+            : kind === "efforts"
+              ? "effort.read"
+              : "commands.read",
+        ];
   if (
     required.some(
       (capability) => !target.descriptor.capabilities.includes(capability),
@@ -80,5 +94,7 @@ async function query(
     ? projectStatus(value)
     : kind === "models"
       ? projectModels(value)
-      : projectEfforts(value);
+      : kind === "efforts"
+        ? projectEfforts(value)
+        : projectCommands(value);
 }

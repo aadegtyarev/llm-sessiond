@@ -62,6 +62,7 @@ function bindPort(
     status = source.status,
     models = source.models;
   const efforts = source.efforts,
+    commands = source.commands,
     changeEffort = source.changeEffort;
   return {
     descriptor,
@@ -73,6 +74,7 @@ function bindPort(
     ...(status ? { status: status.bind(source) } : {}),
     ...(models ? { models: models.bind(source) } : {}),
     ...(efforts ? { efforts: efforts.bind(source) } : {}),
+    ...(commands ? { commands: commands.bind(source) } : {}),
     ...(changeEffort ? { changeEffort: changeEffort.bind(source) } : {}),
   };
 }

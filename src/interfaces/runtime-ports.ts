@@ -7,11 +7,13 @@ export type {
   SessionRecord,
   PublicSession,
   InputState,
+  ActivityEvent,
   SessionEvent,
   Snapshot,
   LiveStatus,
   ModelCatalog,
   EffortCatalog,
+  CommandCatalog,
   HarnessOption,
   HarnessExtension,
   HarnessDescriptor,
@@ -22,9 +24,12 @@ import type {
   LiveStatus,
   ModelCatalog,
   EffortCatalog,
+  CommandCatalog,
   HarnessDescriptor,
   SessionRecord,
 } from "./runtime-data.js";
+export type { HarnessEvent } from "./runtime-harness-events.js";
+import type { HarnessEvent } from "./runtime-harness-events.js";
 export interface SessionStore {
   read(id: string): SessionRecord | undefined;
   list(): SessionRecord[];
@@ -38,6 +43,7 @@ export interface HarnessSessionConfig {
   cwd: string;
   name?: string;
   checkpoint?: SessionRecord["checkpoint"];
+  nativeSessionId?: string;
   adapterOptions?: Record<string, unknown>;
 }
 export type StartOutcome =
@@ -76,6 +82,7 @@ export interface HarnessPort {
   status?(sessionId: string): Promise<LiveStatus>;
   models?(sessionId: string): Promise<ModelCatalog>;
   efforts?(sessionId: string): Promise<EffortCatalog>;
+  commands?(sessionId: string): Promise<CommandCatalog>;
   changeEffort?(
     sessionId: string,
     level: string,
@@ -83,14 +90,3 @@ export interface HarnessPort {
   ): Promise<"applied" | "not-applied" | "unknown">;
   shutdown(): Promise<StopOutcome>;
 }
-export type HarnessEvent =
-  | { kind: "output"; sessionId: string; text: string }
-  | { kind: "settled"; sessionId: string; inputId: string }
-  | {
-      kind: "failed";
-      sessionId: string;
-      inputId: string;
-      reason?:
-        "prompt_rejected" | "hold_timeout" | "held_and_stopped" | "canceled";
-    }
-  | { kind: "ended"; sessionId: string };

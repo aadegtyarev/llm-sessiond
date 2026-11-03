@@ -7,7 +7,12 @@ import type {
 } from "../interfaces/runtime-ports.js";
 import { createRuntimeState } from "./create-runtime-state.js";
 import type { RuntimeState } from "./runtime-state.js";
-import { queryEfforts, queryModels, queryStatus } from "./session-query.js";
+import {
+  queryCommands,
+  queryEfforts,
+  queryModels,
+  queryStatus,
+} from "./session-query.js";
 import { changeEffort } from "./session-effort.js";
 import { cancelInput } from "./session-cancel.js";
 import { createSession } from "./session-create.js";
@@ -72,6 +77,7 @@ export class SessionRuntime {
   status = (id: string) => queryStatus(this.#state, id);
   models = (id: string) => queryModels(this.#state, id);
   efforts = (id: string) => queryEfforts(this.#state, id);
+  commands = (id: string) => queryCommands(this.#state, id);
   changeEffort(
     id: string,
     level: string,

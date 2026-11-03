@@ -43,6 +43,24 @@ export function onHarnessEvent(
         publish(state, { kind: "output", sessionId: id, text: event.text });
       return;
     }
+    if (event.kind === "activity") {
+      if (session.status === "running")
+        publish(state, {
+          kind: "activity",
+          sessionId: id,
+          activity: event.activity,
+        });
+      return;
+    }
+    if (event.kind === "notification") {
+      if (session.status === "running" && typeof event.text === "string")
+        publish(state, {
+          kind: "notification",
+          sessionId: id,
+          text: event.text,
+        });
+      return;
+    }
     const active: InputState | undefined = state.inputs.get(id);
     if (!active || active.inputId !== event.inputId) return;
     const canceled = state.cancelAccepted.delete(id);

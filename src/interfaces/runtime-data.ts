@@ -34,12 +34,21 @@ export interface InputState {
   state: InputStatus;
   reason?: InputFailureReason;
 }
+export type { ActivityEvent } from "./runtime-activity-data.js";
+import type { ActivityEvent } from "./runtime-activity-data.js";
 export interface SessionEvent {
   revision: number;
-  kind: "session.changed" | "session.deleted" | "output" | "input.state";
+  kind:
+    | "session.changed"
+    | "session.deleted"
+    | "output"
+    | "input.state"
+    | "activity"
+    | "notification";
   sessionId: string;
   session?: PublicSession;
   text?: string;
+  activity?: ActivityEvent;
   input?: InputState;
 }
 export interface Snapshot {
@@ -57,6 +66,9 @@ export interface ModelCatalog {
 export interface EffortCatalog {
   levels: string[];
   current?: string;
+}
+export interface CommandCatalog {
+  commands: Array<{ name: string; description: string }>;
 }
 export interface HarnessOption {
   key: string;
