@@ -5,9 +5,9 @@ const id = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/);
 export const v2OpenSchema = z.strictObject({
   apiVersion: z.literal("v2"),
   type: z.literal("client.open"),
-  requestId: z.string(),
+  requestId: z.string().min(1),
   protocolRevision: z.literal(1),
-  callbacks: z.array(z.string()),
+  callbacks: z.array(z.enum(["tool.permission", "agent.file.send"])),
 });
 export const v2LiveEventSchema = z.strictObject({
   apiVersion: z.literal("v2"),

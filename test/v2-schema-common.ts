@@ -1,6 +1,8 @@
 import { z } from "zod";
+import { safeErrorSchema } from "../src/api/v2-error.js";
+import { v2SessionIdSchema } from "../src/api/v2-session-schema.js";
 
-export const sessionId = z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/);
+export const sessionId = v2SessionIdSchema;
 export const empty = z.strictObject({});
 export const session = z.strictObject({
   id: sessionId,
@@ -14,38 +16,4 @@ export const session = z.strictObject({
   failedAt: z.string().optional(),
 });
 export const sessionResponse = z.strictObject({ session });
-export const safeError = z.strictObject({
-  code: z.string(),
-  message: z.string(),
-  category: z.enum([
-    "validation",
-    "not-found",
-    "unsupported",
-    "conflict",
-    "unavailable",
-    "uncertain",
-    "internal",
-  ]),
-  outcome: z.enum(["not-applied", "applied", "unknown"]),
-  reference: z.string(),
-  inputId: sessionId.optional(),
-  failure: z
-    .strictObject({
-      reason: z.enum([
-        "prompt_rejected",
-        "hold_timeout",
-        "held_and_stopped",
-        "canceled",
-      ]),
-      text: z.string().optional(),
-    })
-    .optional(),
-  resumed: z.literal(true).optional(),
-  adapterError: z
-    .strictObject({
-      namespace: z.string(),
-      version: z.number().int(),
-      code: z.string(),
-    })
-    .optional(),
-});
+export const safeError = safeErrorSchema;

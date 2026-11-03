@@ -1,5 +1,7 @@
 import { z } from "zod";
-import { safeError, sessionId } from "./v2-schema-common.js";
+import { sessionId } from "./v2-schema-common.js";
+import { v2CallbackResultSchema as callbackResult } from "../src/api/v2-bridge-inbound-schema.js";
+export { callbackResult };
 import { bind, unbind } from "./v2-bridge-handshake-schema.js";
 import {
   filePayload,
@@ -25,37 +27,6 @@ export const fileRequest = z.strictObject({
   ...common,
   kind: z.literal("agent.file.send"),
   payload: filePayload,
-});
-const permissionResult = z.union([
-  z.strictObject({
-    kind: z.literal("permission"),
-    behavior: z.literal("allow"),
-  }),
-  z.strictObject({
-    kind: z.literal("permission"),
-    behavior: z.literal("deny"),
-    message: z.string(),
-    interrupt: z.literal(false),
-  }),
-]);
-const fileResult = z
-  .strictObject({
-    kind: z.literal("file"),
-    fileName: z.string(),
-    delivered: z.number().int().nonnegative().safe(),
-    recipients: z.number().int().nonnegative().safe(),
-  })
-  .refine((r) => r.delivered <= r.recipients);
-const failureResult = z.strictObject({
-  kind: z.literal("failure"),
-  error: safeError,
-});
-export const callbackResult = z.strictObject({
-  ...api,
-  type: z.literal("callback.result"),
-  callbackId: z.string(),
-  bindingId: z.string(),
-  result: z.union([permissionResult, fileResult, failureResult]),
 });
 export const callbackCancel = z.strictObject({
   ...api,

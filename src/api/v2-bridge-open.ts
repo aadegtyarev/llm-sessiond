@@ -1,16 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { WebSocket, type RawData } from "ws";
 import { v2OpenSchema } from "./v2-bridge-schema.js";
+import { v2UnsupportedRequestSchema } from "./v2-bridge-inbound-schema.js";
 import { sendFrame } from "./v2-bridge-peer.js";
-
-const unsupportedTypes = [
-  "control.request",
-  "control.cancel",
-  "guard.set",
-  "callback.bind",
-  "callback.unbind",
-  "callback.result",
-];
 
 export function handleV2Frame(
   socket: WebSocket,
@@ -33,7 +25,8 @@ export function handleV2Frame(
   }
   const parsed = v2OpenSchema.safeParse(frame);
   if (opened || !parsed.success) {
-    if (rejectUnsupported(socket, frame)) return "continue";
+    const unsupported = rejectUnsupported(socket, frame);
+    if (unsupported) return unsupported;
     socket.close(1002, opened ? "unexpected frame" : "invalid open");
     return "closed";
   }
@@ -59,24 +52,23 @@ export function handleV2Frame(
   return "opened";
 }
 
-function rejectUnsupported(socket: WebSocket, frame: unknown): boolean {
-  const row =
-    frame && typeof frame === "object" && !Array.isArray(frame)
-      ? (frame as Record<string, unknown>)
-      : undefined;
-  if (
-    row?.apiVersion !== "v2" ||
-    typeof row.requestId !== "string" ||
-    !unsupportedTypes.includes(String(row.type))
-  )
-    return false;
+function rejectUnsupported(
+  socket: WebSocket,
+  frame: unknown,
+): "continue" | "closed" | undefined {
+  const parsed = v2UnsupportedRequestSchema.safeParse(frame);
+  if (!parsed.success) return undefined;
+  if (parsed.data.type === "callback.result") {
+    socket.close(1008, "callback responses are unsupported");
+    return "closed";
+  }
   sendFailure(
     socket,
-    row.requestId,
+    parsed.data.requestId,
     "UNSUPPORTED_OPERATION",
     "operation is unsupported",
   );
-  return true;
+  return "continue";
 }
 
 function sendFailure(

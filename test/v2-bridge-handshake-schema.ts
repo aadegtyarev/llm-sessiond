@@ -1,8 +1,14 @@
 import { z } from "zod";
 import { safeError, sessionId } from "./v2-schema-common.js";
+import {
+  v2BridgeCorrelation as correlation,
+  v2CallbackBindSchema as bind,
+  v2CallbackUnbindSchema as unbind,
+  v2GuardSetSchema as guardSet,
+} from "../src/api/v2-bridge-inbound-schema.js";
 
 const api = { apiVersion: z.literal("v2") };
-export const correlation = { ...api, requestId: z.string().min(1) };
+export { correlation, bind, unbind, guardSet };
 export const hello = z.strictObject({
   ...api,
   type: z.literal("server.hello"),
@@ -33,27 +39,10 @@ export const failed = z.strictObject({
   requestId: z.string(),
   error: safeError,
 });
-export const guardSet = z.strictObject({
-  ...correlation,
-  type: z.literal("guard.set"),
-  contextId: z.string(),
-  generation: z.number().int().nonnegative(),
-  sessionId: sessionId.nullable(),
-});
 export const guardAck = z.strictObject({
   contextId: z.string(),
   generation: z.number().int().nonnegative(),
   sessionId: sessionId.nullable(),
-});
-export const bind = z.strictObject({
-  ...correlation,
-  type: z.literal("callback.bind"),
-  sessionId,
-});
-export const unbind = z.strictObject({
-  ...correlation,
-  type: z.literal("callback.unbind"),
-  bindingId: z.string(),
 });
 export const connectionFrames = z.union([
   hello,

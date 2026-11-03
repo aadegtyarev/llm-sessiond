@@ -12,7 +12,7 @@ const failureSchema = z.strictObject({
   ]),
   text: z.string().optional(),
 });
-const safeErrorSchema = z.strictObject({
+export const safeErrorSchema = z.strictObject({
   code: z.string(),
   message: z.string(),
   category: z.enum([

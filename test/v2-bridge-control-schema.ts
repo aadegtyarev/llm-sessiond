@@ -1,35 +1,10 @@
 import { z } from "zod";
-import { sessionId } from "./v2-schema-common.js";
-import { correlation } from "./v2-bridge-handshake-schema.js";
+import {
+  v2ControlCancelSchema as cancel,
+  v2ControlRequestSchema as controlRequest,
+} from "../src/api/v2-bridge-inbound-schema.js";
+export { cancel, controlRequest };
 
-const guard = z.strictObject({
-  contextId: z.string().min(1),
-  generation: z.number().int().nonnegative(),
-});
-const common = {
-  ...correlation,
-  type: z.literal("control.request"),
-  sessionId,
-  guard,
-  timeoutMs: z.number().int().positive(),
-};
-export const controlRequest = z.union([
-  z.strictObject({ ...common, operation: z.literal("reload") }),
-  z.strictObject({
-    ...common,
-    operation: z.literal("command.run"),
-    name: z.string(),
-    remainder: z.string(),
-  }),
-  z.strictObject({
-    ...common,
-    operation: z.literal("extension"),
-    namespace: z.string(),
-    version: z.number().int().positive(),
-    name: z.string(),
-    input: z.unknown(),
-  }),
-]);
 export const controlResults = {
   reload: z.strictObject({ reloaded: z.literal(true) }),
   command: z.strictObject({
@@ -41,11 +16,6 @@ export const controlResults = {
     output: z.unknown(),
   }),
 };
-export const cancel = z.strictObject({
-  ...correlation,
-  type: z.literal("control.cancel"),
-  targetRequestId: z.string().min(1),
-});
 export const cancelResult = z.strictObject({
   outcome: z.enum(["not-dispatched", "unknown"]),
 });
