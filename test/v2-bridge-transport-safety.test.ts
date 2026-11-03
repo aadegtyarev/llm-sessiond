@@ -46,11 +46,24 @@ describe("v2 bridge transport safety", () => {
       JSON.parse(second.send.mock.calls.at(-1)![0] as string),
     ).toMatchObject({ sequence: 1 });
     detach();
-    listener?.(event(2));
+    listener?.({
+      revision: 2,
+      event: {
+        kind: "harness.event",
+        sessionId: "Session.A",
+        event: {
+          kind: "input",
+          inputEvent: { inputId: "Input.Exact", state: "accepted" },
+        },
+      },
+    });
     expect(first.send).toHaveBeenCalledTimes(3);
     expect(
       JSON.parse(second.send.mock.calls.at(-1)![0] as string),
-    ).toMatchObject({ sequence: 2 });
+    ).toMatchObject({
+      sequence: 2,
+      event: { event: { inputEvent: { inputId: "Input.Exact" } } },
+    });
     unavailable?.();
     expect(second.close).toHaveBeenCalledWith(1011, "observation unavailable");
   });
