@@ -17,6 +17,10 @@ The client receives validated snapshot/live frames, submits text, and observes t
 - Bridge uses existing exact schemas: `server.hello`, `client.open` with `callbacks:[]`, correlated open ACK before snapshot begin/session/end, then ordered live envelopes. HTTP and pinned mutations share `instanceId`. Sequence is positive safe monotonic per instance, not a durable cursor. Preserve snapshot barrier; 1 MiB frame and 4 MiB queue/buffer limits disconnect on overflow, never truncate. Disconnect detaches only; no session/process stop, replay, auto-reconnect, or fabricated completion. Do not advertise callback/guard/full-mode readiness or unimplemented feature tokens; advertise `events.live` only if its complete wire/barrier semantics are implemented.
 - Input, adapter, or configuration unsupported by current capability fails explicitly before effects; preserve unrelated adapters and future full callback parity. No new wire fields or API schema.
 
+## Internal domain observation API
+
+The durable manager exposes `events.subscribe(listener)` for committed, normalized domain records and synchronous `events.snapshot()` returning `{afterRevision,sessions}`. Revisions are ephemeral commit ordinals, not durable cursors or transport sequence. The strict generic session whitelist is `id,harnessId,cwd,status,name?,nativeSessionId?,adapterOptions?,failureReason?,failedAt?`. Events are `session.changed`, `session.deleted`, and `harness.event` containing only assistant output text or normalized input state. Execution producers may optionally subscribe to validated output events; lifecycle-only adapters remain valid. This is an internal domain API, not HTTP/WS schema or transport wiring.
+
 ## Non-goals
 
 Claude, images, full callbacks, callback lease plumbing, controls, guard writes, replay/history, final-text guarantees, native SDK/model validation, paid model turns, app/CLI integration, default-v1 changes, and production rollout are excluded. No alternative wire, fake ACK, retry, second RPC reader, or harness-specific core routing.
