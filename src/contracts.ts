@@ -46,3 +46,18 @@ export interface ShutdownResult {
   readonly uncertainSessionIds: readonly string[];
   readonly failedSessionIds: readonly string[];
 }
+
+export interface InputState {
+  readonly inputId: string;
+  status: InputStatus;
+}
+
+export interface SessionRecord {
+  readonly id: string;
+  status: SessionStatus;
+  input: InputState | null;
+  readonly inputIds: Set<string>;
+  generation: number;
+  stopRequested: boolean;
+  startOutcomeWhileStopping: PortOutcome | null;
+}

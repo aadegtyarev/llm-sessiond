@@ -61,6 +61,16 @@ for (const operation of ['start', 'send'] as const) {
         await Promise.resolve();
         assert.deepEqual(calls, [operation, 'stop']);
         assert.ok(stopTask);
+        let result: unknown;
+        if (operation === 'start') {
+          startResult.resolve({ kind: 'confirmed' });
+          result = await operationTask;
+          assert.equal((result as { status: string }).status, 'starting');
+          await assert.rejects(core.send('s', 'later', 'during stop intent'));
+        } else {
+          await assert.rejects(core.send('s', 'i2', 'after stop intent'));
+        }
+        assert.deepEqual(calls, [operation, 'stop']);
         stopResult.resolve({ kind: stopKind });
         const stopReport = await stopTask;
         if (shutdown) {
@@ -70,14 +80,14 @@ for (const operation of ['start', 'send'] as const) {
         } else if (stopKind === 'unknown') {
           assert.equal((stopReport as { code?: string }).code, 'harness-unknown');
         }
-        if (operation === 'start') startResult.resolve({ kind: 'confirmed' });
-        else sendResult.resolve({ kind: 'confirmed' });
-        const result = await operationTask;
+        if (operation === 'send') {
+          sendResult.resolve({ kind: 'confirmed' });
+          result = await operationTask;
+          assert.deepEqual(result, { inputId: 'i', status: 'unknown' });
+        }
         const expectedSessionStatus = stopKind === 'confirmed' ? 'stopped' : 'unknown';
         assert.equal(shutdown ? lastSessionStatus : core.get('s').status, expectedSessionStatus);
         assert.deepEqual(calls, [operation, 'stop']);
-        if (operation === 'start') assert.equal((result as { status: string }).status, expectedSessionStatus);
-        else assert.deepEqual(result, { inputId: 'i', status: 'unknown' });
       });
     }
   }

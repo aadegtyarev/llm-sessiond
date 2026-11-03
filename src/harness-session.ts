@@ -1,17 +1,9 @@
-import type { CoreEvent, HarnessEvent, HarnessPort, InputView, PortOutcome, SessionStatus, ShutdownResult } from './contracts.ts';
-import { inputView, sessionView } from './events.ts';
+import type { CoreEvent, HarnessPort, InputView, PortOutcome, SessionRecord, ShutdownResult } from './contracts.ts';
+import { acceptHarnessEvent, inputView, sessionView } from './events.ts';
 
-export interface InputState {
-  readonly inputId: string;
-  status: InputView['status'];
-}
 
-export interface SessionRecord {
-  readonly id: string;
-  status: SessionStatus;
-  input: InputState | null;
-  readonly inputIds: Set<string>;
-  generation: number;
+export function createSessionRecord(id: string): SessionRecord {
+  return { id, status: 'created', input: null, inputIds: new Set(), generation: 0, stopRequested: false, startOutcomeWhileStopping: null };
 }
 
 export async function startHarnessSession(
@@ -25,6 +17,10 @@ export async function startHarnessSession(
   notify({ type: 'session', session: sessionView(session) });
   const outcome = await startTask;
   if (session.generation !== generation || session.status !== 'starting') return null;
+  if (session.stopRequested) {
+    session.startOutcomeWhileStopping = outcome;
+    return null;
+  }
   session.status = outcome.kind === 'confirmed' ? 'running' : outcome.kind === 'rejected' ? 'failed' : 'unknown';
   notify({ type: 'session', session: sessionView(session) });
   return outcome;
@@ -41,8 +37,20 @@ export async function stopHarnessSession(
     return 'confirmed';
   }
   if (session.status === 'stopped' || session.status === 'failed') return 'rejected';
+  if (session.stopRequested) return 'unknown';
+  session.stopRequested = true;
   const outcome = await callPort(() => port.stop(session.id));
-  if (outcome.kind === 'rejected') return outcome.kind;
+  if (outcome.kind === 'rejected') {
+    session.stopRequested = false;
+    const startOutcome = session.startOutcomeWhileStopping;
+    session.startOutcomeWhileStopping = null;
+    if (startOutcome && session.status === 'starting') {
+      session.status = startOutcome.kind === 'confirmed' ? 'running' : startOutcome.kind === 'rejected' ? 'failed' : 'unknown';
+      notify({ type: 'session', session: sessionView(session) });
+    }
+    return outcome.kind;
+  }
+  session.startOutcomeWhileStopping = null;
   session.generation++;
   session.status = outcome.kind === 'confirmed' ? 'stopped' : 'unknown';
   if (session.input?.status === 'pending') {
@@ -75,21 +83,6 @@ export async function stopAllHarnessSessions(
   });
 }
 
-function acceptHarnessEvent(
-  session: SessionRecord,
-  generation: number,
-  event: HarnessEvent,
-  notify: (event: CoreEvent) => void,
-): void {
-  if (session.generation !== generation || session.status !== 'running') return;
-  if (event.type === 'text') {
-    notify({ type: 'text', sessionId: session.id, text: event.text });
-    return;
-  }
-  if (!session.input || session.input.inputId !== event.inputId || (session.input.status !== 'pending' && session.input.status !== 'unknown')) return;
-  session.input.status = event.type === 'input-completed' ? 'completed' : event.certainty === 'definitive' ? 'failed' : 'unknown';
-  notify({ type: 'input', sessionId: session.id, input: inputView(session.input) });
-}
 
 export async function callPort(operation: () => Promise<PortOutcome>): Promise<PortOutcome> {
   try {

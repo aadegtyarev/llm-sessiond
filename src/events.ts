@@ -1,4 +1,4 @@
-import type { CoreEvent, InputView, SessionStatus, SessionView } from './contracts.ts';
+import type { CoreEvent, HarnessEvent, InputView, SessionRecord, SessionStatus, SessionView } from './contracts.ts';
 
 export function inputView(input: InputView): InputView {
   return Object.freeze({ inputId: input.inputId, status: input.status });
@@ -10,6 +10,22 @@ export function sessionView(session: { id: string; status: SessionStatus; input:
     status: session.status,
     input: session.input ? inputView(session.input) : null,
   });
+}
+
+export function acceptHarnessEvent(
+  session: SessionRecord,
+  generation: number,
+  event: HarnessEvent,
+  notify: (event: CoreEvent) => void,
+): void {
+  if (session.generation !== generation || session.status !== 'running') return;
+  if (event.type === 'text') {
+    notify({ type: 'text', sessionId: session.id, text: event.text });
+    return;
+  }
+  if (!session.input || session.input.inputId !== event.inputId || (session.input.status !== 'pending' && session.input.status !== 'unknown')) return;
+  session.input.status = event.type === 'input-completed' ? 'completed' : event.certainty === 'definitive' ? 'failed' : 'unknown';
+  notify({ type: 'input', sessionId: session.id, input: inputView(session.input) });
 }
 
 export function createEventPublisher() {

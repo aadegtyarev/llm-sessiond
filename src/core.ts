@@ -1,6 +1,6 @@
-import { CoreError, type CoreEvent, type HarnessPort, type InputView, type SessionView, type ShutdownResult } from './contracts.ts';
+import { CoreError, type CoreEvent, type HarnessPort, type InputView, type SessionRecord, type SessionView, type ShutdownResult } from './contracts.ts';
 import { createEventPublisher, inputView, sessionView } from './events.ts';
-import { callPort, startHarnessSession, stopAllHarnessSessions, stopHarnessSession, type SessionRecord } from './harness-session.ts';
+import { callPort, createSessionRecord, startHarnessSession, stopAllHarnessSessions, stopHarnessSession } from './harness-session.ts';
 export { CoreError } from './contracts.ts';
 export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, InputStatus, InputView, PortOutcome, SessionStatus, SessionView, ShutdownResult } from './contracts.ts';
 
@@ -18,7 +18,7 @@ export class SessionCore {
   create(sessionId: string): SessionView {
     this.assertOpen();
     if (this.sessions.has(sessionId)) throw new CoreError('duplicate-session');
-    const record: SessionRecord = { id: sessionId, status: 'created', input: null, inputIds: new Set(), generation: 0 };
+    const record = createSessionRecord(sessionId);
     this.sessions.set(sessionId, record);
     this.events.publish({ type: 'session', session: sessionView(record) });
     return sessionView(record);
@@ -52,7 +52,7 @@ export class SessionCore {
   async send(sessionId: string, inputId: string, text: string): Promise<InputView> {
     this.assertOpen();
     const session = this.requireSession(sessionId);
-    if (session.status !== 'running') throw new CoreError('invalid-state');
+    if (session.status !== 'running' || session.stopRequested) throw new CoreError('invalid-state');
     if (session.input?.status === 'pending' || session.input?.status === 'unknown') throw new CoreError('input-in-flight');
     if (session.inputIds.has(inputId)) throw new CoreError('duplicate-input');
     session.inputIds.add(inputId);
