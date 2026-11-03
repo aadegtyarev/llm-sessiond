@@ -4,7 +4,7 @@ import type { Server } from "node:http";
 import type { DurableSessionManager } from "../core/durable-session-manager.js";
 import { sendFrame } from "./v2-bridge-peer.js";
 import { V2BridgeHub } from "./v2-bridge-hub.js";
-import { acceptV2Open } from "./v2-bridge-open.js";
+import { handleV2Frame } from "./v2-bridge-open.js";
 
 export function attachV2Bridge(
   server: Server,
@@ -52,11 +52,21 @@ export function attachV2Bridge(
         instanceId,
         connectionId,
       });
+      let opened = false;
       let detach: (() => void) | undefined;
-      client.once("message", (data, binary) => {
-        if (!acceptV2Open(client, data, binary, instanceId, connectionId))
-          return;
-        detach = hub.open(client, ready);
+      client.on("message", (data, binary) => {
+        const result = handleV2Frame(
+          client,
+          data,
+          binary,
+          opened,
+          instanceId,
+          connectionId,
+        );
+        if (result === "opened" && !opened) {
+          opened = true;
+          detach = hub.open(client, ready);
+        }
       });
       client.on("close", () => detach?.());
     });

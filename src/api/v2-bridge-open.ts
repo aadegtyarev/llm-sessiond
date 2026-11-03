@@ -3,13 +3,23 @@ import { WebSocket, type RawData } from "ws";
 import { v2OpenSchema } from "./v2-bridge-schema.js";
 import { sendFrame } from "./v2-bridge-peer.js";
 
-export function acceptV2Open(
+const unsupportedTypes = [
+  "control.request",
+  "control.cancel",
+  "guard.set",
+  "callback.bind",
+  "callback.unbind",
+  "callback.result",
+];
+
+export function handleV2Frame(
   socket: WebSocket,
   data: RawData,
   binary: boolean,
+  opened: boolean,
   instanceId: string,
   connectionId: string,
-): boolean {
+): "opened" | "continue" | "closed" {
   let frame: unknown;
   try {
     if (binary) throw new Error();
@@ -19,35 +29,13 @@ export function acceptV2Open(
     frame = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
   } catch {
     socket.close(1002, "invalid frame");
-    return false;
+    return "closed";
   }
   const parsed = v2OpenSchema.safeParse(frame);
-  if (!parsed.success) {
-    const row =
-      frame && typeof frame === "object" && !Array.isArray(frame)
-        ? (frame as Record<string, unknown>)
-        : undefined;
-    if (
-      row?.apiVersion === "v2" &&
-      typeof row.requestId === "string" &&
-      [
-        "control.request",
-        "control.cancel",
-        "guard.set",
-        "callback.bind",
-        "callback.unbind",
-      ].includes(String(row.type))
-    ) {
-      sendFailure(
-        socket,
-        row.requestId,
-        "UNSUPPORTED_OPERATION",
-        "operation is unsupported",
-      );
-      return false;
-    }
-    socket.close(1002, "invalid open");
-    return false;
+  if (opened || !parsed.success) {
+    if (rejectUnsupported(socket, frame)) return "continue";
+    socket.close(1002, opened ? "unexpected frame" : "invalid open");
+    return "closed";
   }
   const open = parsed.data;
   if (open.callbacks.length > 0) {
@@ -57,14 +45,37 @@ export function acceptV2Open(
       "UNSUPPORTED_CALLBACKS",
       "callbacks are unsupported",
     );
-    return false;
+    return "continue";
   }
-  sendFrame(socket, {
-    apiVersion: "v2",
-    type: "request.succeeded",
-    requestId: open.requestId,
-    result: { protocolRevision: 1, instanceId, connectionId },
-  });
+  if (
+    !sendFrame(socket, {
+      apiVersion: "v2",
+      type: "request.succeeded",
+      requestId: open.requestId,
+      result: { protocolRevision: 1, instanceId, connectionId },
+    })
+  )
+    return "closed";
+  return "opened";
+}
+
+function rejectUnsupported(socket: WebSocket, frame: unknown): boolean {
+  const row =
+    frame && typeof frame === "object" && !Array.isArray(frame)
+      ? (frame as Record<string, unknown>)
+      : undefined;
+  if (
+    row?.apiVersion !== "v2" ||
+    typeof row.requestId !== "string" ||
+    !unsupportedTypes.includes(String(row.type))
+  )
+    return false;
+  sendFailure(
+    socket,
+    row.requestId,
+    "UNSUPPORTED_OPERATION",
+    "operation is unsupported",
+  );
   return true;
 }
 

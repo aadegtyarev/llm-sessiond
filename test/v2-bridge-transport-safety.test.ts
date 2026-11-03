@@ -67,6 +67,17 @@ describe("v2 bridge transport safety", () => {
     unavailable?.();
     expect(second.close).toHaveBeenCalledWith(1011, "observation unavailable");
   });
+  it("terminates peers when a frame send throws", () => {
+    const failing = {
+      ...socket(),
+      terminate: vi.fn(),
+      send: vi.fn(() => {
+        throw new Error("closed");
+      }),
+    };
+    expect(sendFrame(failing as never, { type: "event" })).toBe(false);
+    expect(failing.terminate).toHaveBeenCalledOnce();
+  });
   it("disconnects rather than exceeding the websocket queue", () => {
     const slow = { ...socket(), bufferedAmount: 4 * 1024 * 1024 };
     expect(sendFrame(slow as never, { type: "event" })).toBe(false);
