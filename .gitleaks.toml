@@ -1,9 +1,0 @@
-title = "llm-sessiond gitleaks configuration"
-
-[extend]
-useDefault = true
-
-[allowlist]
-description = "RFC 6455 example WebSocket nonce; public test fixture, not a credential"
-regexTarget = "secret"
-regexes = ['''^dGhlIHNhbXBsZSBub25jZQ==$''']

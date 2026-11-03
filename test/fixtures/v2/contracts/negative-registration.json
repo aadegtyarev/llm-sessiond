@@ -1,8 +1,0 @@
-{
-  "mutations": [
-    { "kind": "unknown-root" },
-    { "kind": "missing-capabilities" },
-    { "kind": "unregistered-operation" },
-    { "kind": "checkpoint-namespace-mismatch" }
-  ]
-}
