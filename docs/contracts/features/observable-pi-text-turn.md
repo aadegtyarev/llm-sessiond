@@ -1,7 +1,7 @@
 # Observable Pi text turn
 
 - Status: Approved
-- Scope: contract recording only; implementation is separately authorized.
+- Scope: approved implementation of the opt-in observable Pi text turn; no production/default-v1 or transport wiring changes outside the specified existing v2 seams.
 
 ## Goal and scenarios
 
