@@ -34,7 +34,7 @@ export class SessionCore {
     return [...this.sessions.values()].map(sessionView);
   }
 
-  subscribe(listener: (event: CoreEvent) => void): () => void {
+  subscribe(listener: (event: CoreEvent) => unknown): () => void {
     this.assertOpen();
     return this.events.subscribe(listener);
   }
@@ -56,15 +56,19 @@ export class SessionCore {
     if (session.input?.status === 'pending' || session.input?.status === 'unknown') throw new CoreError('input-in-flight');
     if (session.inputIds.has(inputId)) throw new CoreError('duplicate-input');
     session.inputIds.add(inputId);
-    session.input = { inputId, status: 'pending' };
-    this.events.publish({ type: 'input', sessionId, input: inputView(session.input) });
+    const input: NonNullable<SessionRecord['input']> = { inputId, status: 'pending' };
+    session.input = input;
     const generation = session.generation;
-    const outcome = await callPort(() => this.port.send(sessionId, inputId, text));
-    if (session.generation === generation && session.input?.inputId === inputId && session.input.status === 'pending' && outcome.kind !== 'confirmed') {
-      session.input = { inputId, status: outcome.kind === 'rejected' ? 'failed' : 'unknown' };
-      this.events.publish({ type: 'input', sessionId, input: inputView(session.input) });
+    const sendTask = callPort(() => this.port.send(sessionId, inputId, text));
+    if (session.generation === generation && session.input === input && input.status === 'pending') {
+      this.events.publish({ type: 'input', sessionId, input: inputView(input) });
     }
-    return inputView(session.input ?? { inputId, status: 'unknown' });
+    const outcome = await sendTask;
+    if (session.generation === generation && session.input === input && input.status === 'pending' && outcome.kind !== 'confirmed') {
+      input.status = outcome.kind === 'rejected' ? 'failed' : 'unknown';
+      this.events.publish({ type: 'input', sessionId, input: inputView(input) });
+    }
+    return inputView(input);
   }
 
   async stop(sessionId: string): Promise<SessionView> {
@@ -79,7 +83,8 @@ export class SessionCore {
   shutdown(): Promise<ShutdownResult> {
     if (this.shutdownTask) return this.shutdownTask;
     this.closed = true;
-    this.shutdownTask = stopAllHarnessSessions(this.port, this.sessions.values(), this.events.publish);
+    this.shutdownTask = Promise.resolve().then(() =>
+      stopAllHarnessSessions(this.port, this.sessions.values(), this.events.publish));
     return this.shutdownTask;
   }
 

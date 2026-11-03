@@ -1,10 +1,15 @@
 import type { CoreEvent, HarnessEvent, HarnessPort, InputView, PortOutcome, SessionStatus, ShutdownResult } from './contracts.ts';
 import { inputView, sessionView } from './events.ts';
 
+export interface InputState {
+  readonly inputId: string;
+  status: InputView['status'];
+}
+
 export interface SessionRecord {
   readonly id: string;
   status: SessionStatus;
-  input: InputView | null;
+  input: InputState | null;
   readonly inputIds: Set<string>;
   generation: number;
 }
@@ -15,9 +20,10 @@ export async function startHarnessSession(
   notify: (event: CoreEvent) => void,
 ): Promise<PortOutcome | null> {
   session.status = 'starting';
-  notify({ type: 'session', session: sessionView(session) });
   const generation = session.generation;
-  const outcome = await callPort(() => port.start(session.id, (event) => acceptHarnessEvent(session, generation, event, notify)));
+  const startTask = callPort(() => port.start(session.id, (event) => acceptHarnessEvent(session, generation, event, notify)));
+  notify({ type: 'session', session: sessionView(session) });
+  const outcome = await startTask;
   if (session.generation !== generation || session.status !== 'starting') return null;
   session.status = outcome.kind === 'confirmed' ? 'running' : outcome.kind === 'rejected' ? 'failed' : 'unknown';
   notify({ type: 'session', session: sessionView(session) });
@@ -40,7 +46,7 @@ export async function stopHarnessSession(
   session.generation++;
   session.status = outcome.kind === 'confirmed' ? 'stopped' : 'unknown';
   if (session.input?.status === 'pending') {
-    session.input = { inputId: session.input.inputId, status: 'unknown' };
+    session.input.status = 'unknown';
     notify({ type: 'input', sessionId: session.id, input: inputView(session.input) });
   }
   notify({ type: 'session', session: sessionView(session) });
@@ -81,10 +87,7 @@ function acceptHarnessEvent(
     return;
   }
   if (!session.input || session.input.inputId !== event.inputId || (session.input.status !== 'pending' && session.input.status !== 'unknown')) return;
-  session.input = {
-    inputId: event.inputId,
-    status: event.type === 'input-completed' ? 'completed' : event.certainty === 'definitive' ? 'failed' : 'unknown',
-  };
+  session.input.status = event.type === 'input-completed' ? 'completed' : event.certainty === 'definitive' ? 'failed' : 'unknown';
   notify({ type: 'input', sessionId: session.id, input: inputView(session.input) });
 }
 

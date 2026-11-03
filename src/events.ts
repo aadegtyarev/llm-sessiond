@@ -13,9 +13,9 @@ export function sessionView(session: { id: string; status: SessionStatus; input:
 }
 
 export function createEventPublisher() {
-  const subscribers = new Set<(event: CoreEvent) => void>();
+  const subscribers = new Set<(event: CoreEvent) => unknown>();
   return {
-    subscribe(listener: (event: CoreEvent) => void): () => void {
+    subscribe(listener: (event: CoreEvent) => unknown): () => void {
       subscribers.add(listener);
       return () => subscribers.delete(listener);
     },
@@ -23,7 +23,8 @@ export function createEventPublisher() {
       const publicEvent = Object.freeze(event);
       for (const subscriber of subscribers) {
         try {
-          subscriber(publicEvent);
+          const result = subscriber(publicEvent);
+          if (result && typeof (result as PromiseLike<unknown>).then === 'function') void Promise.resolve(result).catch(() => {});
         } catch {
           // A subscriber cannot interrupt another observer or core operation.
         }
