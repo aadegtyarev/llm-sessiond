@@ -12,7 +12,7 @@
 <!-- END ad-pi-addons contract workflow -->
 
 ## Project-specific commands and conventions
-- Stack and important paths: repository currently contains no implementation, package manifest, or test configuration; contract files are under `docs/contracts/`.
-- Tests / typecheck / build: none are configured or available in the current repository.
+- Stack and important paths: strict TypeScript ES modules on Node.js 24; core is under `src/`, tests under `test/`, and contracts under `docs/contracts/`.
+- Tests / typecheck: `npm run typecheck` runs `tsc --noEmit`; `npm test` runs `node --experimental-strip-types --test test/*.test.ts`. Verified with Node.js v24.21.0 and the existing TypeScript 5.9.3 compiler; no build command is configured.
 - Formatting and style: no project-specific formatter or source conventions are established.
-- Project-specific constraints: implementation is not authorized until this feature contract is explicitly approved. Review contract requirements by root cause and affected case class, not line-level nits.
+- Project-specific constraints: `docs/contracts/features/compact-session-core.md` was explicitly approved by the operator; its scope is the sole product contract for the implementation. Review contract requirements by root cause and affected case class, not line-level nits.
