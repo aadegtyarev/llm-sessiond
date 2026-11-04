@@ -17,4 +17,4 @@ export const answers = [
   { requestId: 'confirm-id', method: 'confirm' as const, confirmed: true },
   { requestId: 'select-id', method: 'select' as const, value: 'blue' },
   { requestId: 'input-id', method: 'input' as const, value: 'hello' },
-];
+] as const;
