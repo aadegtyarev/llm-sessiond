@@ -1,5 +1,6 @@
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import type { ReplyOutcome } from './types.ts';
 
 export type RecordValue = { [key: string]: unknown };
 export function object(value: unknown): RecordValue {
@@ -14,6 +15,7 @@ export function createPiWire(
   let broken = false;
   let buffer = '';
   const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
+  const writes = new Set<() => void>();
   const pending = new Map<string, {
     command: string; finish: (record: RecordValue | null) => void;
   }>();
@@ -21,6 +23,7 @@ export function createPiWire(
     if (broken) return;
     broken = true;
     for (const request of [...pending.values()]) request.finish(null);
+    for (const finish of [...writes]) finish();
     lost();
   }
   child.stdout.on('data', (chunk: Buffer) => {
@@ -88,5 +91,34 @@ export function createPiWire(
       } catch { fail(); }
     });
   }
-  return { fail, command, get broken() { return broken; } };
+  // UI responses have no command ACK. Resolve only local callback + backpressure.
+  function write(record: RecordValue): Promise<ReplyOutcome> {
+    return new Promise((resolve) => {
+      if (broken) { resolve({ kind: 'unknown' }); return; }
+      let written = false;
+      let drained = true;
+      let settled = false;
+      const finish = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        writes.delete(finish);
+        child.stdin.off('drain', onDrain);
+        resolve({ kind: broken ? 'unknown' : 'written' });
+      };
+      const ready = () => { if (written && drained) finish(); };
+      const onDrain = () => { drained = true; ready(); };
+      const timer = setTimeout(fail, deadlineMs);
+      writes.add(finish);
+      try {
+        drained = child.stdin.write(JSON.stringify(record) + '\n', (error) => {
+          if (error) { fail(); return; }
+          written = true;
+          ready();
+        });
+        if (!drained) child.stdin.once('drain', onDrain);
+      } catch { fail(); }
+    });
+  }
+  return { fail, command, write, get broken() { return broken; } };
 }

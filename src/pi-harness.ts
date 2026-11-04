@@ -2,6 +2,7 @@ import type { HarnessEvent, HarnessPort, PortOutcome } from './types.ts';
 import { launchPi, trackPiExit, type PiLaunch } from './pi-process.ts';
 import { createPiWire, object } from './pi-wire.ts';
 import { createPiRun } from './pi-run.ts';
+import { createPiQuestions } from './pi-questions.ts';
 export type { PiLaunch } from './pi-process.ts';
 
 /** Trusted native Pi 1.5 launch; text is RPC data, never shell arguments. */
@@ -17,9 +18,14 @@ export function createPiHarness(config: PiLaunch = {}): HarnessPort {
     const exit = trackPiExit(child);
     let stopping = false;
     let ready = false;
-    const run = createPiRun((event) => { if (!stopping) emit(event); });
-    const wire = createPiWire(child, deadline, run.event, run.uncertain);
-    return { child, exit, run, wire,
+    const publish = (event: HarnessEvent) => { if (!stopping) emit(event); };
+    const run = createPiRun(publish);
+    const questions = createPiQuestions(publish, record => wire.write(record));
+    const wire = createPiWire(child, deadline, record => {
+      questions.event(record);
+      run.event(record);
+    }, () => { questions.invalidate(); run.uncertain(); });
+    return { child, exit, run, wire, questions,
       get ready() { return ready; },
       setReady() { ready = !stopping && !wire.broken && !exit.exited; },
       stop() { stopping = true; wire.fail(); return exit.stop(stopDeadline); },
@@ -50,6 +56,12 @@ export function createPiHarness(config: PiLaunch = {}): HarnessPort {
       });
       if (!response) { owned.run.uncertain(); return { kind: 'unknown' }; }
       return outcome;
+    },
+    async reply(sessionId, answer) {
+      const owned = sessions.get(sessionId);
+      if (!owned) return { kind: 'rejected' };
+      if (owned.wire.broken || owned.exit.exited) return { kind: 'unknown' };
+      return owned.questions.reply(answer);
     },
     async stop(sessionId) {
       const owned = sessions.get(sessionId);

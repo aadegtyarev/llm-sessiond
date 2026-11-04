@@ -1,5 +1,6 @@
 // Thin protocol responder only: no agent, tools, credentials, or provider access.
 import { afterConsumption, phase, publishFixtureFence } from './pi-child-control.ts';
+import { dialogs } from './pi-interaction-records.ts';
 const readyDelay = Number(process.argv.find(arg => arg.startsWith('--ready-delay='))?.split('=')[1] ?? 0);
 const hold = process.argv.includes('--hold-stop');
 let signals = 0;
@@ -11,6 +12,10 @@ process.stdin.on('end', () => {
   if (!hold) { clearInterval(keepAlive); process.exit(0); }
 });
 let batch: string | null = null;
+let uiReplies: unknown[] = [];
+let uiExpected = 0;
+let uiFinal: unknown[] = [];
+let startupReady: (() => void) | undefined;
 const output = (record: unknown) => {
   const line = JSON.stringify(record) + '\n';
   if (batch !== null) batch += line;
@@ -29,6 +34,24 @@ process.stdin.on('data', (chunk: string) => {
 });
 function handle(line: string) {
   const command = JSON.parse(line);
+  if (command.type === 'extension_ui_response') {
+    phase(`ui-response:${command.id}`);
+    phase(`ui-frame:${JSON.stringify(command)}`);
+    uiReplies.push(command);
+    if (uiReplies.length === uiExpected) {
+      output({ type: 'message_update', assistantMessageEvent: {
+        type: 'text_delta', delta: JSON.stringify(uiReplies),
+      } });
+      uiFinal.forEach(output);
+      if (startupReady) {
+        const ready = startupReady;
+        startupReady = undefined;
+        phase('startup-replies-consumed');
+        ready();
+      }
+    }
+    return; // Native UI responses deliberately have no ACK.
+  }
   const response = (data: unknown, success = true, extra = {}) => output({
     type: 'response', id: command.id, command: command.type, success, data, ...extra,
   });
@@ -41,15 +64,28 @@ function handle(line: string) {
       return;
     }
     const ready = () => {
+      if (process.argv.includes('--startup-status')) output({ type: 'extension_ui_request',
+        id: 'startup', method: 'setStatus', statusKey: 'fixture', statusText: 'loading' });
       output({ type: 'response', id: 'unrelated', command: 'get_state', success: true });
       response({ isStreaming: false, sessionId: String(process.pid) });
       phase('ready');
     };
+    if (process.argv.includes('--startup-questions')) {
+      // Readiness is causally withheld until all three explicit replies arrive.
+      uiExpected = dialogs.length;
+      startupReady = ready;
+      phase('startup-questions');
+      dialogs.forEach(output);
+      return;
+    }
     if (readyDelay) setTimeout(ready, readyDelay); else ready();
     return;
   }
   if (process.argv.includes('--ignore-prompt')) return;
   const scenario = JSON.parse(command.message);
+  uiExpected = scenario.uiExpected ?? 0;
+  uiFinal = scenario.uiFinal ?? [];
+  uiReplies = [];
   phase('prompt'); phase(`prompt:${scenario.fixtureFence}`);
   if (scenario.noAck) return;
   if (scenario.exitBeforeAck) process.exit(0);
