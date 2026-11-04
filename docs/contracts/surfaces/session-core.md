@@ -8,6 +8,8 @@
 
 Одобренный контракт стабильной доставки событий сохранён в истории Git: `git show fce991177105e5a194225061fbf7842f42010441:docs/contracts/features/stable-event-delivery.md`.
 
+Отдельная принятая поверхность harness: [Native Pi text adapter](pi-text-harness.md); она не расширяет гарантии ядра.
+
 ## Операции и наблюдаемые результаты
 
 - `create(sessionId)` создаёт `created` и возвращает `SessionView`; повторный ID отклоняется.

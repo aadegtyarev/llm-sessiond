@@ -1,6 +1,6 @@
 # Pi text harness
 
-Status: approved
+Status: complete — для финальной проверки lifecycle; реализация d6207e6 принята.
 
 ## Goal
 Отдельный HarnessPort для штатного Pi 1.5 subprocess RPC: start, text send,
@@ -8,7 +8,9 @@ Status: approved
 
 ## Affected surfaces
 [Session core](../surfaces/session-core.md) остаётся неизменным.
-Native adapter surface пока отсутствует; контракт активен до независимой приёмки.
+Принятая durable surface: [Pi text harness](../surfaces/pi-text-harness.md).
+Реализация прошла Terra ACCEPT и приёмку родителя; временный контракт удаляется
+после проверки документации согласно метаконтракту.
 
 ## Scenarios
 Readiness подтверждается коррелированным успешным get_state, не spawn;
