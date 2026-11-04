@@ -1,6 +1,6 @@
 # Baseline validation
 
-Статус: одобрено оператором, активно; ожидает независимого review.
+Статус: завершено; проверено родителем и независимым Terra review (ACCEPT).
 
 ## Цель
 Публикуемый защищённый baseline: работающие required CI checks, контракты текущего поведения и узкая защита от возврата архивных ссылок.
@@ -24,4 +24,4 @@ PR и push main запускают checks (Node 24, clean install, typecheck, te
 - Новый узкий Node doc regression принимает current links и отвергает git-show/deleted feature references.
 - Focused test, полный typecheck/tests, Pi sentinel 1032, docs checker и diff scope проходят; actual GitHub checks проверяются на pushed SHA.
 - Donor и исходный interaction checkout не меняются; meaningful commits и обычный fast-forward push только в PR #3.
-Контракт остаётся активным до review/завершения родителем.
+Финальная проверка: typecheck PASS, полный набор 1161/1161, focused guard 11/11, docs checker 6 файлов и diff scope PASS. На принятом implementation head required checks/gitleaks PASS. Первый CI attempt имел недиагностированный сбой существующего fake-child теста; один разрешённый повтор прошёл, причина не установлена. Runtime и существующие тесты не менялись. Временный контракт готов к удалению по lifecycle; финальные checks после удаления проверяются отдельно.
