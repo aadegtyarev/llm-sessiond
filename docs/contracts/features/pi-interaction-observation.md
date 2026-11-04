@@ -1,6 +1,7 @@
 # Наблюдение взаимодействий Native Pi
 
-Статус: одобрено оператором; запись контракта, до валидации и реализации.
+Статус: одобрено; baseline выполнен, подтверждённые пробелы разрешено исправить.
+Действует [контракт разработки](../development.md); фича остаётся active до приёмки.
 
 ## Цель и граница
 
@@ -42,10 +43,9 @@ Native `extension_ui_response` не имеет обычного ACK: запис�
 input retry/replay/fallback; ACK не settlement; точное владение либо explicit
 unknown; session-scoped text; snapshot получателей при publish, FIFO и изоляция.
 Наблюдения не должны обходить эти гарантии или воскрешать остановленную сессию.
-Production core/interface остаются в четырёх файлах: `src/contracts.ts`,
-`src/core.ts`, `src/events.ts`, `src/harness-session.ts`. Все authored files ≤100
-физических строк; не codegolf. Если ясное решение не помещается — остановиться
-и запросить одобрение, не расширять ограничения молча.
+Production core/interface остаются в четырёх файлах: `src/types.ts`,
+`src/core.ts`, `src/events.ts`, `src/harness-session.ts`. Искусственный лимит
+100 строк отменён оператором; ясность и разделение по ответственности обязательны.
 
 Не публиковать private config, raw RPC, stderr, credentials и private diagnostics.
 Явные tool/question payload для отображения отделяются от private diagnostics;
@@ -53,7 +53,8 @@ Production core/interface остаются в четырёх файлах: `src/
 Реальные вызовы модели/tools разрешены лишь для bounded validation. Файловые
 эффекты модели — только task-owned temp directories, не репозиторий/user files.
 Не читать секретные конфиги напрямую; не менять установку Pi 1.5.0, зависимости,
-node_modules donor, global config или соседние проекты; без remote Git/deploy.
+node_modules donor, global config или соседние проекты; без deploy.
+Публикация feature branch/PR и required CI разрешены штатным workflow.
 Native resources не отключать, Pi SDK/runtime dependency не добавлять.
 
 ## Нецели
@@ -79,5 +80,5 @@ UI/client, внешний API, permissions engine, произвольный nati
 
 Приёмка требует воспроизводимых результатов до/после, списка подтверждённых
 исправлений и остаточных ограничений; нет обещания arbitrary native parity.
-Этот шаг только сохраняет контракт отдельным локальным commit: без production,
-test, dependency/config изменений, fixture и запуска модели.
+Baseline evidence сохранено в task artifacts; paid baseline не повторяется.
+После fake regression checks повторяется тот же bounded native сценарий.
