@@ -1,5 +1,6 @@
 import type { HarnessEvent, PortOutcome } from './contracts.ts';
 import { object, type RecordValue } from './pi-wire.ts';
+import { assistantStopReason } from './pi-assistant.ts';
 
 type Input = { inputId: string; started: boolean; boundary: boolean; reason?: unknown };
 export function createPiRun(emit: (event: HarnessEvent) => void) {
@@ -42,7 +43,10 @@ export function createPiRun(emit: (event: HarnessEvent) => void) {
     }
     if (record.type === 'message_end' && input?.boundary) {
       const message = object(record.message);
-      if (message.role === 'assistant') input.reason = message.stopReason;
+      if (message.role === 'assistant' || typeof message.role !== 'string') {
+        // A malformed later assistant must discard any earlier terminal evidence.
+        input.reason = assistantStopReason(record.message);
+      }
     }
     if (record.type === 'agent_settled') {
       nativeActive = false;
