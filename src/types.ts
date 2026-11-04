@@ -34,12 +34,12 @@ export type QuestionReply = { readonly requestId: string } & (
 // A successful local write is NOT evidence of native receipt or consumption.
 export type ReplyOutcome = { kind: 'written' } | { kind: 'rejected' } | { kind: 'unknown' };
 export type InteractionEvent =
-  | { type: 'tool'; phase: 'start'; toolCallId: string; toolName: string; args: DisplayValue }
-  | { type: 'tool'; phase: 'update'; toolCallId: string; toolName: string; args: DisplayValue; partialResult: DisplayValue }
-  | { type: 'tool'; phase: 'end'; toolCallId: string; toolName: string; result: DisplayValue; isError: boolean; durationMs?: number }
-  | { type: 'question'; question: NativeQuestion }
-  | { type: 'notification'; method: 'setStatus'; statusKey: string; statusText?: string }
-  | { type: 'notification'; method: 'notify'; message: string; level: 'info' | 'warning' | 'error' };
+  | { readonly type: 'tool'; readonly phase: 'start'; readonly toolCallId: string; readonly toolName: string; readonly args: DisplayValue }
+  | { readonly type: 'tool'; readonly phase: 'update'; readonly toolCallId: string; readonly toolName: string; readonly args: DisplayValue; readonly partialResult: DisplayValue }
+  | { readonly type: 'tool'; readonly phase: 'end'; readonly toolCallId: string; readonly toolName: string; readonly result: DisplayValue; readonly isError: boolean; readonly durationMs?: number }
+  | { readonly type: 'question'; readonly question: NativeQuestion }
+  | { readonly type: 'notification'; readonly method: 'setStatus'; readonly statusKey: string; readonly statusText?: string }
+  | { readonly type: 'notification'; readonly method: 'notify'; readonly message: string; readonly level: 'info' | 'warning' | 'error' };
 
 export type HarnessEvent =
   | InteractionEvent

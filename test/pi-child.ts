@@ -1,5 +1,6 @@
 // Thin protocol responder only: no agent, tools, credentials, or provider access.
 import { afterConsumption, phase, publishFixtureFence } from './pi-child-control.ts';
+import { dialogs } from './pi-interaction-records.ts';
 const readyDelay = Number(process.argv.find(arg => arg.startsWith('--ready-delay='))?.split('=')[1] ?? 0);
 const hold = process.argv.includes('--hold-stop');
 let signals = 0;
@@ -14,6 +15,7 @@ let batch: string | null = null;
 let uiReplies: unknown[] = [];
 let uiExpected = 0;
 let uiFinal: unknown[] = [];
+let startupReady: (() => void) | undefined;
 const output = (record: unknown) => {
   const line = JSON.stringify(record) + '\n';
   if (batch !== null) batch += line;
@@ -34,12 +36,19 @@ function handle(line: string) {
   const command = JSON.parse(line);
   if (command.type === 'extension_ui_response') {
     phase(`ui-response:${command.id}`);
+    phase(`ui-frame:${JSON.stringify(command)}`);
     uiReplies.push(command);
     if (uiReplies.length === uiExpected) {
       output({ type: 'message_update', assistantMessageEvent: {
         type: 'text_delta', delta: JSON.stringify(uiReplies),
       } });
       uiFinal.forEach(output);
+      if (startupReady) {
+        const ready = startupReady;
+        startupReady = undefined;
+        phase('startup-replies-consumed');
+        ready();
+      }
     }
     return; // Native UI responses deliberately have no ACK.
   }
@@ -61,6 +70,14 @@ function handle(line: string) {
       response({ isStreaming: false, sessionId: String(process.pid) });
       phase('ready');
     };
+    if (process.argv.includes('--startup-questions')) {
+      // Readiness is causally withheld until all three explicit replies arrive.
+      uiExpected = dialogs.length;
+      startupReady = ready;
+      phase('startup-questions');
+      dialogs.forEach(output);
+      return;
+    }
     if (readyDelay) setTimeout(ready, readyDelay); else ready();
     return;
   }

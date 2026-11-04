@@ -38,9 +38,10 @@ export function interactionEvent(record: RecordValue): InteractionEvent | null {
         ...(record.statusText === undefined ? {} : { statusText: record.statusText }) };
     }
     if (record.method === 'notify' && typeof record.message === 'string'
-      && (record.notifyType === undefined || ['info', 'warning', 'error'].includes(String(record.notifyType)))) {
+      && (record.notifyType === undefined || record.notifyType === 'info'
+        || record.notifyType === 'warning' || record.notifyType === 'error')) {
       return { type: 'notification', method: 'notify', message: record.message,
-        level: (record.notifyType ?? 'info') as 'info' | 'warning' | 'error' };
+        level: record.notifyType ?? 'info' };
     }
     const request = question(record);
     return request ? { type: 'question', question: request } : null;

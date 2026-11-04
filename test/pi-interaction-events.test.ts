@@ -20,6 +20,28 @@ for (const record of [...tools, ...dialogs, ...notifications]) {
   });
 }
 
+for (const level of [undefined, 'info', 'warning', 'error']) {
+  test(`pi-interaction-events: notify severity preserves actual string/default ${level}`, () => {
+    const record = { type: 'extension_ui_request', method: 'notify', message: 'benign shape probe',
+      ...(level === undefined ? {} : { notifyType: level }),
+      opaqueUnused: { notifyType: ['warning'] } };
+    assert.deepEqual(interactionEvent(record), {
+      type: 'notification', method: 'notify', message: record.message, level: level ?? 'info',
+    });
+  });
+}
+
+for (const notifyType of [
+  ...['info', 'warning', 'error'].map(level => [level]),
+  [], ['info', 'warning'], [['error']], { level: 'info' }, { 0: 'warning' },
+  null, false, true, 0, 1, '', 'INFO', 'other',
+]) {
+  test(`pi-interaction-events: rejects malformed notify severity ${JSON.stringify(notifyType)}`, () => {
+    assert.equal(interactionEvent({ type: 'extension_ui_request', method: 'notify',
+      message: 'benign shape probe', notifyType }), null);
+  });
+}
+
 const malformed = [
   ...tools.map(record => ({ ...record, toolCallId: '' })),
   ...tools.map(record => ({ ...record, toolName: 42 })),
