@@ -63,14 +63,15 @@ send получит unknown, explicit stop использует сохранён
 Нет гарантии finished-all-background, cleanup descendants/remote ресурсов,
 UI/permission dialogs, произвольного session replacement или sandbox.
 Не происходит скрытого approve/cancel. Native tools сохраняют права child.
-Нет native inference/model/auth end-to-end гарантии: проверен fake RPC protocol,
-а не реальные provider/credentials. Реальная генерация требует отдельного consent.
+Нет общей native inference/model/auth end-to-end гарантии или полной native parity.
+Автоматические тесты проверяют fake RPC protocol; отдельно разрешённая native
+валидация не заменяет это покрытие и не расширяет гарантии адаптера.
+Реальная генерация требует отдельного consent. Публичные tool/question/status
+observations и native replies не поддерживаются.
 
-## Проверки и история
+## Проверки
 
 `npm run typecheck` и `npm test`: fake Node RPC child и bounded run/wire tests
 проверяют ownership, mandatory DTO/malformed outcomes, output/privacy, retries,
 uncertainty, observed-exit cleanup и сохранение launch defaults/resources.
 Правила lifecycle — [метаконтракт](../meta-contract.md).
-Принятый feature-контракт сохранён в Git:
-`git show d6207e6704c7fa79aed963c40d343a37f5e69b04:docs/contracts/features/pi-text-harness.md`.
