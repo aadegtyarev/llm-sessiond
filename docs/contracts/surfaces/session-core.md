@@ -18,7 +18,7 @@
 - `subscribe(listener)` подписывает на `session`, `input`, `text` и возвращает функцию отписки. Прошлые события не воспроизводятся.
 - `stop(sessionId)` возвращает представление при подтверждённой остановке; `shutdown()` возвращает сводку остановок.
 
-Сигнатуры и типы: [core.ts](../../../src/core.ts), [contracts.ts](../../../src/contracts.ts). Управление жизненным циклом: [harness-session.ts](../../../src/harness-session.ts); события и проекции: [events.ts](../../../src/events.ts).
+Сигнатуры и типы: [core.ts](../../../src/core.ts), [types.ts](../../../src/types.ts). Управление жизненным циклом: [harness-session.ts](../../../src/harness-session.ts); события и проекции: [events.ts](../../../src/events.ts).
 
 ## Ввод, события и идентичность
 

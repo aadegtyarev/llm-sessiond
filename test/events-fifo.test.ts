@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { CoreEvent } from '../src/contracts.ts';
+import type { CoreEvent } from '../src/types.ts';
 import { createEventPublisher } from '../src/events.ts';
 
 function eventOf(type: CoreEvent['type'], id: string): CoreEvent {

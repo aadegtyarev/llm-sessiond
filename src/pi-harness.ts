@@ -1,4 +1,4 @@
-import type { HarnessEvent, HarnessPort, PortOutcome } from './contracts.ts';
+import type { HarnessEvent, HarnessPort, PortOutcome } from './types.ts';
 import { launchPi, trackPiExit, type PiLaunch } from './pi-process.ts';
 import { createPiWire, object } from './pi-wire.ts';
 import { createPiRun } from './pi-run.ts';

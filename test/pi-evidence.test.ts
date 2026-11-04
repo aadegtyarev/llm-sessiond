@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { test } from 'node:test';
 import { SessionCore } from '../src/core.ts';
 import { fixtureHealth } from './pi-fixture-health.ts';
-import type { HarnessPort } from '../src/contracts.ts';
+import type { HarnessPort } from '../src/types.ts';
 import { final, fixture } from './pi-support.ts';
 
 for (const disposition of ['handled', 'queued']) {

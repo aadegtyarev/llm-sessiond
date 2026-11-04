@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import type { HarnessEvent } from '../src/contracts.ts';
+import type { HarnessEvent } from '../src/types.ts';
 import { createPiRun } from '../src/pi-run.ts';
 import { boundary, fixture, message, settled } from './pi-support.ts';
 import { malformedAssistants } from './pi-assistant-cases.ts';
