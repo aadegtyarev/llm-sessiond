@@ -30,20 +30,32 @@ export function acceptHarnessEvent(
 
 export function createEventPublisher() {
   const subscribers = new Set<(event: CoreEvent) => unknown>();
+  const pending: { event: CoreEvent; recipients: ((event: CoreEvent) => unknown)[] }[] = [];
+  let delivering = false;
   return {
     subscribe(listener: (event: CoreEvent) => unknown): () => void {
       subscribers.add(listener);
       return () => subscribers.delete(listener);
     },
     publish(event: CoreEvent): void {
-      const publicEvent = Object.freeze(event);
-      for (const subscriber of subscribers) {
-        try {
-          const result = subscriber(publicEvent);
-          if (result && typeof (result as PromiseLike<unknown>).then === 'function') void Promise.resolve(result).catch(() => {});
-        } catch {
-          // A subscriber cannot interrupt another observer or core operation.
+      pending.push({ event: Object.freeze(event), recipients: [...subscribers] });
+      if (delivering) return;
+      delivering = true;
+      try {
+        // Reentrant publications keep their publish-time recipients and wait their turn.
+        while (pending.length > 0) {
+          const delivery = pending.shift()!;
+          for (const subscriber of delivery.recipients) {
+            try {
+              const result = subscriber(delivery.event);
+              if (result && typeof (result as PromiseLike<unknown>).then === 'function') void Promise.resolve(result).catch(() => {});
+            } catch {
+              // Synchronous subscriber errors are isolated; callbacks are not sandboxed.
+            }
+          }
         }
+      } finally {
+        delivering = false;
       }
     },
   };
