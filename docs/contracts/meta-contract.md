@@ -13,15 +13,7 @@ Prefer two linked kinds of contract:
 
 Use semantic filenames, lowercase kebab-case, without dates. A date may appear in the document's metadata when useful. Link related contracts rather than duplicating their requirements. Create a separate surface document only where it has a coherent boundary, independent consumers or guarantees, and can be understood without repeating another contract.
 
-## One feature — one agreed complete slice
-
-Approve a feature contract only for a wholly achievable end-to-end result with concrete acceptance criteria, validation, and constraints. If it already requires splitting into partial deliveries or missing independent foundations, do not approve that contract; first propose a different, coherent, achievable result.
-
-After approval, do not expand scope, split the promised feature into subtasks, micro-contracts, or partial deliveries, or defer promised functionality. Internal implementation steps, commits, roles, and test/review/fix cycles are allowed within the same work and do not require approval for each detail; they are not separate deliveries. Only explicitly requested independent features may be delivered separately.
-
-Complete the entire promised result, including validation, required CI, and acceptance. Do not declare individual milestones a completed feature. If completion becomes genuinely impossible or scope must change, stop and ask the operator instead of unilaterally splitting or deferring the result.
-
-Do not impose arbitrary file-line ceilings or split cohesive code to satisfy a line counter. Decompose genuinely large files by responsibility.
+Execution of agreed work is governed by the mandatory [development contract](development.md).
 
 ## Current-state surface contracts
 
