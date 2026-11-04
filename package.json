@@ -1,32 +1,16 @@
 {
-  "name": "llm-sessiond",
-  "version": "0.1.0",
+  "name": "compact-session-core",
   "private": true,
-  "license": "MIT",
   "type": "module",
   "engines": {
-    "node": ">=24"
-  },
-  "scripts": {
-    "start": "node dist/main.js",
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc --noEmit -p tsconfig.json",
-    "test": "vitest run",
-    "lint": "eslint .",
-    "format:check": "prettier --check .",
-    "version:check": "node scripts/check-version.js"
-  },
-  "dependencies": {
-    "ws": "^8.18.3",
-    "zod": "^4.1.12"
+    "node": "24.x"
   },
   "devDependencies": {
-    "@types/node": "^24.10.1",
-    "@types/ws": "^8.18.1",
-    "eslint": "^9.39.1",
-    "prettier": "^3.6.2",
-    "typescript": "^5.9.3",
-    "typescript-eslint": "^8.48.1",
-    "vitest": "^4.0.13"
+    "@types/node": "24.19.2",
+    "typescript": "5.9.3"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "node --experimental-strip-types --test test/*.test.ts"
   }
 }

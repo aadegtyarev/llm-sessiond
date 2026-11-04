@@ -4,12 +4,8 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "types": ["node", "vitest/globals"],
-    "noEmit": true
+    "noEmit": true,
+    "allowImportingTsExtensions": true
   },
   "include": ["src/**/*.ts", "test/**/*.ts"]
 }

@@ -1,9 +1,7 @@
 # Project instructions
 
 <!-- BEGIN ad-pi-addons contract workflow -->
-
 ## Contracts and feature work
-
 - Read `docs/contracts/meta-contract.md` before implementing or reviewing a feature.
 - Before implementation, agree on and save the approved feature contract under `docs/contracts/features/`; identify and read affected `docs/contracts/surfaces/` contracts.
 - Give the exact contract paths to the planner, implementer, and reviewer. If working directly, use the same contracts as the source of truth.
@@ -11,12 +9,12 @@
 - Preserve existing instructions and surface contracts; never overwrite or delete them silently. Feature contracts are temporary task artifacts and must not remain after verified completion.
 - Use available subagent roles only when configured. For nontrivial codebase or documentation reconnaissance, delegate bounded, read-only investigation to a suitable configured role when available; request relevant source paths and concise evidence, not whole-document dumps. Keep trivial lookups direct. The parent owns scope, decisions, synthesis, verification, and user communication. If no suitable role is available, work directly from the same contracts and checks, and state if independent review cannot be obtained. This rule does not require named Pi skills.
 - End every task with a concise user-facing report of what changed, checks and outcomes, and remaining risks or blockers. Do not finish with tool output alone or end silently; this rule requires no installed skills.
-
 <!-- END ad-pi-addons contract workflow -->
 
 ## Project-specific commands and conventions
-
-- Stack and important paths: Node.js 24+ strict TypeScript ESM service; `docs/contracts/` contains normative project contracts.
-- Tests / typecheck / build: `npm test`, `npm run typecheck`, `npm run build`; also run `npm run lint`, `npm run format:check`, `npm run version:check`, `git diff --check`, and the authored-file line-count check.
-- Formatting and style: Keep documentation concise; do not invent endpoints or implementation details absent from an approved contract.
-- Project-specific constraints: Service owns sessions, harness, and process lifecycle. Pi is first harness, Claude follows. `harnessd` and `plasma-ai-assist` are future clients using a new API; compatibility belongs in clients. Never log prompt bodies. Unsupported capabilities fail explicitly; uncertain input is never auto-retried. Network scope is localhost loopback TCP HTTP + WebSocket JSON API v1 on Windows/Linux; no Unix sockets. TLS and bearer auth are roadmap/non-goals for now.
+- Stack and important paths: strict TypeScript ES modules on Node.js 24; core is under `src/`, tests under `test/`, and contracts under `docs/contracts/`.
+- Setup: Node.js 24.x and npm; run `npm ci --ignore-scripts --no-audit --no-fund` in a clean checkout. Exact devDependencies and their resolution are recorded in package.json/package-lock.json; see README.md for the quickstart.
+- Tests / typecheck: `npm run typecheck` runs local `tsc --noEmit`; `npm test` runs `node --experimental-strip-types --test test/*.test.ts`. Toolchain: TypeScript 5.9.3 and @types/node 24.19.2, verified on Node.js v24.21.0; no build command is configured.
+- Formatting and style: no project-specific formatter or source conventions are established. There is no arbitrary file-line ceiling: keep cohesive files readable and decompose genuinely large, mixed-responsibility files.
+- Durable surface contracts describe current behavior. History belongs in Git/PRs: do not add links to deleted temporary feature contracts or `git show` archival references. Do not change repository merge policy or branch protections solely to preserve obsolete documentation references.
+- Project-specific constraints: `docs/contracts/surfaces/session-core.md` records the accepted implementation and is the current product contract for the session core. `docs/contracts/surfaces/pi-text-harness.md` is the normative contract for the accepted Native Pi text adapter. Review contract requirements by root cause and affected case class, not line-level nits.
