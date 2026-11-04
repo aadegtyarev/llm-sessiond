@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { boundary, final, fixture, message, settled, until } from './pi-support.ts';
+import { boundary, final, fixture, message, settled } from './pi-support.ts';
 
 for (const [reason, aborted, expected] of [
   ['stop', false, 'completed'], ['error', false, 'definitive'],
@@ -15,7 +15,7 @@ for (const [reason, aborted, expected] of [
     assert.equal((await f.start()).kind, 'confirmed');
     const records = final(reason, aborted === undefined ? null : aborted);
     assert.equal((await f.send({ records })).kind, 'confirmed');
-    await until(() => f.events.some((e) => e.type !== 'text'));
+    await f.until(() => f.events.some((e) => e.type !== 'text'), 'terminal evidence');
     assert.deepEqual(f.events, [expected === 'completed'
       ? { type: 'input-completed', inputId: 'i' }
       : { type: 'input-failed', inputId: 'i', certainty: expected }]);
@@ -31,7 +31,7 @@ for (const records of [
     const f = await fixture(t);
     await f.start();
     await f.send({ records });
-    await until(() => f.events.length > 0);
+    await f.until(() => f.events.length > 0, 'missing evidence terminal');
     assert.deepEqual(f.events, [{ type: 'input-failed', inputId: 'i', certainty: 'unknown' }]);
   });
 }
@@ -50,7 +50,7 @@ test('pi retries stay native; last final assistant evidence wins', async (t) => 
   await f.send({ records: [boundary, message('error'),
     { type: 'agent_end', willRetry: true }, { type: 'auto_retry_start' },
     ...final()] });
-  await until(() => f.events.length > 0);
+  await f.until(() => f.events.length > 0, 'recovered terminal');
   assert.deepEqual(f.events, [{ type: 'input-completed', inputId: 'i' }]);
 });
 

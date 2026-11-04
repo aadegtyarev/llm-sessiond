@@ -30,4 +30,4 @@ src/, package/lock/tsconfig, native API/гарантии и политики fro
 5. Meaningful verified commits, обычный fast-forward push только PR #3; original interaction checkout и donor неизменны. Lifecycle завершает родитель после независимого review.
 
 ## Текущий этап
-Сначала фиксируется только этот одобренный контракт, до planning/implementation. На этом этапе нет code/probe/model/push и claims об устранении CI failures.
+Контракт зафиксирован до planning/implementation. Реализация test-only seam и bounded validation выполняются по этому контракту; он остаётся активным до свежего независимого review. Старые CI failures сохраняются как evidence, их точная причина не объявляется доказанной.

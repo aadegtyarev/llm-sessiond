@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { HarnessEvent } from '../src/contracts.ts';
 import { createPiRun } from '../src/pi-run.ts';
-import { boundary, fixture, message, settled, until } from './pi-support.ts';
+import { boundary, fixture, message, settled } from './pi-support.ts';
 import { malformedAssistants } from './pi-assistant-cases.ts';
 
 const outcomes = [['stop', false], ['error', false], ['aborted', true]] as const;
@@ -74,7 +74,7 @@ for (const [reason, aborted] of outcomes) {
         { type: 'message_end', message: { role: 'assistant', stopReason: reason } },
         settled(aborted),
       ] });
-      await until(() => f.events.length > 0);
+      await f.until(() => f.events.length > 0, 'malformed assistant terminal');
       assert.deepEqual(f.events, unknown);
       assert.equal((await f.send({ records: [] }, 'next')).kind, 'unknown');
     });
