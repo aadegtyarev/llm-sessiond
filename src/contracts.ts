@@ -59,5 +59,6 @@ export interface SessionRecord {
   readonly inputIds: Set<string>;
   generation: number;
   stopRequested: boolean;
+  stopInFlight: boolean;
   startOutcomeWhileStopping: PortOutcome | null;
 }

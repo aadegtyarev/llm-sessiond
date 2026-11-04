@@ -3,7 +3,10 @@ import { acceptHarnessEvent, inputView, sessionView } from './events.ts';
 
 
 export function createSessionRecord(id: string): SessionRecord {
-  return { id, status: 'created', input: null, inputIds: new Set(), generation: 0, stopRequested: false, startOutcomeWhileStopping: null };
+  return {
+    id, status: 'created', input: null, inputIds: new Set(), generation: 0,
+    stopRequested: false, stopInFlight: false, startOutcomeWhileStopping: null,
+  };
 }
 
 export async function startHarnessSession(
@@ -37,11 +40,15 @@ export async function stopHarnessSession(
     return 'confirmed';
   }
   if (session.status === 'stopped' || session.status === 'failed') return 'rejected';
-  if (session.stopRequested) return 'unknown';
+  if (session.stopInFlight) return 'unknown';
+  const stopPreviouslyRequested = session.stopRequested;
   session.stopRequested = true;
+  session.stopInFlight = true;
   const outcome = await callPort(() => port.stop(session.id));
+  session.stopInFlight = false;
   if (outcome.kind === 'rejected') {
-    session.stopRequested = false;
+    // A rejected cleanup cannot undo uncertainty from an earlier stop.
+    session.stopRequested = stopPreviouslyRequested;
     const startOutcome = session.startOutcomeWhileStopping;
     session.startOutcomeWhileStopping = null;
     if (startOutcome && session.status === 'starting') {
