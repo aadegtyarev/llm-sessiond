@@ -74,4 +74,7 @@ Production-ядро и интерфейсы ограничены четырьм�
 
 ## Проверка изменений
 
+Подготовка окружения и минимальный проверенный сценарий: [README](../../../README.md).
+Принятый контракт developer entrypoint сохранён в истории Git: `git show 742d7fed58ea1e9defe82dd45865905ae97bc2d1:docs/contracts/features/developer-entrypoint.md`.
+
 `npm run typecheck` и `npm test` проверяют фактическое ядро с тонким поддельным `HarnessPort`, без модели и платных SDK. Регрессии включают обычный поток, точные ID, раннее завершение, изоляцию сессий, stale events, явную cleanup после uncertainty, concurrent/reentrant вызовы, изменения подписок, фиксацию получателей при enqueue, FIFO вложенных событий всех трёх типов и ошибки подписчиков.

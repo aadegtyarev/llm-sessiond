@@ -1,6 +1,6 @@
 # Воспроизводимый developer entrypoint
 
-Статус: одобрен, активен; 2026-07-10. Финализация после parent acceptance.
+Статус: complete для финальной проверки; реализация принята родителем после Terra review и независимой clean-copy проверки.
 
 ## Цель и наблюдаемое поведение
 
@@ -46,4 +46,4 @@ Scope: package.json, package-lock.json, README.md, точечные dev-кома
 npm run typecheck, npm test, выполнение README-примера.
 Затем docs checker, git diff --check, сравнение runtime с e377c7810abbca1868be17116cb040d8352a8651
 и проверка donor device:inode 66307:116392234. Сохранить полный committed diff и лог вне repo.
-Контракт остаётся активным до независимого review и parent acceptance.
+Независимый review и parent acceptance завершены; после финальной проверки документации временный контракт удаляется по lifecycle.
