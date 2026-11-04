@@ -49,7 +49,11 @@ JS
 
 ## Нецели
 
-Это не готовый daemon/CLI или интеграция с моделью. Здесь нет native adapters,
-HTTP/SDK, persistence, истории, восстановления и автоматических retry.
+Это не готовый daemon/CLI. HTTP/SDK, persistence, истории, восстановления и
+автоматических retry здесь нет. Native Pi 1.5 RPC entrypoint —
+`createPiHarness` из [src/pi-harness.ts](src/pi-harness.ts), передаваемый в `SessionCore`.
+Он сохраняет native tools/resources; handled/queued и недоказанные terminal исходы
+оставляют input unknown до явной cleanup. Реальная генерация не проверена;
+тесты используют только fake Node child.
 Harness владеет моделью, инструментами и процессом; ядро хранит только текущее
 состояние в памяти. Полный перечень ограничений — в нормативном контракте выше.

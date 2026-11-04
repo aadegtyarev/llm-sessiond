@@ -11,11 +11,14 @@ Status: approved
 Native adapter surface пока отсутствует; контракт активен до независимой приёмки.
 
 ## Scenarios
-Readiness подтверждается коррелированным успешным get_state, не spawn.
+Readiness подтверждается коррелированным успешным get_state, не spawn;
+ошибка readiness оставляет start unknown и owned child доступным cleanup.
+Коррелированный prompt success=false до acceptance даёт rejected, без raw error.
 Свой prompt ACK started и следующий причинный agent_start связывают input с run.
 agent_end и промежуточные retry/error не терминальны; кандидат — agent_settled.
-Финальный assistant stopReason stop/toolUse при aborted=false означает completed;
-error/aborted означает definitive failed только с согласованным финальным evidence.
+Финальный assistant stopReason=stop при aborted=false означает completed;
+error+aborted=false / aborted+aborted=true означает definitive failed только для
+своего run. toolUse/length/прочие, отсутствующие или противоречивые evidence — unknown.
 Недостающее/противоречивое evidence означает input-failed certainty unknown.
 handled/queued/неизвестная disposition возвращает unknown: последующие анонимные
 runs не принадлежат такому input. Core блокирует send до явной cleanup.
@@ -55,3 +58,12 @@ npm run typecheck; npm test (118 старых тестов плюс новые);
 git diff --check; budgets/donor/core/dependency/config diff; clean local commits.
 Реальная Pi/model/provider генерация и credentials reads запрещены без отдельного
 operator consent. Независимая приёмка нужна перед завершением контракта.
+
+## Native evidence
+Pi 1.5.0 docs/rpc.md, rpc-commands.md, json.md, message-types.md описывают
+JSONL, dispositions, final message и settled. dist/modes/rpc/rpc-mode.js:298-317
+публикует ACK preflight; dist/core/agent-session.js:1435-1489 даёт ACK перед
+agent.prompt и settled после recovery; :696-718 отделяет deferred background;
+:1649-1736 сохраняет native interception/commands/templates. pi-agent-core
+ dist/agent.js:340-404 создаёт финальный assistant error/aborted при failure.
+SDK не импортируется, native inference этим evidence не проверен.
