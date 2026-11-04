@@ -1,5 +1,5 @@
 // Thin protocol responder only: no agent, tools, credentials, or provider access.
-import { afterConsumption, phase } from './pi-child-control.ts';
+import { afterConsumption, phase, publishFixtureFence } from './pi-child-control.ts';
 const readyDelay = Number(process.argv.find(arg => arg.startsWith('--ready-delay='))?.split('=')[1] ?? 0);
 const hold = process.argv.includes('--hold-stop');
 let signals = 0;
@@ -78,9 +78,7 @@ function handle(line: string) {
       if (scenario.laterGate) afterConsumption(scenario.laterGate, later);
       else setTimeout(later, scenario.laterDelay ?? 150);
     }
-    if (scenario.fixtureFence && !scenario.omitFence) output({ type: 'message_update', assistantMessageEvent: {
-      type: 'text_delta', delta: scenario.fixtureFence,
-    } });
+    publishFixtureFence(scenario, output);
     phase('records');
     if (batch !== null) { process.stdout.write(batch); batch = null; }
     afterConsumption(scenario.fixtureGate, () => {

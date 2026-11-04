@@ -9,7 +9,7 @@ import { fixtureHealth } from './pi-fixture-health.ts';
 import { hostCloseEvidence } from './pi-host-close.ts';
 export { boundary, message, settled, final } from './pi-records.ts';
 export async function fixture(t: TestContext, flags: string[] = [], commandDeadlineMs = allowanceMs,
-  observationMs = allowanceMs) {
+  fault?: { sessionId: string; inputId: string; observationMs: number }) {
   const trace = phaseTrace();
   const health = fixtureHealth();
   const host = hostCloseEvidence();
@@ -26,7 +26,7 @@ export async function fixture(t: TestContext, flags: string[] = [], commandDeadl
   const fenceTokens = new Set<string>();
   let sequence = 0;
   const diagnostics = () => `outcomes=${outcomes.join(',')}; phases=${trace.phases().join(',')}`;
-  const observe = (predicate: () => boolean, phase = 'wire event', timeoutMs = observationMs) =>
+  const observe = (predicate: () => boolean, phase = 'wire event', timeoutMs = allowanceMs) =>
     health.run('observation', () => until(predicate, phase, timeoutMs, diagnostics));
   t.after(async () => {
     try {
@@ -65,6 +65,8 @@ export async function fixture(t: TestContext, flags: string[] = [], commandDeadl
     async send(id, input, text) {
       assert.ok(confirmed.has(id), `send requires confirmed readiness; ${diagnostics()}`);
       const exercise = usable.has(id);
+      const timeoutMs = fault?.sessionId === id && fault.inputId === input
+        ? fault.observationMs : allowanceMs;
       const fence = `fixture-fence:${++sequence}`;
       fenceTokens.add(fence);
       const scenario = exercise ? JSON.parse(text) : {};
@@ -74,10 +76,10 @@ export async function fixture(t: TestContext, flags: string[] = [], commandDeadl
       const result = await raw.send(id, input, payload);
       outcomes.push(`send:${result.kind}`);
       if (result.kind === 'unknown') usable.delete(id);
-      if (exercise) await observe(() => trace.count(`prompt:${fence}`) === 1, 'prompt reached child');
+      if (exercise) await observe(() => trace.count(`prompt:${fence}`) === 1, 'prompt reached child', timeoutMs);
       if (exercise && !scenario.noAck && !scenario.delayAck && !scenario.exitBeforeAck
         && !scenario.wrongCommand) {
-        await observe(() => fences.has(fence), 'prompt records consumed');
+        await observe(() => fences.has(fence), 'prompt records consumed', timeoutMs);
         if (gate) trace.release(gate);
       }
       return result;

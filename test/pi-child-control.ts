@@ -18,3 +18,15 @@ export function afterConsumption(gate: string | undefined, action: () => void) {
   const watcher = watch(directory, check);
   check();
 }
+
+export function publishFixtureFence(scenario: {
+  fixtureFence?: string; omitFence?: boolean; fenceGate?: string;
+}, output: (record: unknown) => void) {
+  if (!scenario.fixtureFence || scenario.omitFence) return;
+  if (scenario.fenceGate) phase(`fence-held:${scenario.fenceGate}`);
+  afterConsumption(scenario.fenceGate, () => output({
+    type: 'message_update', assistantMessageEvent: {
+      type: 'text_delta', delta: scenario.fixtureFence,
+    },
+  }));
+}

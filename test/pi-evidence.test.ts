@@ -23,6 +23,9 @@ for (const disposition of ['handled', 'queued']) {
         assert.match(result.stdout, /probe body accepted isolated unknown/);
         assert.match(result.stdout, /owned host cleanup confirmed/);
         assert.match(result.stdout, /fixture health failure/);
+        if (fault === 'parallel') {
+          assert.match(result.stdout, /healthy actor observed after fault budget: /);
+        }
         t.diagnostic(result.stdout);
       }
     });
