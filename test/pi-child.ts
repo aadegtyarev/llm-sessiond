@@ -11,6 +11,9 @@ process.stdin.on('end', () => {
   if (!hold) { clearInterval(keepAlive); process.exit(0); }
 });
 let batch: string | null = null;
+let uiReplies: unknown[] = [];
+let uiExpected = 0;
+let uiFinal: unknown[] = [];
 const output = (record: unknown) => {
   const line = JSON.stringify(record) + '\n';
   if (batch !== null) batch += line;
@@ -29,6 +32,17 @@ process.stdin.on('data', (chunk: string) => {
 });
 function handle(line: string) {
   const command = JSON.parse(line);
+  if (command.type === 'extension_ui_response') {
+    phase(`ui-response:${command.id}`);
+    uiReplies.push(command);
+    if (uiReplies.length === uiExpected) {
+      output({ type: 'message_update', assistantMessageEvent: {
+        type: 'text_delta', delta: JSON.stringify(uiReplies),
+      } });
+      uiFinal.forEach(output);
+    }
+    return; // Native UI responses deliberately have no ACK.
+  }
   const response = (data: unknown, success = true, extra = {}) => output({
     type: 'response', id: command.id, command: command.type, success, data, ...extra,
   });
@@ -41,6 +55,8 @@ function handle(line: string) {
       return;
     }
     const ready = () => {
+      if (process.argv.includes('--startup-status')) output({ type: 'extension_ui_request',
+        id: 'startup', method: 'setStatus', statusKey: 'fixture', statusText: 'loading' });
       output({ type: 'response', id: 'unrelated', command: 'get_state', success: true });
       response({ isStreaming: false, sessionId: String(process.pid) });
       phase('ready');
@@ -50,6 +66,9 @@ function handle(line: string) {
   }
   if (process.argv.includes('--ignore-prompt')) return;
   const scenario = JSON.parse(command.message);
+  uiExpected = scenario.uiExpected ?? 0;
+  uiFinal = scenario.uiFinal ?? [];
+  uiReplies = [];
   phase('prompt'); phase(`prompt:${scenario.fixtureFence}`);
   if (scenario.noAck) return;
   if (scenario.exitBeforeAck) process.exit(0);

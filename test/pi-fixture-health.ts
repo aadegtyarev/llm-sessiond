@@ -16,6 +16,8 @@ export function fixtureHealth() {
     start: (...args) => run('start', () => port.start(...args)),
     send: (...args) => run('send', () => port.send(...args)),
     stop: (...args) => run('stop', () => port.stop(...args)),
+    ...(port.reply ? { reply: (...args: Parameters<NonNullable<HarnessPort['reply']>>) =>
+      run('reply', () => port.reply!(...args)) } : {}),
   });
   return { run, wrap, assertHealthy: () => {
     assert.equal(failures.length, 0, `fixture health failure: ${failures.join('; ')}`);

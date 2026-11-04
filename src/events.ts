@@ -12,13 +12,33 @@ export function sessionView(session: { id: string; status: SessionStatus; input:
   });
 }
 
+/** Detach consumer payloads before publication; freeze nested display data too. */
+export function snapshot<T>(value: T): T {
+  const copy = structuredClone(value);
+  const seen = new WeakSet<object>();
+  function freeze(item: unknown): void {
+    if (item === null || typeof item !== 'object' || seen.has(item)) return;
+    seen.add(item);
+    for (const child of Object.values(item)) freeze(child);
+    Object.freeze(item);
+  }
+  freeze(copy);
+  return copy;
+}
+
 export function acceptHarnessEvent(
   session: SessionRecord,
   generation: number,
   event: HarnessEvent,
   notify: (event: CoreEvent) => void,
 ): void {
-  if (session.generation !== generation || session.status !== 'running') return;
+  if (session.generation !== generation) return;
+  if (event.type === 'tool' || event.type === 'question' || event.type === 'notification') {
+    if (session.stopRequested || (session.status !== 'starting' && session.status !== 'running')) return;
+    notify(snapshot({ ...event, sessionId: session.id }));
+    return;
+  }
+  if (session.status !== 'running') return;
   if (event.type === 'text') {
     notify({ type: 'text', sessionId: session.id, text: event.text });
     return;

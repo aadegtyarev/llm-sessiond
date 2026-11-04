@@ -1,8 +1,8 @@
-import { CoreError, type CoreEvent, type HarnessPort, type InputView, type SessionRecord, type SessionView, type ShutdownResult } from './types.ts';
+import { CoreError, type CoreEvent, type HarnessPort, type InputView, type QuestionReply, type ReplyOutcome, type SessionRecord, type SessionView, type ShutdownResult } from './types.ts';
 import { createEventPublisher, inputView, sessionView } from './events.ts';
 import { callPort, createSessionRecord, startHarnessSession, stopAllHarnessSessions, stopHarnessSession } from './harness-session.ts';
 export { CoreError } from './types.ts';
-export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, InputStatus, InputView, PortOutcome, SessionStatus, SessionView, ShutdownResult } from './types.ts';
+export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, InputStatus, InputView, PortOutcome, SessionStatus, SessionView, ShutdownResult, DisplayValue, InteractionEvent, NativeQuestion, QuestionMethod, QuestionReply, ReplyOutcome } from './types.ts';
 
 export class SessionCore {
   private readonly sessions = new Map<string, SessionRecord>();
@@ -69,6 +69,21 @@ export class SessionCore {
       this.events.publish({ type: 'input', sessionId, input: inputView(input) });
     }
     return inputView(input);
+  }
+
+  /** Reply to a native question, not a new model input. Written is local only. */
+  async reply(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome> {
+    this.assertOpen();
+    const session = this.requireSession(sessionId);
+    if (session.stopRequested || (session.status !== 'starting' && session.status !== 'running')) {
+      throw new CoreError('invalid-state');
+    }
+    const generation = session.generation;
+    let outcome: ReplyOutcome;
+    try { outcome = await this.port.reply?.(sessionId, reply) ?? { kind: 'rejected' }; }
+    catch { outcome = { kind: 'unknown' }; }
+    if (session.generation !== generation || session.stopRequested) return { kind: 'unknown' };
+    return Object.freeze({ kind: outcome.kind });
   }
 
   async stop(sessionId: string): Promise<SessionView> {

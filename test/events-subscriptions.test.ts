@@ -3,7 +3,7 @@ import test from 'node:test';
 import type { CoreEvent } from '../src/types.ts';
 import { createEventPublisher } from '../src/events.ts';
 
-function eventOf(type: CoreEvent['type']): CoreEvent {
+function eventOf(type: 'session' | 'input' | 'text'): CoreEvent {
   if (type === 'session') return { type, session: { sessionId: 's', status: 'created', input: null } };
   if (type === 'input') return { type, sessionId: 's', input: { inputId: 'i', status: 'pending' } };
   return { type, sessionId: 's', text: 'hello' };
