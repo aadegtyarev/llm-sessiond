@@ -13,6 +13,7 @@
 
 ## Project-specific commands and conventions
 - Stack and important paths: strict TypeScript ES modules on Node.js 24; core is under `src/`, tests under `test/`, and contracts under `docs/contracts/`.
-- Tests / typecheck: `npm run typecheck` runs `tsc --noEmit`; `npm test` runs `node --experimental-strip-types --test test/*.test.ts`. Verified with Node.js v24.21.0 and the existing TypeScript 5.9.3 compiler; no build command is configured.
+- Setup: Node.js 24.x and npm; run `npm ci --ignore-scripts --no-audit --no-fund` in a clean checkout. Exact devDependencies and their resolution are recorded in package.json/package-lock.json; see README.md for the quickstart.
+- Tests / typecheck: `npm run typecheck` runs local `tsc --noEmit`; `npm test` runs `node --experimental-strip-types --test test/*.test.ts`. Toolchain: TypeScript 5.9.3 and @types/node 24.19.2, verified on Node.js v24.21.0; no build command is configured.
 - Formatting and style: no project-specific formatter or source conventions are established.
 - Project-specific constraints: `docs/contracts/surfaces/session-core.md` records the accepted implementation and is the current product contract for the session core. Review contract requirements by root cause and affected case class, not line-level nits.
