@@ -1,4 +1,4 @@
-import type { CoreEvent, HarnessPort, InputView, PortOutcome, SessionRecord, ShutdownResult } from './contracts.ts';
+import type { CoreEvent, HarnessPort, InputView, PortOutcome, SessionRecord, ShutdownResult } from './types.ts';
 import { acceptHarnessEvent, inputView, sessionView } from './events.ts';
 
 

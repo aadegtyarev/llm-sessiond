@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import type { HarnessPort } from '../src/contracts.ts';
+import type { HarnessPort } from '../src/types.ts';
 
 // Failures belong to the test, independently of Core's exception -> unknown isolation.
 export function fixtureHealth() {

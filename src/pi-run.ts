@@ -1,4 +1,4 @@
-import type { HarnessEvent, PortOutcome } from './contracts.ts';
+import type { HarnessEvent, PortOutcome } from './types.ts';
 import { object, type RecordValue } from './pi-wire.ts';
 import { assistantStopReason } from './pi-assistant.ts';
 

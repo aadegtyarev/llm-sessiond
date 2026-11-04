@@ -1,8 +1,8 @@
-import { CoreError, type CoreEvent, type HarnessPort, type InputView, type SessionRecord, type SessionView, type ShutdownResult } from './contracts.ts';
+import { CoreError, type CoreEvent, type HarnessPort, type InputView, type SessionRecord, type SessionView, type ShutdownResult } from './types.ts';
 import { createEventPublisher, inputView, sessionView } from './events.ts';
 import { callPort, createSessionRecord, startHarnessSession, stopAllHarnessSessions, stopHarnessSession } from './harness-session.ts';
-export { CoreError } from './contracts.ts';
-export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, InputStatus, InputView, PortOutcome, SessionStatus, SessionView, ShutdownResult } from './contracts.ts';
+export { CoreError } from './types.ts';
+export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, InputStatus, InputView, PortOutcome, SessionStatus, SessionView, ShutdownResult } from './types.ts';
 
 export class SessionCore {
   private readonly sessions = new Map<string, SessionRecord>();

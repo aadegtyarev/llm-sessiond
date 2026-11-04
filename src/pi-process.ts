@@ -1,5 +1,5 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
-import type { PortOutcome } from './contracts.ts';
+import type { PortOutcome } from './types.ts';
 
 export interface PiLaunch {
   executable?: string;

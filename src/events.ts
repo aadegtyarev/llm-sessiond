@@ -1,4 +1,4 @@
-import type { CoreEvent, HarnessEvent, InputView, SessionRecord, SessionStatus, SessionView } from './contracts.ts';
+import type { CoreEvent, HarnessEvent, InputView, SessionRecord, SessionStatus, SessionView } from './types.ts';
 
 export function inputView(input: InputView): InputView {
   return Object.freeze({ inputId: input.inputId, status: input.status });

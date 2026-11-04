@@ -1,7 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import type { TestContext } from 'node:test';
-import type { HarnessEvent } from '../src/contracts.ts';
+import type { HarnessEvent } from '../src/types.ts';
 import { createPiHarness } from '../src/pi-harness.ts';
 import { allowanceMs, phaseTrace, until } from './pi-observation.ts';
 
