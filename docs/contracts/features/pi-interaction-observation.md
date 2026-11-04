@@ -1,7 +1,8 @@
 # Наблюдение взаимодействий Native Pi
 
-Статус: одобрено; baseline выполнен, подтверждённые пробелы разрешено исправить.
-Действует [контракт разработки](../development.md); фича остаётся active до приёмки.
+Статус: реализация и fake/native повторная проверка выполнены; ожидает required CI,
+независимого Terra review и приёмки. Feature остаётся active.
+Действует [контракт разработки](../development.md).
 
 ## Цель и граница
 
@@ -82,3 +83,17 @@ UI/client, внешний API, permissions engine, произвольный nati
 исправлений и остаточных ограничений; нет обещания arbitrary native parity.
 Baseline evidence сохранено в task artifacts; paid baseline не повторяется.
 После fake regression checks повторяется тот же bounded native сценарий.
+
+## Результат проверки перед review
+
+- Typecheck и 1272 fake/core/protocol теста прошли (база 1184).
+- Одна post-fix direct Pi сессия: уточнение, явный текстовый ответ, native write/read
+  и disk verify; публичные tool start/update/end, status set/clear и три concurrent
+  confirm/select/input; ответы через Core.reply, ожидаемый tuple в tool result,
+  completed final и наблюдённый native exit/close. Временный файл удалён.
+- Core.reply возвращает written только как результат локальной записи, не native
+  ACK/consumption. Consumption в проверке доказан отдельно tool result.
+- Fake tests покрывают invalid/session/method/duplicate/expired/channel/stop,
+  startup observations, immutable snapshots, FIFO/reentry и listener isolation.
+  Native cancellation/timeout races не прогонялись отдельной платной матрицей.
+- Durable surfaces и удаление active feature — только после required CI/приёмки.
