@@ -48,8 +48,9 @@ function handle(line: string) {
     if (readyDelay) setTimeout(ready, readyDelay); else ready();
     return;
   }
-  phase('prompt');
+  if (process.argv.includes('--ignore-prompt')) return;
   const scenario = JSON.parse(command.message);
+  phase('prompt'); phase(`prompt:${scenario.fixtureFence}`);
   if (scenario.noAck) return;
   if (scenario.exitBeforeAck) process.exit(0);
   const records = (values: unknown[] = []) => values.forEach(output);
@@ -72,10 +73,12 @@ function handle(line: string) {
       for (const byte of bytes) process.stdout.write(Buffer.from([byte]));
     }
     records(scenario.records);
-    if (scenario.later) setTimeout(() => {
-      records(scenario.later); phase('later');
-    }, scenario.laterDelay ?? 150);
-    if (scenario.fixtureFence) output({ type: 'message_update', assistantMessageEvent: {
+    if (scenario.later) {
+      const later = () => { records(scenario.later); phase('later'); phase(`later:${scenario.laterGate}`); };
+      if (scenario.laterGate) afterConsumption(scenario.laterGate, later);
+      else setTimeout(later, scenario.laterDelay ?? 150);
+    }
+    if (scenario.fixtureFence && !scenario.omitFence) output({ type: 'message_update', assistantMessageEvent: {
       type: 'text_delta', delta: scenario.fixtureFence,
     } });
     phase('records');

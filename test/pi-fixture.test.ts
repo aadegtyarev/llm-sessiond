@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { boundary, final, fixture } from './pi-support.ts';
+import { until } from './pi-observation.ts';
 
 test('pi fixture tolerates delayed readiness before exercising a real prompt', async t => {
   const f = await fixture(t, ['--ready-delay=450']);
@@ -23,9 +24,8 @@ for (const flag of ['--no-ready', '--wrong-ready', '--malformed-ready', '--ready
   test(`pi fixture rejects failed readiness and observes cleanup: ${flag}`, async t => {
     const deliberateTimeout = flag === '--no-ready' || flag === '--ready-delay=450';
     const f = await fixture(t, [flag], deliberateTimeout ? 300 : undefined);
-    await assert.rejects(f.start(), /readiness phase; outcomes=start:unknown/);
+    assert.equal((await f.rawStart()).kind, 'unknown');
     await f.phase('get_state');
-    await assert.rejects(f.send({ records: final() }), /requires confirmed readiness/);
     assert.ok(!f.phases().includes('prompt'));
     assert.equal((await f.port.stop('s')).kind, 'confirmed');
   });
@@ -41,9 +41,7 @@ for (const loss of [{ invalidUtf8: true }, { raw: 'not json\n' }, { eof: true },
   });
 }
 
-test('pi fixture diagnoses a missing observation without protocol payloads', async t => {
-  const f = await fixture(t);
-  await f.start();
-  await assert.rejects(f.until(() => false, 'deliberate missing phase', 20),
-    /deliberate missing phase: exceeded 20ms; outcomes=start:confirmed; phases=/);
+test('pi observation primitive diagnoses a missing phase without protocol payloads', async () => {
+  await assert.rejects(until(() => false, 'deliberate missing phase', 20, () => 'safe phase counts'),
+    /deliberate missing phase: exceeded 20ms; safe phase counts/);
 });

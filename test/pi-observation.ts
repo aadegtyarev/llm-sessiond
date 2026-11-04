@@ -19,7 +19,13 @@ export function phaseTrace() {
   const directory = mkdtempSync(join(tmpdir(), 'pi-test-phases-'));
   const phases = () => readdirSync(directory).filter(name => /^\d+$/.test(name)).flatMap(name =>
     readFileSync(join(directory, name), 'utf8').split('\n').filter(Boolean));
-  return { flag: `--trace-dir=${directory}`, phases,
+  let sequence = 0;
+  const gate = () => {
+    const id = `control-${++sequence}`;
+    return { id, release: () => writeFileSync(join(directory, id), ''),
+      written: () => phases().includes(`later:${id}`) };
+  };
+  return { flag: `--trace-dir=${directory}`, phases, gate,
     release: (gate: string) => writeFileSync(join(directory, gate), ''),
     count: (phase: string) => phases().filter(value => value === phase).length,
     cleanup: () => rmSync(directory, { recursive: true, force: true }),

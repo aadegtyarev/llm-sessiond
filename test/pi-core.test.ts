@@ -38,16 +38,27 @@ test('pi unknown stop ignores stale source events and permits explicit cleanup',
   await core.start('s');
   const events: unknown[] = [];
   core.subscribe((event) => { events.push(event); });
-  await core.send('s', 'i', JSON.stringify({ records: [boundary], later: [
+  const late = f.gate();
+  await core.send('s', 'i', JSON.stringify({ records: [boundary], laterGate: late.id, later: [
     { type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: 'stale' } },
     ...final(),
   ] }));
   await assert.rejects(core.stop('s'), { code: 'harness-unknown' });
-  const snapshot = [...events];
-  await f.phase('later');
+  const snapshot = [
+    { type: 'input', sessionId: 's', input: { inputId: 'i', status: 'pending' } },
+    { type: 'input', sessionId: 's', input: { inputId: 'i', status: 'unknown' } },
+    { type: 'session', session: { sessionId: 's', status: 'unknown',
+      input: { inputId: 'i', status: 'unknown' } } },
+  ];
+  assert.deepEqual(events, snapshot);
+  assert.equal(late.written(), false);
+  late.release();
+  await f.until(late.written, 'child wrote post-unknown-stop records');
   assert.deepEqual(events, snapshot);
   assert.equal(core.get('s').status, 'unknown');
   assert.equal((await core.stop('s')).status, 'stopped');
-  // Child exit closes the late-output path; only the exact final stop may publish.
+  await f.closed(); // Host close, not just child-written trace or process exit.
+  assert.deepEqual(core.get('s'), { sessionId: 's', status: 'stopped',
+    input: { inputId: 'i', status: 'unknown' } });
   assert.deepEqual(events, [...snapshot, { type: 'session', session: core.get('s') }]);
 });
