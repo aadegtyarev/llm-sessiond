@@ -1,7 +1,10 @@
 # Наблюдение взаимодействий Native Pi
 
-Статус: реализация и fake/native повторная проверка выполнены; ожидает required CI,
-независимого Terra review и приёмки. Feature остаётся active.
+Статус: COMPLETE. Whole-feature поведение принято родителем и Terra на
+`be78c15b2f80b4ba3c4f4928e01f5a1c2b0e031c`; 1294 теста/typecheck/docs и required CI
+checks/gitleaks успешны, все три review findings закрыты. Native happy-path evidence
+подтверждён отдельно; повторная платная генерация не требуется.
+Durable surfaces обновлены; этот временный контракт удаляется после final docs verification.
 Действует [контракт разработки](../development.md).
 
 ## Цель и граница
@@ -86,7 +89,7 @@ Baseline evidence сохранено в task artifacts; paid baseline не по�
 
 ## Результат проверки перед review
 
-- Typecheck и 1272 fake/core/protocol теста прошли (база 1184).
+- Typecheck и 1294 fake/core/protocol теста прошли (база 1184).
 - Одна post-fix direct Pi сессия: уточнение, явный текстовый ответ, native write/read
   и disk verify; публичные tool start/update/end, status set/clear и три concurrent
   confirm/select/input; ответы через Core.reply, ожидаемый tuple в tool result,
@@ -96,4 +99,5 @@ Baseline evidence сохранено в task artifacts; paid baseline не по�
 - Fake tests покрывают invalid/session/method/duplicate/expired/channel/stop,
   startup observations, immutable snapshots, FIFO/reentry и listener isolation.
   Native cancellation/timeout races не прогонялись отдельной платной матрицей.
-- Durable surfaces и удаление active feature — только после required CI/приёмки.
+- Required CI, Terra и parent acceptance выполнены; durable surfaces обновлены.
+  Далее final docs verification и удаление временного feature contract.

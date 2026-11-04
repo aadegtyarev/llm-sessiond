@@ -54,7 +54,10 @@ JS
 `createPiHarness` из [src/pi-harness.ts](src/pi-harness.ts), передаваемый в `SessionCore`.
 Нормативные границы — [контракт Pi adapter](docs/contracts/surfaces/pi-text-harness.md).
 Он сохраняет native tools/resources; handled/queued и недоказанные terminal исходы
-оставляют input unknown до явной cleanup. Реальная генерация не проверена;
-тесты используют только fake Node child. UI/permissions и sandbox не гарантированы.
+оставляют input unknown до явной cleanup. Автоматические тесты используют fake
+Node child; bounded реальная генерация проверена, новые вызовы требуют отдельного
+consent. Поддержаны tool/question/status observations и явный Core.reply в границах
+контракта Pi adapter; written не означает native consumption. UI renderer,
+permissions engine и sandbox не предоставляются.
 Harness владеет моделью, инструментами и процессом; ядро хранит только текущее
 состояние в памяти. Полный перечень ограничений — в нормативном контракте выше.

@@ -26,8 +26,10 @@ optional terminal CR, streaming UTF8, непрерывное чтение и std
 ## Output, ownership и terminal
 
 Текст — только assistant `text_delta`, session-scoped, не привязан к input.
-Thinking/tool/stderr/raw RPC errors/private config и повторный message_end text
-не публикуются. Сам assistant text не очищается от возможного чувствительного содержания.
+Thinking, stderr, raw RPC/errors/private config и повторный message_end text
+не публикуются. Tool/question/notification публикуются только в нормализованной
+форме для отображения, не как исходный RPC record. Assistant/tool/question и другой
+явный display text не очищается от возможного чувствительного содержания.
 Собственный ACK(id,started) и причинный следующий `agent_start` связывают run
 с точным inputId; ACK не terminal. Поздние replies/continuations A не меняют B.
 `agent_end`, промежуточные error и native retry/recovery не завершают input.
@@ -51,6 +53,69 @@ Core блокирует следующий send при unknown до explicit cle
 Потеря канала/write или ACK deadline даёт unknown; асинхронная потеря активного
 подтверждённого run публикует input-failed certainty unknown.
 
+## Tool, question и notification observations
+
+Наблюдения идут через существующий HarnessPort → Core.subscribe, session-scoped,
+без присвоения inputId. Они возможны при starting, без owned input и при running;
+после stop gate/потери актуального источника не доставляются. Readonly публичные
+payload отделены от private records и глубоко заморожены; FIFO, recipient snapshot
+и изоляция подписчиков — по [контракту Core](session-core.md).
+
+Native `tool_execution_start/update/end` нормализуются в `tool` с `phase`:
+
+| Phase | Публичные поля |
+| --- | --- |
+| start | toolCallId, toolName, args |
+| update | toolCallId, toolName, args, partialResult |
+| end | toolCallId, toolName, result, isError, optional durationMs |
+
+`toolCallId` связывает native lifecycle, не доказывает владение input. Display
+args/results имеют JSON-форму; неизвестные private поля RPC record не передаются.
+Malformed обязательные поля не публикуются как валидные observations.
+
+Native `extension_ui_request` поддерживает три публичных question метода.
+Общие поля: `requestId` из native id, `method`, `title`, optional `timeout` в ms.
+Confirm добавляет `message`, select — `options` (строки), input — optional
+`placeholder`. Adapter сохраняет вопрос до публикации; немедленный reply из
+subscriber и несколько concurrent вопросов одной сессии допустимы.
+
+Fire-and-forget `setStatus` даёт `notification` с method/statusKey и optional
+statusText; отсутствие statusText означает очистку. `notify` даёт method/message
+и level: только info/warning/error, default info при отсутствии native notifyType.
+Это не общий статус thinking/liveness; ответ на notification не отправляется.
+Widgets, titles, editor и произвольный renderer/native UI parity не поддерживаются.
+
+## Явные ответы и неопределённость
+
+`Core.reply(sessionId, QuestionReply)` доходит до optional HarnessPort.reply.
+`requestId` и `method` должны совпадать с известным вопросом именно этой сессии:
+
+| Метод | Явный ответ |
+| --- | --- |
+| confirm | confirmed: boolean |
+| select | value: string из исходных options |
+| input | value: string |
+| любой из трёх | cancelled: true вместо confirmed/value |
+
+Неверные ID/method/shape/option и повторная локальная отправка уже использованного
+ответа дают rejected без записи. Дублирующий native request ID становится ambiguous,
+а не заменяет прежний вопрос. Известный expiry, ambiguous ID или потеря канала
+дают unknown; новой записи/replay при этом нет. По optional timeout adapter ведёт
+локальный deadline, но момент native expiry раньше наблюдения точно не известен.
+
+Ответ помечается использованным до write, включая concurrent вызовы; неудачная
+или неопределённая запись не даёт права автоматического повторения.
+`extension_ui_response` не имеет normal command ACK. `written` означает только
+успешный локальный stdin callback и снятое backpressure, НЕ receipt/consumption Pi.
+Ошибка, потеря канала или write deadline дают unknown. Даже written не доказывает,
+что native вопрос ещё не истёк/не был отменён: Pi не публикует универсального
+cancellation event. Потребление можно доказать лишь отдельным дальнейшим evidence,
+не исходом write. Replies не завершают input, не создают send и не обходят stop.
+Скрытых approve/cancel, retry/replay/fallback нет.
+
+Реализация нормализации и ответа: [pi-interaction-events.ts](../../../src/pi-interaction-events.ts),
+[pi-questions.ts](../../../src/pi-questions.ts), [pi-wire.ts](../../../src/pi-wire.ts).
+
 ## Остановка и ограничения
 
 Stop закрывает stdin и посылает SIGTERM только owned child. Confirmed — только
@@ -61,17 +126,25 @@ HarnessPort не имеет отдельного async session-status событ
 `Core.get` не обещает автоматически актуальный process-liveness; следующий
 send получит unknown, explicit stop использует сохранённый факт выхода.
 Нет гарантии finished-all-background, cleanup descendants/remote ресурсов,
-UI/permission dialogs, произвольного session replacement или sandbox.
+полной UI/permission parity, произвольного session replacement или sandbox.
 Не происходит скрытого approve/cancel. Native tools сохраняют права child.
 Нет общей native inference/model/auth end-to-end гарантии или полной native parity.
 Автоматические тесты проверяют fake RPC protocol; отдельно разрешённая native
 валидация не заменяет это покрытие и не расширяет гарантии адаптера.
-Реальная генерация требует отдельного consent. Публичные tool/question/status
-observations и native replies не поддерживаются.
+Реальная генерация требует отдельного consent. Поддержаны только описанные
+observations/replies, не произвольный native parity. Нет собственного UI renderer,
+внешнего API, permissions engine, истории или persistence; SDK/runtime dependency
+Pi не требуется.
 
 ## Проверки
 
 `npm run typecheck` и `npm test`: fake Node RPC child и bounded run/wire tests
 проверяют ownership, mandatory DTO/malformed outcomes, output/privacy, retries,
 uncertainty, observed-exit cleanup и сохранение launch defaults/resources.
+Interaction regressions проверяют immutable shapes, startup/reentrant replies,
+три concurrent request ID, validation/expiry/duplicates/channel loss и ответы без ACK.
+Отдельная bounded real-Pi проверка подтверждает clarification → явный текстовый
+ответ → native write/read с disk verify → три вопроса/ответа через Core → tool result
+с consumed tuple → completed final и observed owned exit. Это не universal provider,
+auth, native cancellation/timeout или descendant/remote cleanup гарантия.
 Правила lifecycle — [метаконтракт](../meta-contract.md).
