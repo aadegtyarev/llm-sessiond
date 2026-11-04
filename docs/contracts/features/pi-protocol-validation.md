@@ -1,6 +1,6 @@
 # Pi protocol validation
 
-Статус: одобрено оператором, активно; реализация и независимый review впереди.
+Статус: завершено; реализация принята родителем и третьим Terra review (ACCEPT), все P1/P2 закрыты.
 
 ## Цель
 Надёжный причинный Pi/RPC test harness и работающий protected CI для принятого baseline без изменения production-поведения. Исправляется весь класс setup/observation/cleanup проблем реальных fake Node subprocess tests, не один timeout.
@@ -30,4 +30,4 @@ src/, package/lock/tsconfig, native API/гарантии и политики fro
 5. Meaningful verified commits, обычный fast-forward push только PR #3; original interaction checkout и donor неизменны. Lifecycle завершает родитель после независимого review.
 
 ## Текущий этап
-Контракт зафиксирован до planning/implementation. Реализация test-only seam и bounded validation выполняются по этому контракту; он остаётся активным до свежего независимого review. Старые CI failures сохраняются как evidence, их точная причина не объявляется доказанной.
+Финальная проверка принятой реализации: typecheck PASS; полный suite1184/1184; focused27/27; sentinel1055/1055; три последовательных full suites под CPU0,1/concurrency4 PASS; doc guard11/11, docs checker6 и protected diff PASS. Initial CI и один full same-head replay на разных runners завершились SUCCESS; родитель подтвердил оба required checks COMPLETED/SUCCESS. Повторная локальная проверка перед lifecycle также прошла. Исторические failures сохраняются в artifacts/PR; точная timing causality не доказана, bounded runs не гарантируют отсутствие любых flakes. Временный контракт проверен и готов к удалению; окончательный publication head требует отдельной CI проверки.
