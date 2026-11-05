@@ -1,80 +1,66 @@
 # Локальный HTTP/SSE API из checkout
 
-Рабочая инструкция для реализации; итоговая приёмка фичи ещё не заявлена.
-Daemon слушает только `127.0.0.1`. Запуск — `node src/daemon-cli.ts` (Node 24).
-На stdin передаётся один JSON документ до EOF, не более 65536 bytes:
-`{"token":"<32–256 base64url characters>","port":3000,"launch":{}}`.
-`port:0` выбирает свободный порт; stdout сообщает JSON `listening.host/port`, не token.
-Не передавайте token через argv/URL/env: stdin не наследуется Native Pi.
-Храните config с ограниченными правами; Windows требует соответствующего ACL.
-Launch — доверенная операторская конфигурация, не HTTP-параметры и не sandbox:
-`executable`, `prefixArgs` (string array), `cwd`, положительные конечные
-`commandDeadlineMs`/`stopDeadlineMs`. Отсутствующие поля сохраняют defaults Pi.
+Запустите локальный daemon из корня подготовленного checkout с Node.js24.
+Внешнему клиенту достаточно HTTP/JSON и SSE; импорт нашего TypeScript не нужен.
+Полные routes, DTO, auth, пределы и гарантии: [нормативный API](contracts/surfaces/local-daemon-api.md).
+Служба не устанавливается. Для native сессии нужен доступный trusted Native Pi;
+запуск listener и запрос list сами по себе не запускают модель.
 
-## Запросы
+## 1. Подготовьте приватный config
 
-Каждый запрос, включая SSE, требует `Authorization: Bearer <token>`.
-Нет auth-free health endpoint, CORS, browser UI, query parameters или token в URL.
-POST требует `Content-Type: application/json` (optional `charset=utf-8`).
-GET не принимает body. Все POST body ниже обязательны, в том числе `{}`.
+Команда создаёт owned temp config и печатает только путь, не token:
 
-| Метод и путь | Body → JSON result |
-| --- | --- |
-| POST `/sessions` | `{sessionId}` → SessionView |
-| GET `/sessions` | → SessionView[] |
-| GET `/sessions/:sessionId` | → SessionView |
-| POST `/sessions/:sessionId/start` | `{}` → SessionView |
-| POST `/sessions/:sessionId/send` | `{inputId,text}` → InputView |
-| POST `/sessions/:sessionId/reply` | QuestionReply → `{kind: written/rejected/unknown}` |
-| POST `/sessions/:sessionId/stop` | `{}` → SessionView |
-| POST `/shutdown` | `{}` → `{stoppedSessionIds,uncertainSessionIds,failedSessionIds}` |
-| GET `/events` | SSE: `event: ready`/`data: {}`, затем `event: core`/`data: <CoreEvent>` |
+```sh
+node --input-type=module -e 'import {mkdtempSync,writeFileSync} from "node:fs"; import {tmpdir} from "node:os"; import {join} from "node:path"; import {randomBytes} from "node:crypto"; const p=join(mkdtempSync(join(tmpdir(),"sessiond-")),"config.json"); writeFileSync(p,JSON.stringify({token:randomBytes(32).toString("base64url"),port:3000}),{mode:0o600}); console.log(p);'
+```
 
-Успешные операции дают HTTP 200. Session/input IDs: 1–128 ASCII characters
-`A-Z a-z 0-9 . _ -`. Для sessionId исключены ровно `.` и `..`, поскольку URL-клиенты
-нормализуют такие path segments; прочие dot-containing IDs допустимы.
-Для inputId в JSON body `.` и `..` допустимы. Публичные DTO и шесть CoreEvent типов
-определены в [src/types.ts](../src/types.ts). Reply имеет opaque непустой string `requestId`;
-отдельного лимита длины ID нет, но весь JSON body вместе с ID/ответом ограничен 65536 bytes.
-Ответ задаёт `method: confirm/select/input` и соответственно `confirmed:boolean`/`value:string`,
-либо `cancelled:true` вместо ответа. Extra fields отклоняются.
+Ограничьте Windows ACL файла и его каталога текущим оператором; Unix mode не заменяет
+Windows ACL. Не передавайте token через argv/env/URL и не включайте config в repo.
+Launch settings при необходимости задаёт оператор, не HTTP-клиент; это не sandbox.
 
-Сначала подключите SSE и дождитесь **ready**, затем create/start: startup questions
-могут прийти до HTTP start ACK. `session`/`input` сохраняют свои projections;
-`text`/`tool`/`question`/`notification` session-scoped, native IDs не превращаются
-в input correlation. HTTP ACK не settlement; reply written — только local write,
-не native consumption. Явный display text может содержать чувствительные данные,
-он не secret-filtered. Token/private config/raw RPC/stderr в API не публикуются.
+## 2. Запустите listener
 
-## Ошибки, пределы и потеря связи
+Подставьте напечатанный путь; stdin должен получить JSON и EOF:
 
-Ошибки JSON имеют вид `{"error":{"code":"..."}}`: 401 auth; 400 transport/json/schema;
-413 body-too-large; 415 content-type; 404 route; 405 method; 503 closed/stream-limit.
-CoreError возвращает HTTP 409 и исходный безопасный code; неожиданный сбой —
-500 internal без private exception. Transport/parser может закрыть неполный канал
-или вернуть bare HTTP 400/408; HTTP-ошибка не является доказательством settlement.
+```sh
+node src/daemon-cli.ts < /path/to/config.json
+```
 
-Request body ≤65536 bytes, HTTP headers ≤8192 bytes; request timeout 15 s,
-headers timeout 10 s. Одновременно не более 32 SSE streams. Каждый stream имеет
-очередь не более 256 ожидающих frames и byte budget 1048576, включая Node writable
-buffer и следующий frame. Oversize event или overflow **закрывает stream**,
-без drop/truncate. Медленный stream не блокирует Core или другого consumer.
+В PowerShell: `Get-Content -Raw $config | node src/daemon-cli.ts`.
+Дождитесь stdout JSON `listening.host/port`. Это только bind, не подписка или readiness Pi.
+Если выбрали `port:0`, используйте фактический port из listening в клиенте.
 
-Нет истории, SSE IDs, replay или resume. После разрыва полнота наблюдения потеряна;
-автоматическое reconnect/retry не восстанавливает её и не должно повторять commands.
-Get/list возвращают только текущее состояние; explicit stop доступен до shutdown.
-Разрыв клиента не отменяет команду и не доказывает остановку сессии.
-Shutdown сразу прекращает admission, использует Core cleanup, возвращает честную
-сводку и закрывает streams/listener. Unknown не all-cleaned: owned process может
-остаться жив, выход daemon process в этом случае не гарантируется. SIGINT/SIGTERM
-используют тот же cleanup. Нет обещания cleanup descendants/remote resources.
+## 3. Подключите внешний клиент
 
-## Проверки
+В другом терминале прочитайте тот же приватный config. Пример для заданного port3000
+только запрашивает current list, не запускает модель и не печатает token:
 
-`npm run test:api-smoke` запускает независимый JS HTTP/SSE client, checkout CLI и
-fake Native RPC child с disk/consumed-tuple/owned-exit evidence. Этот же сценарий
-запускается на Linux и Windows CI; full suite остаётся Linux. Это не real Pi,
-provider/auth или full Native Pi Windows certification. Реальная генерация требует
-отдельного разрешения; текущий approved feature задаёт bounded Linux consent.
-Границы Core/Pi: [SessionCore](contracts/surfaces/session-core.md),
-[Pi adapter](contracts/surfaces/pi-text-harness.md).
+```sh
+node --input-type=module - /path/to/config.json <<'JS'
+import {readFileSync} from 'node:fs';
+const {token,port}=JSON.parse(readFileSync(process.argv[2],'utf8'));
+const headers={Authorization:`Bearer ${token}`};
+const response=await fetch(`http://127.0.0.1:${port}/sessions`,{headers});
+console.log(response.status,await response.json());
+JS
+```
+
+Для работы с сессией подключите `/events` с тем же Authorization header и дождитесь
+`event: ready`. Только затем create/start/send; обрабатывайте события уже во время start.
+На question отправляйте явный reply с точными requestId/method. HTTP ACK не settlement,
+reply written не native consumption. Не повторяйте команды автоматически после разрыва;
+проверьте текущее состояние и при необходимости явно остановите сессию.
+
+Полный воспроизводимый внешний client→CLI→fakeNative сценарий без модели:
+`npm run test:api-smoke`. Его [JS client](../test/api-client.mjs) не импортирует Core/TS;
+[сценарий](../test/api-external-smoke.mjs) показывает ready, операции и явные ответы.
+
+## 4. Завершите работу
+
+Вызовите authenticated POST `/sessions/:sessionId/stop` с JSON `{}` для отдельной
+сессии; затем POST `/shutdown` с `{}` либо SIGINT/SIGTERM для daemon cleanup.
+Читайте сводку: unknown не all-cleaned и не гарантирует выход процесса.
+После завершения удалите owned config. Разрыв SSE сам по себе сессию не останавливает;
+replay нет. Display text не secret-filtered, Native tools сохраняют права child.
+Проверенный Windows сценарий — API fake smoke, не full Native Pi certification;
+границы платформ и cleanup определяет [нормативный API](contracts/surfaces/local-daemon-api.md).

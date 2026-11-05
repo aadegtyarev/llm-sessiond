@@ -1,7 +1,8 @@
 # Compact session core
 
-Компактное TypeScript-ядро сессий в памяти. Нормативные гарантии, ошибки и границы:
-[контракт ядра](docs/contracts/surfaces/session-core.md). Public API: [src/core.ts](src/core.ts).
+Компактное TypeScript-ядро сессий в памяти и локальный HTTP/JSON + SSE daemon API.
+[Контракт ядра](docs/contracts/surfaces/session-core.md); Public API: [src/core.ts](src/core.ts).
+Внешнему HTTP-клиенту импорт TypeScript не нужен.
 
 ## Подготовка и проверки
 
@@ -49,34 +50,15 @@ JS
 
 ## Локальный daemon из checkout
 
-HTTP/JSON + SSE implementation: [запуск, routes, auth и limits](docs/local-daemon-api.md).
-Новая фича ещё проходит независимую приёмку. Служба не устанавливается.
-Создайте закрытый config в owned temp (команда печатает только путь):
-
-```sh
-node --input-type=module -e 'import {mkdtempSync,writeFileSync} from "node:fs"; import {tmpdir} from "node:os"; import {join} from "node:path"; import {randomBytes} from "node:crypto"; const p=join(mkdtempSync(join(tmpdir(),"sessiond-")),"config.json"); writeFileSync(p,JSON.stringify({token:randomBytes(32).toString("base64url"),port:3000}),{mode:0o600}); console.log(p);'
-# Подставьте напечатанный путь; token не передаётся через argv/env/URL.
-node src/daemon-cli.ts < /path/to/config.json
-```
-
-В PowerShell stdin: `Get-Content -Raw $config | node src/daemon-cli.ts`;
-ограничьте ACL config. В другом терминале клиент читает тот же config, не печатая token:
-
-```sh
-node --input-type=module - /path/to/config.json <<'JS'
-import {readFileSync} from 'node:fs';
-const {token,port}=JSON.parse(readFileSync(process.argv[2],'utf8'));
-const headers={Authorization:`Bearer ${token}`};
-const response=await fetch(`http://127.0.0.1:${port}/sessions`,{headers});
-console.log(response.status,await response.json());
-JS
-```
-
-Для сессии сначала подключите `/events` с тем же header и дождитесь `event: ready`,
-затем create/start/send/reply/stop. Полный воспроизводимый fake protocol/client сценарий:
-`npm run test:api-smoke` (без модели и credentials). Остановка daemon — authenticated
-`POST /shutdown` с JSON `{}` либо SIGINT/SIGTERM; unknown cleanup не all-cleaned.
-После завершения удалите owned config. Loopback не заменяет обязательный bearer auth.
+[Запуск и внешний клиент](docs/local-daemon-api.md): Node24 CLI читает приватный
+config через stdin до EOF, слушает только `127.0.0.1`; bearer auth обязателен даже
+для SSE. Token не передаётся через argv/env/URL. Служба не устанавливается.
+[Нормативный API](docs/contracts/surfaces/local-daemon-api.md) описывает routes,
+DTO, readiness, ограничения и честные unknown outcomes. Сначала SSE ready, затем
+create/start; HTTP ACK и reply written не означают settlement/native consumption.
+`npm run test:api-smoke` проверяет внешний HTTP/SSE сценарий без модели на Linux
+и Windows; это не full Native Pi Windows certification. Для cleanup используйте
+explicit stop/shutdown; unknown не all-cleaned.
 
 ## Нецели
 

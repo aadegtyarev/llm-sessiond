@@ -1,6 +1,12 @@
 # Локальный daemon API
 
-Статус: approved.
+Статус: complete.
+
+Whole-code принят parent и Terra (ACCEPT, оба P2 closed, formal reject count0).
+Проверены full1334/typecheck/docs/API fake smoke, bounded Linux real Pi HTTP/SSE
+сценарий и exact-head CI включая actual Windows, checks/gitleaks COMPLETED SUCCESS.
+Durable поверхность актуализирована; этот временный контракт готов к удалению
+после проверки complete-state документации.
 
 ## Цель и наблюдаемое поведение
 
@@ -9,7 +15,7 @@
 ## Затронутые поверхности и пути
 
 - Сохраняются гарантии [SessionCore](../surfaces/session-core.md) и [Native Pi text adapter](../surfaces/pi-text-harness.md).
-- Новая durable поверхность после приёмки: `docs/contracts/surfaces/local-daemon-api.md` (пока не существует).
+- Текущая durable поверхность: [локальный daemon API](../surfaces/local-daemon-api.md).
 - Затрагиваются локальный daemon/API и checkout entrypoint в `src/`, API/client fixtures и проверки в `test/`, CI в `.github/workflows/`, команды проверки/запуска и документация по необходимости.
 - Процесс изменения и завершения: [development](../development.md), [meta-contract](../meta-contract.md).
 
