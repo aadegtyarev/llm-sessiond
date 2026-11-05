@@ -1,5 +1,5 @@
 import type { SessionCore } from './core.ts';
-import { ApiError, fields, replyBody, sessionId } from './daemon-schema.ts';
+import { ApiError, fields, lexicalId, replyBody, sessionId } from './daemon-schema.ts';
 
 export function route(core: SessionCore, method: string, path: string, body: Record<string, unknown>) {
   if (path === '/sessions') {
@@ -17,7 +17,7 @@ export function route(core: SessionCore, method: string, path: string, body: Rec
   if (operation === 'reply') return core.reply(id, replyBody(body));
   if (operation === 'send') {
     fields(body, ['inputId', 'text']);
-    const inputId = sessionId(body.inputId);
+    const inputId = lexicalId(body.inputId);
     if (typeof body.text !== 'string') throw new ApiError(400, 'schema');
     return core.send(id, inputId, body.text);
   }

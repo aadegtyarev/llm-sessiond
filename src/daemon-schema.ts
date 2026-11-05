@@ -13,14 +13,21 @@ export function record(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-export function sessionId(value: unknown): string {
+export function lexicalId(value: unknown): string {
   if (typeof value !== 'string' || !ID.test(value)) throw new ApiError(400, 'schema');
   return value;
 }
 
+export function sessionId(value: unknown): string {
+  const id = lexicalId(value);
+  // Session IDs must survive standard URL dot-segment normalization unchanged.
+  if (id === '.' || id === '..') throw new ApiError(400, 'schema');
+  return id;
+}
+
 export function replyBody(value: Record<string, unknown>): QuestionReply {
   const { requestId, method } = value;
-  if (typeof requestId !== 'string' || requestId.length === 0 || requestId.length > 1024
+  if (typeof requestId !== 'string' || requestId.length === 0
     || typeof method !== 'string' || !['confirm', 'select', 'input'].includes(method)) throw new ApiError(400, 'schema');
   if (value.cancelled === true) fields(value, ['requestId', 'method', 'cancelled']);
   else if (method === 'confirm') {

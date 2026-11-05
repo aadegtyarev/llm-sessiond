@@ -31,9 +31,12 @@ GET не принимает body. Все POST body ниже обязательн
 | GET `/events` | SSE: `event: ready`/`data: {}`, затем `event: core`/`data: <CoreEvent>` |
 
 Успешные операции дают HTTP 200. Session/input IDs: 1–128 ASCII characters
-`A-Z a-z 0-9 . _ -`. Публичные DTO и шесть CoreEvent типов определены в
-[src/types.ts](../src/types.ts). Reply имеет `requestId` (1–1024 characters),
-`method: confirm/select/input` и соответственно `confirmed:boolean`/`value:string`,
+`A-Z a-z 0-9 . _ -`. Для sessionId исключены ровно `.` и `..`, поскольку URL-клиенты
+нормализуют такие path segments; прочие dot-containing IDs допустимы.
+Для inputId в JSON body `.` и `..` допустимы. Публичные DTO и шесть CoreEvent типов
+определены в [src/types.ts](../src/types.ts). Reply имеет opaque непустой string `requestId`;
+отдельного лимита длины ID нет, но весь JSON body вместе с ID/ответом ограничен 65536 bytes.
+Ответ задаёт `method: confirm/select/input` и соответственно `confirmed:boolean`/`value:string`,
 либо `cancelled:true` вместо ответа. Extra fields отклоняются.
 
 Сначала подключите SSE и дождитесь **ready**, затем create/start: startup questions
