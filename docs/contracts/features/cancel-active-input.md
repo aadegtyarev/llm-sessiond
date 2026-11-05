@@ -1,6 +1,6 @@
 # Отмена активного ввода с продолжением разговора
 
-Статус: согласован оператором; реализация и проверка ещё не выполнены.
+Статус: кандидат реализации; обязательная повторная Native-проверка ожидается, приёмка не завершена.
 
 ## Цель
 
@@ -40,7 +40,7 @@
 
 1. Внешний HTTP/SSE клиент завершает первый turn с контрольным маркером, затем запускает длительную операцию и отменяет именно её input. Получает доказанный `cancelled`, а не shutdown.
 2. Новый input получает ответ с исходным маркером из контекста. Recall prompt не повторяет маркер; ручного replay или SDK history copy нет. Session и Native PID остаются теми же. Затем explicit stop, observed owned exit и shutdown подтверждают cleanup.
-3. Длительная операция — bounded benign native wait, учитывающая native AbortSignal; file effects только в owned temp. Проверка использует штатный tool loop, одну новую real-Pi Linux session и максимум три user inputs. Эта bounded проверка явно разрешена оператором; платные retries/campaigns не разрешены.
+3. Длительная операция — bounded benign native wait, учитывающая native AbortSignal; file effects только в owned temp. Проверка использует штатный tool loop, одну новую real-Pi Linux session и максимум три user inputs. Первая разрешённая проверка выполнена и завершилась FAILED. Оператор явно разрешил ровно одну дополнительную такую сессию, не более трёх user inputs; всего разрешены две сессии, дальнейшие платные retries/campaigns не разрешены.
 4. Fake-регрессии охватывают exact target, гонки, early terminal, late abort ACK и неизменность B; pending ACK/unknown/unsupported admission; дубли и cancel vs stop/shutdown; cooperative/incomplete/malformed/channel-loss исходы. Без доказанного settlement следующий input не освобождается.
 5. Ошибки fixtures обязательно проверяются снаружи Core/Port/subscriber isolation: существующий fixtureHealth расширяется на новую операцию, assertions не скрываются в callback. Timing контролируется причинными сигналами; environmental allowances не увеличивают short fault budget здорового actor.
 6. Вся фича и новый API seam поставляются целиком в одном PR. Готовность требует проверок ниже и итоговой приёмки; запись этого контракта сама по себе не означает готовность фичи.
@@ -49,9 +49,9 @@
 
 - Полный Linux suite (исходная база 1335+ тестов), typecheck и docs check; новые fake-регрессии проверяют весь класс отмены и существующие инварианты.
 - Тот же portable external API smoke расширяется cancel → continue сценарием и проходит на Linux и actual Windows CI. Windows использует portable Node, не Linux paths. Full Native Windows не обещан.
-- Одна разрешённая bounded real-Pi Linux проверка выполняет HTTP/SSE сценарий приёмки без повторной платной кампании. Недоказуемое обещание, отсутствующая foundation или неизвестный блокирующий диалог требуют остановки и решения оператора.
+- Одна дополнительно разрешённая bounded real-Pi Linux проверка выполняет HTTP/SSE сценарий приёмки без дальнейших повторов и платной кампании. Недоказуемое обещание, отсутствующая foundation или неизвестный блокирующий диалог требуют остановки и решения оператора.
 - Сохраняются exact required checks, gitleaks, smoke needs/always fail guard и pinned actions. Все обязательные проверки должны иметь actual COMPLETED SUCCESS для точного HEAD; bypass, rerun/cancel chase-green не допускаются.
-- Итоговый целостный diff проходит свежий Terra review и parent acceptance. После успешной валидации и приёмки все три durable surface contracts сверяются и обновляются; feature contract отмечается завершённым, проверяется и удаляется по метаконтракту. Завершение — normal protected squash без deployment.
+- Итоговый целостный diff проходит свежий независимый configured reviewer review и parent acceptance. После успешной валидации и приёмки все три durable surface contracts сверяются и обновляются; feature contract отмечается завершённым, проверяется и удаляется по метаконтракту. Завершение — normal protected squash без deployment.
 
 ## Нецели
 
