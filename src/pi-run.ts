@@ -43,7 +43,9 @@ export function createPiRun(emit: (event: HarnessEvent) => void) {
     cancelling = null;
     cancellationSettlement = null;
     if (response?.success === true && settlement && input === owned && !blocked) {
-      finish(settlement, owned, true);
+      // Native abort ACK awaits idle; own settled.aborted is independent of LLM DTO.
+      input = null;
+      emit({ type: 'input-cancelled', inputId: owned.inputId });
       return { kind: 'confirmed' };
     }
     // A natural terminal already published is never rewritten by a late abort response.
@@ -51,17 +53,13 @@ export function createPiRun(emit: (event: HarnessEvent) => void) {
     if (input === owned) uncertain();
     return { kind: 'unknown' };
   }
-  function finish(record: RecordValue, owned: Input, cancelled = false) {
+  function finish(record: RecordValue, owned: Input) {
     input = null; // Clear before publishing: a subscriber may submit the next input.
     const success = record.aborted === false && owned.reason === 'stop';
     const failure = (record.aborted === false && owned.reason === 'error')
       || (record.aborted === true && owned.reason === 'aborted');
-    // Native aborted is run control evidence; a cooperative tool can leave toolUse last.
-    const cancellation = cancelled && record.aborted === true
-      && (owned.reason === 'aborted' || owned.reason === 'toolUse');
-    if (!success && !failure && !cancellation) blocked = true;
-    emit(cancellation ? { type: 'input-cancelled', inputId: owned.inputId }
-      : success ? { type: 'input-completed', inputId: owned.inputId } : {
+    if (!success && !failure) blocked = true;
+    emit(success ? { type: 'input-completed', inputId: owned.inputId } : {
         type: 'input-failed', inputId: owned.inputId,
         certainty: failure ? 'definitive' : 'unknown',
       });
@@ -73,7 +71,7 @@ export function createPiRun(emit: (event: HarnessEvent) => void) {
     }
     if (record.type === 'agent_start') {
       nativeActive = true;
-      if (cancellationSettlement) { uncertain(); return; }
+      if (cancelling) { uncertain(); return; }
       if (input?.started) { input.boundary = true; input.reason = undefined; }
       else if (input) uncertain(); // A run before our ACK cannot be claimed later.
     }

@@ -44,7 +44,15 @@ export function acceptHarnessEvent(
     return;
   }
   if (!session.input || session.input.inputId !== event.inputId || (session.input.status !== 'pending' && session.input.status !== 'unknown')) return;
-  if (event.type === 'input-cancelled' && !session.input.cancelRequested) return;
+  if (session.input.cancelledWhileCancelling) return;
+  if (event.type === 'input-cancelled') {
+    if (!session.input.cancelRequested) return;
+    if (session.input.cancelInFlight) {
+      // Publish only after the control fence opens, so subscribers can send immediately.
+      session.input.cancelledWhileCancelling = true;
+      return;
+    }
+  }
   session.input.status = event.type === 'input-completed' ? 'completed'
     : event.type === 'input-cancelled' ? 'cancelled'
     : event.certainty === 'definitive' ? 'failed' : 'unknown';

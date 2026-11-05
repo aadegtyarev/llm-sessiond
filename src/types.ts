@@ -87,6 +87,7 @@ export interface InputState {
   accepted?: boolean;
   cancelRequested?: boolean;
   cancelInFlight?: boolean;
+  cancelledWhileCancelling?: boolean;
 }
 
 export interface SessionRecord {

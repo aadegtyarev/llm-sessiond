@@ -87,6 +87,12 @@ export class SessionCore {
       ?? Promise.resolve({ kind: 'rejected' }));
     input.cancelInFlight = false;
     if (session.generation === generation && session.input === input
+      && input.cancelledWhileCancelling && (input.status === 'pending' || input.status === 'unknown')) {
+      input.cancelledWhileCancelling = false;
+      input.status = 'cancelled';
+      this.events.publish({ type: 'input', sessionId, input: inputView(input) });
+    }
+    if (session.generation === generation && session.input === input
       && input.status === 'pending' && outcome.kind === 'unknown') {
       input.status = 'unknown';
       this.events.publish({ type: 'input', sessionId, input: inputView(input) });

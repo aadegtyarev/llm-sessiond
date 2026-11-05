@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { SessionCore } from '../src/core.ts';
 import { boundary, message, settled, final, fixture } from './pi-support.ts';
 
-for (const reason of ['aborted', 'toolUse']) {
+for (const reason of ['aborted', 'toolUse', 'stop', 'error', 'length']) {
   test(`pi cancel: owned ${reason} settlement and drained abort allow same child continue`, async t => {
     const f = await fixture(t);
     const core = new SessionCore(f.port);
@@ -26,8 +26,6 @@ for (const reason of ['aborted', 'toolUse']) {
 }
 
 for (const [name, records] of [
-  ['missing', [settled(true)]],
-  ['malformed', [{ type: 'message_end', message: { role: 'assistant', stopReason: 'aborted' } }, settled(true)]],
   ['incomplete', [message('toolUse'), { type: 'agent_end' }]],
   ['conflicting', [message('toolUse'), settled(false)]],
   ['bad-control', [message('aborted'), settled('true')]],

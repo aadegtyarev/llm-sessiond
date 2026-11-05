@@ -57,8 +57,9 @@ reply written не native consumption. Не повторяйте команды 
 или ACK. Пока control command в полёте, следующий send также заблокирован, даже
 если ввод естественно завершился. Неверный/неактивный ID, неподтверждённый send или
 повторный cancel отклоняются. При `unknown` новый send запрещён: нужен explicit stop.
-После доказанного `cancelled` и завершения cancel-запроса можно отправить новый input
-в ту же сессию без перезапуска Pi и потери контекста. Tool effects не откатываются.
+Наблюдаемый `cancelled` публикуется после завершения control fence: уже из его
+subscriber можно отправить новый input в ту же сессию без перезапуска Pi и потери
+контекста, не ожидая отдельного HTTP ACK. Tool effects не откатываются.
 
 Полный воспроизводимый внешний client→CLI→fakeNative сценарий без модели:
 `npm run test:api-smoke`. Его [JS client](../test/api-client.mjs) не импортирует Core/TS;
