@@ -36,7 +36,7 @@ Thinking, stderr, raw RPC/errors/private config и повторный message_en
 Кандидат terminal — `agent_settled` с финальным assistant message своего run.
 Обязательная Native форма assistant проверяется до использования stopReason
 ([pi-assistant.ts](../../../src/pi-assistant.ts)); optional metadata остаётся opaque.
-Поздний malformed assistant сбрасывает прежнее evidence. Определённые исходы:
+Поздний malformed assistant сбрасывает прежнее evidence. Определённые обычные исходы без доказанной отмены:
 
 | Final stopReason | settled.aborted | Harness terminal |
 | --- | --- | --- |
@@ -52,6 +52,12 @@ Handled/queued/неизвестная disposition даёт PortOutcome unknown �
 Core блокирует следующий send при unknown до explicit cleanup, без retry/replay.
 Потеря канала/write или ACK deadline даёт unknown; асинхронная потеря активного
 подтверждённого run публикует input-failed certainty unknown.
+
+## Отмена активного ввода
+
+Для точно зарезервированного owned input с подтверждённым started и его `agent_start` adapter отправляет штатный RPC abort. Отдельное доказательство `input-cancelled` требует совпадающий успешный и завершившийся ответ abort после native waitForIdle, собственный wire `agent_settled.aborted=true` и отсутствие конфликтующего run или ранее принятого естественного terminal. Один ACK, сигнал или extension file не доказывают settlement. DTO и stopReason assistant не являются ни доказательством, ни veto этой независимой control-цепочки; обязательная DTO-проверка обычных completed/failed исходов остаётся без изменений.
+
+Неподтверждённая отмена, потеря канала или deadline дают unknown и требуют explicit stop; автоматических retry, replay, restart и hard-stop нет. После доказанной отмены продолжение использует ту же сессию и owned Pi PID с контекстом ранее завершённых сообщений. Выполненные эффекты tools не откатываются; остановка descendants, remote jobs или инструментов, игнорирующих abort, не гарантируется.
 
 ## Tool, question и notification observations
 
@@ -145,6 +151,6 @@ Interaction regressions проверяют immutable shapes, startup/reentrant r
 три concurrent request ID, validation/expiry/duplicates/channel loss и ответы без ACK.
 Отдельная bounded real-Pi проверка подтверждает clarification → явный текстовый
 ответ → native write/read с disk verify → три вопроса/ответа через Core → tool result
-с consumed tuple → completed final и observed owned exit. Это не universal provider,
-auth, native cancellation/timeout или descendant/remote cleanup гарантия.
+с consumed tuple → completed final и observed owned exit. Отдельный bounded Linux сценарий также проверил native cancellation и продолжение контекста в том же owned процессе. Это не universal provider,
+auth, native timeout или descendant/remote cleanup гарантия.
 Правила lifecycle — [метаконтракт](../meta-contract.md).

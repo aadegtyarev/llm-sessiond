@@ -35,6 +35,7 @@ GET без body. Query/fragment/percent-encoded paths и Origin отклоняю
 | GET `/sessions/:sessionId` | → SessionView |
 | POST `/sessions/:sessionId/start` | `{}` → SessionView |
 | POST `/sessions/:sessionId/send` | `{inputId,text}` → InputView |
+| POST `/sessions/:sessionId/cancel` | `{inputId}` → InputView целевого ввода |
 | POST `/sessions/:sessionId/reply` | QuestionReply → `{kind: written/rejected/unknown}` |
 | POST `/sessions/:sessionId/stop` | `{}` → SessionView |
 | POST `/shutdown` | `{}` → `{stoppedSessionIds,uncertainSessionIds,failedSessionIds}` |
@@ -46,6 +47,7 @@ Session/input IDs: 1–128 ASCII `A-Z a-z 0-9 . _ -`. Только для sessio
 InputView — inputId/status. Reply: opaque непустой requestId, method confirm/select/input,
 confirmed:boolean для confirm, value:string для select/input либо cancelled:true вместо
 ответа; extra fields отклоняются. Отдельного length cap requestId нет; body limit действует.
+Cancel принимает только указанный допустимый input ID и строгий body без дополнительных полей; auth проверяется до операции. `cancelled` — статус существующего события `input`, не новый тип SSE. HTTP200 с `unknown` не подтверждает отмену; ошибки admission или отказ harness возвращают HTTP409. Пока control отмены не завершён, новый send блокирован; подтверждённый `cancelled` позволяет продолжить тот же разговор. `cancelled` в QuestionReply отменяет ответ на вопрос, а не input.
 HTTP ACK не settlement: pending/unknown блокируют следующий send. Reply written — только
 local write, не native receipt/consumption; replies не создают input и не завершают его.
 
@@ -96,5 +98,5 @@ UI/harnessd/Telegram/ClaudeCode или generic executable gateway.
 ## Проверенная platform boundary
 
 Один HTTP/SSE external-client fake-native smoke проверен на Linux и actual Windows CI.
-Full suite и bounded real Native Pi scenario проверены на Linux. Это не full Native Pi/old
-full-suite Windows certification, provider/auth, native cancellation/timeout или remote cleanup гарантия.
+Full suite и bounded real Native Pi cancellation → продолжение контекста проверены на Linux. Portable fake-native smoke проверяет отмену и продолжение на Linux и actual Windows CI. Это не full Native Pi/old
+full-suite Windows certification, универсальная provider/auth, native timeout или remote cleanup гарантия.
