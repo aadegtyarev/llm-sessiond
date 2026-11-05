@@ -1,7 +1,8 @@
 # Compact session core
 
-Компактное TypeScript-ядро сессий в памяти. Нормативные гарантии, ошибки и границы:
-[контракт ядра](docs/contracts/surfaces/session-core.md). Public API: [src/core.ts](src/core.ts).
+Компактное TypeScript-ядро сессий в памяти и локальный HTTP/JSON + SSE daemon API.
+[Контракт ядра](docs/contracts/surfaces/session-core.md); Public API: [src/core.ts](src/core.ts).
+Внешнему HTTP-клиенту импорт TypeScript не нужен.
 
 ## Подготовка и проверки
 
@@ -47,10 +48,22 @@ console.log('fake-port flow: completed → stopped → shutdown');
 JS
 ```
 
+## Локальный daemon из checkout
+
+[Запуск и внешний клиент](docs/local-daemon-api.md): Node24 CLI читает приватный
+config через stdin до EOF, слушает только `127.0.0.1`; bearer auth обязателен даже
+для SSE. Token не передаётся через argv/env/URL. Служба не устанавливается.
+[Нормативный API](docs/contracts/surfaces/local-daemon-api.md) описывает routes,
+DTO, readiness, ограничения и честные unknown outcomes. Сначала SSE ready, затем
+create/start; HTTP ACK и reply written не означают settlement/native consumption.
+`npm run test:api-smoke` проверяет внешний HTTP/SSE сценарий без модели на Linux
+и Windows; это не full Native Pi Windows certification. Для cleanup используйте
+explicit stop/shutdown; unknown не all-cleaned.
+
 ## Нецели
 
-Это не готовый daemon/CLI. HTTP/SDK, persistence, истории, восстановления и
-автоматических retry здесь нет. Native Pi 1.5 RPC entrypoint —
+SDK, persistence, истории, восстановления и автоматических retry нет.
+Native Pi 1.5 RPC entrypoint —
 `createPiHarness` из [src/pi-harness.ts](src/pi-harness.ts), передаваемый в `SessionCore`.
 Нормативные границы — [контракт Pi adapter](docs/contracts/surfaces/pi-text-harness.md).
 Он сохраняет native tools/resources; handled/queued и недоказанные terminal исходы
