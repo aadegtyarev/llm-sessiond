@@ -46,7 +46,6 @@
 - Для реализации выполнить `npm run typecheck`, `npm test`, docs checks, API fake integration и отдельный API smoke на Linux и Windows CI; проверить итоговые required checks/gitleaks и зависимость от Windows smoke.
 - Этим согласием явно разрешена одна bounded real Pi validation Linux session: до трёх user inputs, штатный native tool loop, только известные benign namespaced fixture answers; file effects только в owned temp. Неизвестный blocking dialog требует STOP/ask. Без paid retries/campaigns; сохраняются существующие Pi 1.5/default resources, без отключающих flags/SDK.
 - До начала и каждого возобновления разработки прочитать development и этот approved feature contract. Новый scope или реальная невозможность полного результата требуют STOP и обращения к оператору, не дробления обещанного.
-- Первый внутренний этап только записывает этот контракт: clean state/donor/fetch, task branch от свежей origin/main, docs/diff checks и meaningful local commit. На нём нет runtime/CI/package/README изменений, push/PR или планирования runtime; следующая стадия — scout после сохранения. Это не отдельная поставка фичи.
 - Глобальные настройки, соседние проекты, установка Pi и donor node_modules не меняются; deploy/установка службы не выполняются. Решения, приёмка и merge принадлежат parent; один writer.
 
 ## Нецели
