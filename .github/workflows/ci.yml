@@ -10,9 +10,30 @@ permissions:
   pull-requests: read
 
 jobs:
+  api-smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run test:api-smoke
+
   checks:
+    needs: api-smoke
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require Linux and Windows API smoke success
+        env:
+          SMOKE_RESULT: ${{ needs.api-smoke.result }}
+        run: test "$SMOKE_RESULT" = success
       - uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0

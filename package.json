@@ -10,6 +10,8 @@
     "typescript": "5.9.3"
   },
   "scripts": {
+    "start": "node src/daemon-cli.ts",
+    "test:api-smoke": "node test/api-external-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts"
   }
