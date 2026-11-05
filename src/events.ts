@@ -44,7 +44,10 @@ export function acceptHarnessEvent(
     return;
   }
   if (!session.input || session.input.inputId !== event.inputId || (session.input.status !== 'pending' && session.input.status !== 'unknown')) return;
-  session.input.status = event.type === 'input-completed' ? 'completed' : event.certainty === 'definitive' ? 'failed' : 'unknown';
+  if (event.type === 'input-cancelled' && !session.input.cancelRequested) return;
+  session.input.status = event.type === 'input-completed' ? 'completed'
+    : event.type === 'input-cancelled' ? 'cancelled'
+    : event.certainty === 'definitive' ? 'failed' : 'unknown';
   notify({ type: 'input', sessionId: session.id, input: inputView(session.input) });
 }
 

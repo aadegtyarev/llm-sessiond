@@ -57,6 +57,12 @@ export function createPiHarness(config: PiLaunch = {}): HarnessPort {
       if (!response) { owned.run.uncertain(); return { kind: 'unknown' }; }
       return outcome;
     },
+    async cancel(sessionId, inputId) {
+      const owned = sessions.get(sessionId);
+      if (!owned) return { kind: 'rejected' };
+      if (!owned.ready || owned.wire.broken || owned.exit.exited) return { kind: 'unknown' };
+      return owned.run.cancel(inputId, () => owned.wire.command('abort'));
+    },
     async reply(sessionId, answer) {
       const owned = sessions.get(sessionId);
       if (!owned) return { kind: 'rejected' };

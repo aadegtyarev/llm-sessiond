@@ -54,6 +54,16 @@ try {
   ]);
   await stream.next(f => f.event === 'core' && f.data.type === 'input' && f.data.input.inputId === 'answer' && f.data.input.status === 'completed');
   assert.equal((await api.request('/sessions/external')).input.status, 'completed');
+  await api.request('/sessions/external/send', { inputId: 'cancel-target', text: 'fixture:wait' });
+  const waiting = await stream.next(f => f.event === 'core' && f.data.type === 'tool' && f.data.toolCallId === 'wait' && f.data.phase === 'start');
+  await api.request('/sessions/external/cancel', { inputId: 'wrong' }, 409);
+  assert.equal((await api.request('/sessions/external/cancel', { inputId: 'cancel-target' })).status, 'cancelled');
+  await stream.next(f => f.event === 'core' && f.data.type === 'tool' && f.data.toolCallId === 'wait' && f.data.phase === 'end' && f.data.result.content[0].text === 'abort-received');
+  await stream.next(f => f.event === 'core' && f.data.type === 'input' && f.data.input.inputId === 'cancel-target' && f.data.input.status === 'cancelled');
+  assert.equal((await api.request('/sessions/external')).status, 'running');
+  await api.request('/sessions/external/send', { inputId: 'continue', text: 'fixture:recall' });
+  await stream.next(f => f.event === 'core' && f.data.type === 'text' && f.data.text === `fixture:recall:fixture:clarify:${waiting.data.args.pid}`);
+  await stream.next(f => f.event === 'core' && f.data.type === 'input' && f.data.input.inputId === 'continue' && f.data.input.status === 'completed');
   assert.equal((await api.request('/sessions/external/stop', {})).status, 'stopped');
   assert.deepEqual(await api.request('/shutdown', {}), { stoppedSessionIds: [], uncertainSessionIds: [], failedSessionIds: [] });
   assert.deepEqual(await exit, [0, null]);
@@ -63,7 +73,7 @@ try {
   console.log(JSON.stringify({ smoke: 'passed', platform: process.platform, node: process.version,
     client: 'external HTTP/JSON + SSE, no project TypeScript imports', events: stream.events.length,
     types: [...new Set(stream.events.filter(f => f.event === 'core').map(f => f.data.type))],
-    disk: 'verified', consumed: 'three explicit replies verified', ownedExit: 'stop confirmed' }));
+    disk: 'verified', consumed: 'three explicit replies verified', cancellation: 'targeted cancelled + same-PID context recall verified', ownedExit: 'stop confirmed' }));
 } finally {
   clearTimeout(deadline);
   if (stream) await stream.close();

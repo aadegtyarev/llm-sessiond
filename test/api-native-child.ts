@@ -12,6 +12,7 @@ const complete = () => { out(message('stop')); out(settled()); };
 const consumed: Record<string, unknown>[] = [];
 let phase = 'startup';
 let turn = 0;
+let remembered = '';
 const reader = createInterface({ input: process.stdin });
 reader.on('close', () => process.exit(0));
 reader.on('line', line => {
@@ -29,10 +30,28 @@ function handle(command: Record<string, unknown>) {
     if (consumed.length === 3) finishReplies();
     return;
   }
+  if (command.type === 'abort') {
+    if (phase !== 'waiting') throw new Error('abort must target waiting input');
+    phase = 'cancelled';
+    out({ type: 'tool_execution_end', toolCallId: 'wait', toolName: 'fixtureWait', isError: true,
+      result: { content: [{ type: 'text', text: 'abort-received' }] } });
+    out(settled(true));
+    out({ type: 'response', id: command.id, command: 'abort', success: true });
+    return;
+  }
   if (command.type !== 'prompt') throw new Error('unexpected command');
   out({ type: 'response', id: command.id, command: 'prompt', success: true, data: { disposition: 'started' } });
   out({ type: 'agent_start' });
-  if (++turn === 1) { text('fixture:clarify: choose fixture-blue'); complete(); return; }
+  if (++turn === 1) { remembered = String(command.message); text('fixture:clarify: choose fixture-blue'); complete(); return; }
+  if (turn === 3 && command.message === 'fixture:wait') {
+    phase = 'waiting';
+    out(message('toolUse'));
+    out({ type: 'tool_execution_start', toolCallId: 'wait', toolName: 'fixtureWait', args: { pid: process.pid } });
+    return;
+  }
+  if (turn === 4 && phase === 'cancelled' && command.message === 'fixture:recall') {
+    text(`fixture:recall:${remembered}:${process.pid}`); complete(); return;
+  }
   if (turn !== 2 || command.message !== 'fixture-blue') throw new Error('unexpected answer');
   phase = 'questions';
   const bytes = 'fixture-owned-bytes\n';

@@ -84,6 +84,7 @@ export async function fixture(t: TestContext, flags: string[] = [], commandDeadl
       }
       return result;
     },
+    async cancel(id, input) { return raw.cancel!(id, input); },
     async reply(id, answer) { return raw.reply!(id, answer); },
     async stop(id) { usable.delete(id); return raw.stop(id); },
   });

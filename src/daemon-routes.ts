@@ -7,7 +7,7 @@ export function route(core: SessionCore, method: string, path: string, body: Rec
     if (method === 'POST') { fields(body, ['sessionId']); return core.create(sessionId(body.sessionId)); }
     throw new ApiError(405, 'method');
   }
-  const match = /^\/sessions\/([^/]+)(?:\/(start|send|reply|stop))?$/.exec(path);
+  const match = /^\/sessions\/([^/]+)(?:\/(start|send|reply|cancel|stop))?$/.exec(path);
   if (!match) throw new ApiError(404, 'route');
   const id = sessionId(match[1]);
   const operation = match[2];
@@ -15,6 +15,10 @@ export function route(core: SessionCore, method: string, path: string, body: Rec
   if (!operation) throw new ApiError(405, 'method');
   if (method !== 'POST') throw new ApiError(405, 'method');
   if (operation === 'reply') return core.reply(id, replyBody(body));
+  if (operation === 'cancel') {
+    fields(body, ['inputId']);
+    return core.cancel(id, lexicalId(body.inputId));
+  }
   if (operation === 'send') {
     fields(body, ['inputId', 'text']);
     const inputId = lexicalId(body.inputId);

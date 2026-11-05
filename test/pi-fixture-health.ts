@@ -16,6 +16,8 @@ export function fixtureHealth() {
     start: (...args) => run('start', () => port.start(...args)),
     send: (...args) => run('send', () => port.send(...args)),
     stop: (...args) => run('stop', () => port.stop(...args)),
+    ...(port.cancel ? { cancel: (...args: Parameters<NonNullable<HarnessPort['cancel']>>) =>
+      run('cancel', () => port.cancel!(...args)) } : {}),
     ...(port.reply ? { reply: (...args: Parameters<NonNullable<HarnessPort['reply']>>) =>
       run('reply', () => port.reply!(...args)) } : {}),
   });

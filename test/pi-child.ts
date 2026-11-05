@@ -16,6 +16,7 @@ let uiReplies: unknown[] = [];
 let uiExpected = 0;
 let uiFinal: unknown[] = [];
 let startupReady: (() => void) | undefined;
+let abortScenario: { records?: unknown[]; gate?: string; success?: boolean; noAck?: boolean; eof?: boolean } = {};
 const output = (record: unknown) => {
   const line = JSON.stringify(record) + '\n';
   if (batch !== null) batch += line;
@@ -81,8 +82,19 @@ function handle(line: string) {
     if (readyDelay) setTimeout(ready, readyDelay); else ready();
     return;
   }
+  if (command.type === 'abort') {
+    phase('abort-received');
+    (abortScenario.records ?? []).forEach(output);
+    afterConsumption(abortScenario.gate, () => {
+      if (abortScenario.eof) { process.stdout.end(); return; }
+      if (!abortScenario.noAck) response(undefined, abortScenario.success ?? true);
+      phase('abort-response');
+    });
+    return;
+  }
   if (process.argv.includes('--ignore-prompt')) return;
   const scenario = JSON.parse(command.message);
+  abortScenario = scenario.abort ?? {};
   uiExpected = scenario.uiExpected ?? 0;
   uiFinal = scenario.uiFinal ?? [];
   uiReplies = [];
