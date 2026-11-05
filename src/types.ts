@@ -1,5 +1,5 @@
 export type SessionStatus = 'created' | 'starting' | 'running' | 'stopped' | 'failed' | 'unknown';
-export type InputStatus = 'pending' | 'completed' | 'failed' | 'unknown';
+export type InputStatus = 'pending' | 'completed' | 'failed' | 'cancelled' | 'unknown';
 export type PortOutcome = { kind: 'confirmed' } | { kind: 'rejected' } | { kind: 'unknown' };
 
 export interface InputView {
@@ -45,6 +45,7 @@ export type HarnessEvent =
   | InteractionEvent
   | { type: 'text'; text: string }
   | { type: 'input-completed'; inputId: string }
+  | { type: 'input-cancelled'; inputId: string }
   | { type: 'input-failed'; inputId: string; certainty: 'definitive' | 'unknown' };
 
 export interface HarnessPort {
@@ -52,6 +53,8 @@ export interface HarnessPort {
   send(sessionId: string, inputId: string, text: string): Promise<PortOutcome>;
   stop(sessionId: string): Promise<PortOutcome>;
   reply?(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome>;
+  // Confirmed acknowledges control delivery, never input settlement.
+  cancel?(sessionId: string, inputId: string): Promise<PortOutcome>;
 }
 
 export type CoreEvent =
@@ -81,6 +84,10 @@ export interface ShutdownResult {
 export interface InputState {
   readonly inputId: string;
   status: InputStatus;
+  accepted?: boolean;
+  cancelRequested?: boolean;
+  cancelInFlight?: boolean;
+  cancelledWhileCancelling?: boolean;
 }
 
 export interface SessionRecord {

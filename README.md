@@ -56,6 +56,9 @@ config через stdin до EOF, слушает только `127.0.0.1`; beare
 [Нормативный API](docs/contracts/surfaces/local-daemon-api.md) описывает routes,
 DTO, readiness, ограничения и честные unknown outcomes. Сначала SSE ready, затем
 create/start; HTTP ACK и reply written не означают settlement/native consumption.
+`Core.cancel(sessionId, inputId)` и authenticated HTTP cancel позволяют отменить
+активный ввод и продолжить разговор после подтверждённой отмены; запрос и пример —
+в [руководстве клиента](docs/local-daemon-api.md).
 `npm run test:api-smoke` проверяет внешний HTTP/SSE сценарий без модели на Linux
 и Windows; это не full Native Pi Windows certification. Для cleanup используйте
 explicit stop/shutdown; unknown не all-cleaned.

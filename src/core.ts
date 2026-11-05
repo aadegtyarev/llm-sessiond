@@ -53,7 +53,7 @@ export class SessionCore {
     this.assertOpen();
     const session = this.requireSession(sessionId);
     if (session.status !== 'running' || session.stopRequested) throw new CoreError('invalid-state');
-    if (session.input?.status === 'pending' || session.input?.status === 'unknown') throw new CoreError('input-in-flight');
+    if (session.input?.status === 'pending' || session.input?.status === 'unknown' || session.input?.cancelInFlight) throw new CoreError('input-in-flight');
     if (session.inputIds.has(inputId)) throw new CoreError('duplicate-input');
     session.inputIds.add(inputId);
     const input: NonNullable<SessionRecord['input']> = { inputId, status: 'pending' };
@@ -64,10 +64,40 @@ export class SessionCore {
       this.events.publish({ type: 'input', sessionId, input: inputView(input) });
     }
     const outcome = await sendTask;
+    input.accepted = outcome.kind === 'confirmed';
     if (session.generation === generation && session.input === input && input.status === 'pending' && outcome.kind !== 'confirmed') {
       input.status = outcome.kind === 'rejected' ? 'failed' : 'unknown';
       this.events.publish({ type: 'input', sessionId, input: inputView(input) });
     }
+    return inputView(input);
+  }
+
+  /** Target one accepted input; only a harness terminal event proves cancellation. */
+  async cancel(sessionId: string, inputId: string): Promise<InputView> {
+    this.assertOpen();
+    const session = this.requireSession(sessionId);
+    const input = session.input;
+    if (session.status !== 'running' || session.stopRequested || !input
+      || input.inputId !== inputId || input.status !== 'pending'
+      || !input.accepted || input.cancelRequested) throw new CoreError('invalid-state');
+    const generation = session.generation;
+    input.cancelRequested = true;
+    input.cancelInFlight = true; // Also gates a natural terminal racing the control command.
+    const outcome = await callPort(() => this.port.cancel?.(sessionId, inputId)
+      ?? Promise.resolve({ kind: 'rejected' }));
+    input.cancelInFlight = false;
+    if (session.generation === generation && session.input === input
+      && input.cancelledWhileCancelling && (input.status === 'pending' || input.status === 'unknown')) {
+      input.cancelledWhileCancelling = false;
+      input.status = 'cancelled';
+      this.events.publish({ type: 'input', sessionId, input: inputView(input) });
+    }
+    if (session.generation === generation && session.input === input
+      && input.status === 'pending' && outcome.kind === 'unknown') {
+      input.status = 'unknown';
+      this.events.publish({ type: 'input', sessionId, input: inputView(input) });
+    }
+    if (outcome.kind === 'rejected') throw new CoreError('harness-rejected');
     return inputView(input);
   }
 

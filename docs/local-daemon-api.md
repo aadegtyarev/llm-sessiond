@@ -51,9 +51,20 @@ JS
 reply written не native consumption. Не повторяйте команды автоматически после разрыва;
 проверьте текущее состояние и при необходимости явно остановите сессию.
 
+Для отмены конкретного активного ввода отправьте authenticated POST
+`/sessions/:sessionId/cancel` с JSON `{inputId}`. Результат — `InputView` этого ввода;
+только статус `cancelled` в HTTP/SSE доказывает отменённое завершение, не сам запрос
+или ACK. Пока control command в полёте, следующий send также заблокирован, даже
+если ввод естественно завершился. Неверный/неактивный ID, неподтверждённый send или
+повторный cancel отклоняются. При `unknown` новый send запрещён: нужен explicit stop.
+Наблюдаемый `cancelled` публикуется после завершения control fence: уже из его
+subscriber можно отправить новый input в ту же сессию без перезапуска Pi и потери
+контекста, не ожидая отдельного HTTP ACK. Tool effects не откатываются.
+
 Полный воспроизводимый внешний client→CLI→fakeNative сценарий без модели:
 `npm run test:api-smoke`. Его [JS client](../test/api-client.mjs) не импортирует Core/TS;
-[сценарий](../test/api-external-smoke.mjs) показывает ready, операции и явные ответы.
+[сценарий](../test/api-external-smoke.mjs) показывает ready, операции, явные ответы
+и targeted cancel → продолжение разговора.
 
 ## 4. Завершите работу
 
