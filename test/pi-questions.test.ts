@@ -91,3 +91,36 @@ test('pi-questions: claim synchronously, write uncertainty does not permit retry
   assert.deepEqual(await questions.reply(answers[0]), { kind: 'rejected' });
   assert.equal(writes, 1);
 });
+
+test('pi-questions: written replies need a later correlated idle barrier, never replay old UI IDs', async () => {
+  const { questions } = setup();
+  assert.equal(questions.controlAdmissible, false);
+  assert.equal(questions.quiescent, false);
+  const tooEarly = questions.barrier();
+  for (const answer of answers) await questions.reply(answer);
+  assert.equal(questions.controlAdmissible, true);
+  tooEarly();
+  assert.equal(questions.quiescent, false);
+  questions.barrier()();
+  assert.equal(questions.quiescent, true);
+  for (const answer of answers) assert.deepEqual(await questions.reply(answer), { kind: 'rejected' });
+  questions.event({ ...dialogs[0], id: 'new-question' });
+  assert.equal(questions.controlAdmissible, false); assert.equal(questions.quiescent, false);
+});
+
+for (const fault of ['duplicate', 'lost', 'new-question', 'malformed', 'editor', 'unknown-write'] as const) {
+  test(`pi-questions: idle barrier does not erase ${fault}`, async () => {
+    const questions = createPiQuestions(() => {}, async () => ({ kind: fault === 'unknown-write' ? 'unknown' : 'written' }));
+    questions.event(dialogs[0]);
+    await questions.reply(answers[0]);
+    const prove = questions.barrier();
+    if (fault === 'duplicate') questions.event(dialogs[0]);
+    if (fault === 'lost') questions.invalidate();
+    if (fault === 'new-question') questions.event({ ...dialogs[0], id: 'new' });
+    if (fault === 'malformed') questions.event({ ...dialogs[0], id: 'new', title: null });
+    if (fault === 'editor') questions.event({ type: 'extension_ui_request', id: 'editor', method: 'editor' });
+    prove();
+    assert.equal(questions.controlAdmissible, false);
+    assert.equal(questions.quiescent, false);
+  });
+}

@@ -49,7 +49,12 @@ export type HarnessEvent =
   | { type: 'input-failed'; inputId: string; certainty: 'definitive' | 'unknown' };
 
 // Private exact-file binding; never part of public views or HTTP input.
+export interface NativeStartupReference {
+  readonly prefixByteLength: number;
+  readonly sha256: string;
+}
 export interface NativeBinding {
+  startupReference?: NativeStartupReference;
   file: string;
   cwd: string;
   nativeId: string | null;
@@ -57,11 +62,36 @@ export interface NativeBinding {
   fresh: boolean;
 }
 
+export interface NativeModel {
+  readonly provider: string;
+  readonly id: string;
+  readonly name?: string;
+}
+export interface ModelChoice { readonly provider: string; readonly modelId: string }
+export interface SessionSettings {
+  readonly model: NativeModel | null;
+  readonly thinkingLevel: string;
+  // Native capabilities of the CURRENT model only.
+  readonly availableThinkingLevels: readonly string[];
+}
+export type ControlResult<T> = { readonly kind: 'confirmed'; readonly value: T }
+  | { readonly kind: 'rejected' | 'unknown' };
+// Private port evidence; Core removes this marker from public results.
+export type HarnessControlResult<T> = ControlResult<T> & {
+  readonly effectUncertain?: true;
+  readonly ownershipLost?: true;
+};
+
 export interface HarnessPort {
   start(sessionId: string, emit: (event: HarnessEvent) => void, native?: NativeBinding): Promise<PortOutcome>;
   send(sessionId: string, inputId: string, text: string): Promise<PortOutcome>;
   stop(sessionId: string): Promise<PortOutcome>;
   reply?(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome>;
+  models?(sessionId: string): Promise<HarnessControlResult<readonly NativeModel[]>>;
+  settings?(sessionId: string): Promise<HarnessControlResult<SessionSettings>>;
+  setModel?(sessionId: string, choice: ModelChoice): Promise<HarnessControlResult<SessionSettings>>;
+  setThinkingLevel?(sessionId: string, level: string): Promise<HarnessControlResult<SessionSettings>>;
+  reload?(sessionId: string): Promise<HarnessControlResult<SessionSettings>>;
   // Confirmed acknowledges control delivery, never input settlement.
   cancel?(sessionId: string, inputId: string): Promise<PortOutcome>;
 }
@@ -113,5 +143,6 @@ export interface SessionRecord {
   owned?: boolean;
   stopProven?: boolean;
   operations: number;
+  controlInFlight?: boolean;
   deleting?: boolean;
 }

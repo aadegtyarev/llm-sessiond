@@ -100,5 +100,7 @@ export function createPiRun(emit: (event: HarnessEvent) => void) {
     if (record.type === 'message_update' && update.type === 'text_delta'
       && typeof update.delta === 'string') emit({ type: 'text', text: update.delta });
   }
-  return { begin, acknowledge, uncertain, event, cancel };
+  return { begin, acknowledge, uncertain, event, cancel,
+    get idle() { return !blocked && !input && !nativeActive && !cancelling; },
+  };
 }
