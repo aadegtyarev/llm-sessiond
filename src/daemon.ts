@@ -1,17 +1,17 @@
 import { createServer, type ServerResponse } from 'node:http';
-import { SessionCore, CoreError, type HarnessPort } from './core.ts';
+import { SessionCore, CoreError, type HarnessPort, type NativeOptions } from './core.ts';
 import { authenticate, requestBody } from './daemon-request.ts';
 import { ApiError, fields } from './daemon-schema.ts';
 import { openEventStream, STREAM_CLIENTS } from './daemon-stream.ts';
 import { route } from './daemon-routes.ts';
 
-export interface DaemonOptions { token: string; port: number; harness: HarnessPort }
+export interface DaemonOptions { token: string; port: number; harness: HarnessPort; native?: NativeOptions }
 
-export async function listenDaemon({ token, port, harness }: DaemonOptions) {
+export async function listenDaemon({ token, port, harness, native }: DaemonOptions) {
   if (!/^[A-Za-z0-9_-]{32,256}$/.test(token) || !Number.isInteger(port) || port < 0 || port > 65535) {
     throw new Error('invalid daemon settings');
   }
-  const core = new SessionCore(harness);
+  const core = new SessionCore(harness, native);
   const streams = new Set<() => void>();
   let closing = false;
   let shutdownTask: ReturnType<SessionCore['shutdown']> | undefined;

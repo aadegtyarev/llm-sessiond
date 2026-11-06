@@ -66,6 +66,58 @@ subscriber можно отправить новый input в ту же сесс�
 [сценарий](../test/api-external-smoke.mjs) показывает ready, операции, явные ответы
 и targeted cancel → продолжение разговора.
 
+## Постоянные native-сессии: S1, до полной приёмки
+
+[Согласованная фича](contracts/features/native-session-lifecycle.md) остаётся pending;
+независимый review, native/platform проверки и обновление durable contracts ещё впереди.
+Без следующих настроек сохраняется прежний in-memory режим с `--no-session`.
+
+Оператор может добавить в stdin config пару `stateDir` и `nativeSessionDir` (оба
+непустые пути). Первый каталог содержит только приватные metadata; их имена кодируют
+case-sensitive session IDs в lowercase base32 с безопасным префиксом (включая `Foo`/`foo`,
+`CON`, `.leading` и ID длины128), а не используют ID как raw basename. Второй —
+непосредственные `.jsonl` native files. Это не рекурсивный поиск по всему Pi home.
+Для новых сессий cwd берётся из `launch.cwd` либо cwd daemon; импорт использует cwd
+native header. Защитите оба каталога правами/Windows ACL. В HTTP пути не передаются.
+
+| Authenticated операция | Body / результат |
+| --- | --- |
+| GET `/native-sessions` | `[{nativeId}]`: валидные однозначные native UUID в доверенном каталоге |
+| POST `/sessions/:sessionId/register` | `{nativeId}` → SessionView; существующий native file, без запуска |
+| POST `/sessions` | `{sessionId}` → SessionView; в persistent режиме резервирует новый пустой file |
+| POST `/sessions/:sessionId/start` | `{}`; created либо explicit reopen stopped, точный `--session` file |
+| POST `/sessions/:sessionId/delete` | `{}` → `{deleted:true}`; только stopped без незавершённых операций |
+
+Native Pi сам пишет header/history, allocation filename не является native UUID.
+Инициализировать пустой file разрешено только NEW reservation, ещё не проходившей
+launch attempt. Durable start intent снимает это разрешение до запуска: unknown
+attempt с оставшимся пустым файлом не получает повторную пустую инициализацию даже
+после доказанного stop. Никогда не запускавшаяся пустая сессия остаётся startable.
+Stop сохраняет историю; clean shutdown освобождает свои ownership gates. Новый
+процесс с теми же настройками восстанавливает registry без запуска Pi. Used input IDs
+не освобождаются при reopen; старый unknown input не превращается в completed и не
+мешает новому вводу после доказанного stop/reopen. Нет prompt/event mirror или replay.
+Пропавшая/невалидная/подменённая история не заменяется пустой. Hardlinks, symlink files
+и неоднозначные UUID не импортируются. Partial delete не объявляется успехом;
+повторный explicit delete завершает только ранее записанный intent, проверяя identity
+оставшегося файла. Startup ничего не удаляет.
+
+Каждый canonical root эксклюзивно занят `.llm-sessiond.lock` (`wx`, mode0600, без PID).
+Второй compliant daemon с любым общим root откажет до командных эффектов. При startup
+failure освобождаются только свои захваченные gates; после uncertain/failed cleanup
+они остаются. После crash leftover locks **не удаляются/перехватываются автоматически**:
+оператор сначала независимо доказывает отсутствие прежнего child/writer и только
+затем выполняет безопасное восстановление собственных каталогов. Dirty metadata
+после такого recovery восстанавливается как unknown: новый daemon не принимает
+чужой PID и не выдаёт собственный пустой port за доказательство его остановки.
+Сторонний Pi, игнорирующий gate, и hostile same-user filesystem mutation не защищены.
+
+Дополнительные безопасные Core/API error codes: `storage-failed`, `native-invalid`,
+`native-owned` (HTTP409); private filesystem/native diagnostics не публикуются.
+Metadata I/O синхронно выполняется на command boundaries до новых эффектов и перед
+clean completion, не внутри subscriber. Запись каждого live terminal/SSE event и
+crash-consistent outcome snapshots не обещаются.
+
 ## 4. Завершите работу
 
 Вызовите authenticated POST `/sessions/:sessionId/stop` с JSON `{}` для отдельной

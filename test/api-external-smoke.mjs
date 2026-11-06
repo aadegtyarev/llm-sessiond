@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { apiClient } from './api-client.mjs';
+import { nativeSessionSmoke } from './native-session-smoke.mjs';
 
 const root = mkdtempSync(join(tmpdir(), 'llm-sessiond-api-'));
 const token = randomBytes(32).toString('base64url');
@@ -80,3 +81,4 @@ try {
   if (child.exitCode === null && child.signalCode === null) { child.kill(); await exit; }
   rmSync(root, { recursive: true, force: true });
 }
+await nativeSessionSmoke();

@@ -38,10 +38,10 @@ export function trackPiExit(child: ChildProcessWithoutNullStreams) {
   return { stop, get exited() { return exited; } };
 }
 
-export function launchPi(config: PiLaunch): ChildProcessWithoutNullStreams {
+export function launchPi(config: PiLaunch, sessionFile?: string): ChildProcessWithoutNullStreams {
   const env = { ...process.env };
   delete env.PI_PACKAGE_DIR;
   return spawn(config.executable ?? 'pi', [
-    ...(config.prefixArgs ?? []), '--mode', 'rpc', '--no-session',
+    ...(config.prefixArgs ?? []), '--mode', 'rpc', ...(sessionFile ? ['--session', sessionFile] : ['--no-session']),
   ], { cwd: config.cwd, env, shell: false, stdio: 'pipe' });
 }

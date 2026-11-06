@@ -13,9 +13,17 @@ test('daemon config allows only trusted launch settings and bounded token/port',
     { token, port: 65536 }, { token, host: '0.0.0.0' }, { token, launch: { rawRpc: {} } },
     { token, launch: { executable: '' } }, { token, launch: { prefixArgs: [1] } },
     { token, launch: { cwd: 1 } }, { token, launch: { stopDeadlineMs: 0 } },
-    { token, launch: { commandDeadlineMs: Infinity } }]) {
+    { token, launch: { commandDeadlineMs: Infinity } }, { token, stateDir: '/private/state' },
+    { token, nativeSessionDir: '/private/native' }, { token, stateDir: '', nativeSessionDir: '/private/native' },
+    { token, stateDir: '/private/state', nativeSessionDir: 1 }, { token, native: {} }]) {
     assert.throws(() => daemonConfig(config));
   }
+});
+
+test('daemon config: persistence roots are paired trusted settings, never public DTO fields', () => {
+  assert.deepEqual(daemonConfig({ token, stateDir: '/private/state', nativeSessionDir: '/private/native',
+    launch: { cwd: '/private/work' } }), { token, port: 3000, launch: { cwd: '/private/work' },
+    native: { stateDir: '/private/state', nativeSessionDir: '/private/native', cwd: '/private/work' } });
 });
 
 for (const mode of ['argv', 'bad-json', 'oversize', 'invalid-utf8']) {
