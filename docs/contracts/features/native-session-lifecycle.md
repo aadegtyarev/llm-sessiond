@@ -1,6 +1,6 @@
 # Постоянные native-сессии
 
-**Статус:** согласовано; реализация и приёмка не выполнены.
+**Статус:** выполнено. Функциональная валидация, независимый code review и required CI пройдены; durable surfaces согласованы с текущей реализацией. Документ сохраняется для проверки complete-state перед удалением по метаконтракту.
 
 ## Цель и сценарии
 
@@ -25,6 +25,13 @@ Pi хранит стандартную историю и контекст; daemo
 ## Валидация
 
 Полный Linux suite (baseline 1385+), typecheck, проверка документации; portable external API fake smoke на actual Linux и Windows; независимый review и приёмка parent. Native Linux: всего не более 3 запусков Pi и 3 коротких user inputs, только owned temp, без платных повторов. Неизвестные блокирующие диалоги: STOP и запрос решения, без автоответов. Required checks/pins/strict guard не меняются; Native Windows и универсальная поддержка provider не гарантируются. После валидации согласовать durable contracts; complete → verify → delete по метаконтракту.
+
+## Выполненная валидация
+
+- Linux: typecheck, полный suite1870/1870, оба external HTTP/SSE fake-native smoke, docs checker и diff checks.
+- Actual CI: Ubuntu/Windows external API smoke (включая persistence/restart/delete), Linux checks и secret scan успешны.
+- Bounded real Native Pi Linux: два owned запуска/два коротких inputs; clean daemon restart, тот же file/native UUID, completed context recall без повторения marker, stop/delete и сохранность unrelated file. Owned exit/close и clean shutdown всех трёх daemon подтверждены; никаких вопросов/hidden retries.
+- Проверка complete-state документации и последующее удаление только этого temporary feature contract выполняются отдельными последовательными шагами. S2/S3 не реализованы; Native Windows, full-suite Windows и universal provider/auth не заявлены.
 
 ## Поверхности
 

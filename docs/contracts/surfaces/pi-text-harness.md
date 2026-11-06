@@ -3,8 +3,9 @@
 ## Граница и владение
 
 `createPiHarness(PiLaunch)` из [pi-harness.ts](../../../src/pi-harness.ts) реализует
-существующий `HarnessPort` для штатного Native Pi 1.5 subprocess RPC.
-Потребитель — [SessionCore](session-core.md); его гарантии не меняются.
+`HarnessPort` для штатного Native Pi 1.5 subprocess RPC.
+Потребитель — [SessionCore](session-core.md), который владеет lifecycle/admission
+и optional durable registry. Adapter не становится вторым владельцем registry.
 Adapter владеет процессом и wire/run state: один owned child на логическую сессию.
 Pi владеет agent/model/tool loop, tools, skills, MCP, extensions и templates.
 Это доверительная граница штатного RPC и native resources, не защита от
@@ -14,14 +15,45 @@ Pi владеет agent/model/tool loop, tools, skills, MCP, extensions и templ
 
 `PiLaunch` задаёт trusted executable (default `pi`), prefixArgs, cwd и deadlines:
 commandDeadlineMs (default 10000), stopDeadlineMs (default 5000); оба конечные >0.
-Аргументы по умолчанию — `--mode rpc --no-session`, без initial prompt/resume.
+Без native binding аргументы — `--mode rpc --no-session`, без initial prompt/resume.
+При trusted binding от Core используется только точный `--mode rpc --session <absolute file>`;
+нет picker/resume, ID/prefix/global поиска или неявного fork. Cwd берётся из binding.
 Adapter намеренно не отключает native tools/resources; trusted launch config
 контролирует оператор. `shell:false`; текст передаётся только как JSON data.
 Child env — копия parent env без `PI_PACKAGE_DIR`; parent/global env не меняется.
 Start подтверждается коррелированным успешным `get_state` с проверкой state,
 не spawn/задержкой; недоказанная readiness даёт unknown и сохраняет child для cleanup.
+При native binding readiness дополнительно требует совпадения correlated state
+`sessionId`/`sessionFile` с actual header UUID и exact canonical path; проверяются
+cwd и file identity. Core сохраняет подтверждённый binding до running success.
 Unique command ID и запись input существуют до write. JSONL использует LF,
 optional terminal CR, streaming UTF8, непрерывное чтение и stdin backpressure.
+
+## Native история и повторное открытие
+
+Pi сам пишет стандартные header/history/context. Core до первого launch сохраняет
+intent и эксклюзивно выделяет zero-byte file mode0600 (`wx`). Имя allocation — nonce,
+не native UUID. Native startup tools/resources могут иметь эффекты до первого prompt,
+поэтому fencing начинается перед launch, а не только перед отправкой текста.
+
+Empty initialization допустима только для NEW reservation, ещё не проходившей launch
+attempt. Durable start intent снимает eligibility до запуска. Attempted/unknown empty
+history не инициализируется повторно после stop; никогда не запускавшаяся пустая запись
+остаётся startable. Existing missing/empty/corrupt/replaced history не заменяется новым
+разговором. Безопасность allocation/import/reopen/delete и root ownership определяет
+[контракт Core](session-core.md).
+
+Файлы — canonical regular, без symlink/hardlink selection и неоднозначного binding.
+Header versions1/2/3 поддерживаются; только отсутствие version означает legacy v1.
+Проверяются обязательные известные context payloads, native Tool/ToolReference формы
+и compaction retention: legacy index не указывает вперёд; modern target — self retain-none
+либо ancestor текущей ветки. Unknown extension entries/roles и opaque metadata не
+превращаются в универсальную schema/replay модель daemon.
+
+Stop сохраняет native history. Explicit Core reopen stopped запускает новый owned child
+на том же точном файле/UUID; прошлый child адаптера должен иметь observed exit.
+История не replay-ится вручную и не копируется в registry. Отдельного delete_session RPC
+нет: после доказанного stop точный file и metadata удаляет Core.
 
 ## Output, ownership и terminal
 
@@ -139,8 +171,9 @@ send получит unknown, explicit stop использует сохранён
 валидация не заменяет это покрытие и не расширяет гарантии адаптера.
 Реальная генерация требует отдельного consent. Поддержаны только описанные
 observations/replies, не произвольный native parity. Нет собственного UI renderer,
-внешнего API, permissions engine, истории или persistence; SDK/runtime dependency
-Pi не требуется.
+permissions engine, SDK/runtime dependency Pi или отдельного history store адаптера;
+стандартная история принадлежит Pi, durable registry — Core. Это не sandbox,
+координация стороннего Pi/writer или hostile same-user filesystem защита.
 
 ## Проверки
 
@@ -149,8 +182,11 @@ Pi не требуется.
 uncertainty, observed-exit cleanup и сохранение launch defaults/resources.
 Interaction regressions проверяют immutable shapes, startup/reentrant replies,
 три concurrent request ID, validation/expiry/duplicates/channel loss и ответы без ACK.
-Отдельная bounded real-Pi проверка подтверждает clarification → явный текстовый
-ответ → native write/read с disk verify → три вопроса/ответа через Core → tool result
-с consumed tuple → completed final и observed owned exit. Отдельный bounded Linux сценарий также проверил native cancellation и продолжение контекста в том же owned процессе. Это не universal provider,
-auth, native timeout или descendant/remote cleanup гарантия.
+Bounded real Native Pi проверка на Linux подтвердила completed marker → clean stop/shutdown →
+новый daemon без auto-launch → exact file/UUID reopen и recall без повторения marker →
+stop/delete с сохранением unrelated file и observed owned child exit/close. External fake
+HTTP/SSE smoke, включая persistence/restart/delete и cancellation/replies, проверен на Linux
+и actual Windows CI. Full suite/typecheck проверены на Linux, не как full-suite Windows
+или Native Pi Windows certification. Это не universal provider/auth, native timeout,
+всех background jobs или descendant/remote cleanup гарантия.
 Правила lifecycle — [метаконтракт](../meta-contract.md).

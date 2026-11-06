@@ -1,6 +1,8 @@
 # Compact session core
 
-Компактное TypeScript-ядро сессий в памяти и локальный HTTP/JSON + SSE daemon API.
+Компактное TypeScript-ядро и локальный HTTP/JSON + SSE daemon для native Pi сессий:
+создание/регистрация, stop с сохранением истории, clean restart, exact reopen с контекстом и delete.
+Без trusted storage options ядро по-прежнему работает только в памяти.
 [Контракт ядра](docs/contracts/surfaces/session-core.md); Public API: [src/core.ts](src/core.ts).
 Внешнему HTTP-клиенту импорт TypeScript не нужен.
 
@@ -63,9 +65,19 @@ create/start; HTTP ACK и reply written не означают settlement/native 
 и Windows; это не full Native Pi Windows certification. Для cleanup используйте
 explicit stop/shutdown; unknown не all-cleaned.
 
+Для постоянных сессий оператор задаёт в stdin config пару `stateDir`/`nativeSessionDir`.
+Native Pi хранит стандартную историю, Core — только registry/binding/current metadata
+и used input IDs. Restart daemon сам не запускает Pi; reopen выполняется явно.
+[Руководство](docs/local-daemon-api.md) показывает настройку и цикл stop/restart/reopen/delete;
+[контракт Core](docs/contracts/surfaces/session-core.md) описывает durability и recovery.
+Каталоги должны быть приватными и эксклюзивно owned: после crash нельзя автоматически
+перехватывать leftover locks или считать чужой процесс остановленным.
+
 ## Нецели
 
-SDK, persistence, истории, восстановления и автоматических retry нет.
+Собственного SDK, conversation history/replay engine и автоматических retry нет.
+Registry не копирует prompts/messages/events и не обещает crash-consistent каждый live outcome.
+API управления model/effort/reload и manual compaction не предоставляется.
 Native Pi 1.5 RPC entrypoint —
 `createPiHarness` из [src/pi-harness.ts](src/pi-harness.ts), передаваемый в `SessionCore`.
 Нормативные границы — [контракт Pi adapter](docs/contracts/surfaces/pi-text-harness.md).
@@ -75,5 +87,6 @@ Node child; bounded реальная генерация проверена, но
 consent. Поддержаны tool/question/status observations и явный Core.reply в границах
 контракта Pi adapter; written не означает native consumption. UI renderer,
 permissions engine и sandbox не предоставляются.
-Harness владеет моделью, инструментами и процессом; ядро хранит только текущее
-состояние в памяти. Полный перечень ограничений — в нормативном контракте выше.
+Harness владеет моделью, инструментами и процессом; Core — lifecycle/admission и optional
+durable registry. External fake smoke проверен на Linux/Windows, bounded real Native Pi
+stop/restart/exact context recall/delete — на Linux, не как universal provider или Native Windows гарантия. Полный перечень ограничений — в нормативном контракте выше.
