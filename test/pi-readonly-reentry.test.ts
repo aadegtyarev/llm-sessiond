@@ -71,6 +71,7 @@ for (const query of ['models', 'settings'] as const) {
         if (cancel) assert.deepEqual(await cancel, { inputId: 'A', status: 'cancelled' });
       }
       f.release('query-result'); assert.deepEqual(await read, { kind: 'unknown' });
+      await f.phase('query-result');
       assert.equal(f.core.get('s').status, 'running');
       assert.equal(JSON.stringify(f.events).includes('secret'), false);
       if (action !== 'question') {
