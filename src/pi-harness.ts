@@ -1,8 +1,9 @@
-import type { HarnessEvent, HarnessPort, PortOutcome } from './types.ts';
+import type { HarnessEvent, HarnessPort, NativeBinding, PortOutcome } from './types.ts';
 import { launchPi, trackPiExit, type PiLaunch } from './pi-process.ts';
 import { createPiWire, object } from './pi-wire.ts';
 import { createPiRun } from './pi-run.ts';
 import { createPiQuestions } from './pi-questions.ts';
+import { checkNative } from './native-history.ts';
 export type { PiLaunch } from './pi-process.ts';
 
 /** Trusted native Pi 1.5 launch; text is RPC data, never shell arguments. */
@@ -13,8 +14,9 @@ export function createPiHarness(config: PiLaunch = {}): HarnessPort {
   for (const value of [deadline, stopDeadline]) {
     if (!Number.isFinite(value) || value <= 0) throw new RangeError('invalid deadline');
   }
-  function session(emit: (event: HarnessEvent) => void) {
-    const child = launchPi(config);
+  function session(emit: (event: HarnessEvent) => void, native?: NativeBinding) {
+    if (native) checkNative(native, native.fresh);
+    const child = launchPi(native ? { ...config, cwd: native.cwd } : config, native?.file);
     const exit = trackPiExit(child);
     let stopping = false;
     let ready = false;
@@ -32,16 +34,23 @@ export function createPiHarness(config: PiLaunch = {}): HarnessPort {
     };
   }
   return {
-    async start(sessionId, emit) {
-      if (sessions.has(sessionId)) return { kind: 'rejected' };
+    async start(sessionId, emit, native) {
+      const previous = sessions.get(sessionId);
+      if (previous && (!native || !previous.exit.exited)) return { kind: 'rejected' };
       let owned: ReturnType<typeof session>;
-      try { owned = session(emit); } catch { return { kind: 'unknown' }; }
+      try { owned = session(emit, native); } catch { return { kind: 'unknown' }; }
       sessions.set(sessionId, owned);
       const response = await owned.wire.command('get_state');
       if (!response) return { kind: 'unknown' };
       const state = object(response.data);
       if (response.success !== true || typeof state.isStreaming !== 'boolean'
         || typeof state.sessionId !== 'string') return { kind: 'unknown' };
+      if (native) {
+        try {
+          const nativeId = checkNative(native);
+          if (state.sessionId !== nativeId || state.sessionFile !== native.file) return { kind: 'unknown' };
+        } catch { return { kind: 'unknown' }; }
+      }
       owned.setReady();
       return { kind: owned.ready ? 'confirmed' : 'unknown' };
     },

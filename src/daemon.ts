@@ -1,21 +1,21 @@
 import { createServer, type ServerResponse } from 'node:http';
-import { SessionCore, CoreError, type HarnessPort } from './core.ts';
+import { SessionCore, CoreError, type HarnessPort, type NativeOptions } from './core.ts';
 import { authenticate, requestBody } from './daemon-request.ts';
 import { ApiError, fields } from './daemon-schema.ts';
 import { openEventStream, STREAM_CLIENTS } from './daemon-stream.ts';
 import { route } from './daemon-routes.ts';
 
-export interface DaemonOptions { token: string; port: number; harness: HarnessPort }
+export interface DaemonOptions { token: string; port: number; harness: HarnessPort; native?: NativeOptions }
 
-export async function listenDaemon({ token, port, harness }: DaemonOptions) {
+export async function listenDaemon({ token, port, harness, native }: DaemonOptions) {
   if (!/^[A-Za-z0-9_-]{32,256}$/.test(token) || !Number.isInteger(port) || port < 0 || port > 65535) {
     throw new Error('invalid daemon settings');
   }
-  const core = new SessionCore(harness);
+  const server = createServer({ maxHeaderSize: 8192, requestTimeout: 15_000, headersTimeout: 10_000 });
+  const core = new SessionCore(harness, native);
   const streams = new Set<() => void>();
   let closing = false;
   let shutdownTask: ReturnType<SessionCore['shutdown']> | undefined;
-  const server = createServer({ maxHeaderSize: 8192, requestTimeout: 15_000, headersTimeout: 10_000 });
   server.on('clientError', (_error, socket) => {
     socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
   });
@@ -67,12 +67,20 @@ export async function listenDaemon({ token, port, harness }: DaemonOptions) {
       request.resume();
     });
   });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
-  });
-  const address = server.address();
-  if (!address || typeof address === 'string') throw new Error('invalid address');
+  let address;
+  try {
+    await new Promise<void>((resolve, reject) => {
+      server.once('error', reject);
+      server.listen(port, '127.0.0.1', () => { server.off('error', reject); resolve(); });
+    });
+    address = server.address();
+    if (!address || typeof address === 'string') throw new Error('invalid address');
+  } catch (error) {
+    // Core owns gate release: uncertain cleanup must remain fail-closed even on startup.
+    try { await shutdown(); }
+    finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+    throw error;
+  }
   return {
     port: address.port,
     closed: new Promise<void>(resolve => server.once('close', resolve)),

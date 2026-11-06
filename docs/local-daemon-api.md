@@ -66,6 +66,58 @@ subscriber можно отправить новый input в ту же сесс�
 [сценарий](../test/api-external-smoke.mjs) показывает ready, операции, явные ответы
 и targeted cancel → продолжение разговора.
 
+## Сохраните и повторно откройте native-сессию
+
+Полные routes и гарантии — в [API contract](contracts/surfaces/local-daemon-api.md),
+порядок записи/recovery — в [контракте Core](contracts/surfaces/session-core.md).
+Без storage settings остаётся in-memory режим с `--no-session`.
+
+1. Добавьте в приватный stdin config парные непустые `stateDir` и `nativeSessionDir`.
+   Первый каталог хранит metadata, второй — непосредственные native `.jsonl` files.
+   Ограничьте права обоих каталогов/Windows ACL. Для новых сессий cwd — `launch.cwd`
+   либо cwd daemon; импорт сохраняет cwd native header. Это trusted operator paths,
+   не поля HTTP request.
+2. Подключите authenticated SSE и дождитесь ready. `POST /sessions {sessionId}`
+   резервирует NEW empty file; затем `POST /sessions/:sessionId/start {}` запускает Pi.
+   Header пишет Pi, allocation filename не является native UUID. Native resources
+   могут действовать уже при startup; sandbox не предоставляется.
+3. Отправьте `send` с новым inputId и дождитесь input completed в SSE/current state.
+   HTTP ACK не settlement; pending/unknown текущего поколения блокируют следующий send.
+4. Выполните `POST /sessions/:sessionId/stop {}`, затем `POST /shutdown {}`. История
+   сохраняется. Проверьте clean результат: unknown не all-cleaned. Never-launched empty
+   records тоже сохраняются и могут быть остановлены локально без Pi.
+5. Запустите новый daemon с теми же roots. Registry восстанавливается без auto-launch;
+   снова подключите SSE до `start`. Откройте прежний sessionId через `start {}` и отправьте
+   новый inputId. Контекст берётся из того же native file/UUID: не пересылайте прошлые
+   messages вручную. Used IDs остаются использованными; старый unknown после доказанного
+   stop/reopen не становится completed, но не блокирует input нового поколения.
+6. Для удаления выполните explicit stop, затем `POST /sessions/:sessionId/delete {}`.
+   `{deleted:true}` означает удаление зарегистрированного native file и metadata, не
+   чужих файлов или tool effects. Pending операции блокируют delete. Partial failure
+   остаётся ошибкой; matching explicit retry может завершить durable delete intent.
+
+Чтобы зарегистрировать существующую owned историю в configured native root, запросите
+`GET /native-sessions`, затем `POST /sessions/:sessionId/register {nativeId}`. Register
+не запускает Pi. Catalogue не ищет по всему Pi home; raw path не принимается. Невалидные
+файлы, symlink/hardlink selection и неоднозначные UUID не предлагаются; binding уже
+зарегистрированной сессии не получает второго владельца. Сторонний Pi/writer должен
+быть независимо остановлен оператором: daemon не принимает чужой PID под управление.
+
+При `storage-failed` не повторяйте ввод автоматически: новый эффект мог быть не допущен,
+а ID уже зарезервирован. Explicit owned cleanup остаётся возможен; после восстановления
+записи уже наблюдённый stop proof может сохранить clean snapshot без повторного port.stop.
+При `native-invalid` не подменяйте историю пустым файлом: missing/corrupt/replaced и
+attempted-empty history не сбрасываются. Header пустой NEW reservation пишет Pi в первой
+launch attempt; eligibility для повторной empty initialization долговечно снимается
+до spawn. `native-owned` означает конфликт binding.
+
+После crash leftover `.llm-sessiond.lock` не удаляется/перехватывается автоматически.
+Оператор сначала независимо доказывает отсутствие прежнего writer/child перед safe
+recovery собственных каталогов. Dirty metadata остаётся unknown и unowned для нового
+daemon; его собственный пустой port не может подтвердить остановку старого child.
+Не обещаны crash-consistent outcome каждого live события, event replay, secure erase,
+hostile same-user filesystem защита или rollback внешних effects.
+
 ## 4. Завершите работу
 
 Вызовите authenticated POST `/sessions/:sessionId/stop` с JSON `{}` для отдельной

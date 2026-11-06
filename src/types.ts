@@ -48,8 +48,17 @@ export type HarnessEvent =
   | { type: 'input-cancelled'; inputId: string }
   | { type: 'input-failed'; inputId: string; certainty: 'definitive' | 'unknown' };
 
+// Private exact-file binding; never part of public views or HTTP input.
+export interface NativeBinding {
+  file: string;
+  cwd: string;
+  nativeId: string | null;
+  identity: string | null;
+  fresh: boolean;
+}
+
 export interface HarnessPort {
-  start(sessionId: string, emit: (event: HarnessEvent) => void): Promise<PortOutcome>;
+  start(sessionId: string, emit: (event: HarnessEvent) => void, native?: NativeBinding): Promise<PortOutcome>;
   send(sessionId: string, inputId: string, text: string): Promise<PortOutcome>;
   stop(sessionId: string): Promise<PortOutcome>;
   reply?(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome>;
@@ -63,7 +72,7 @@ export type CoreEvent =
   | { type: 'session'; session: SessionView }
   | { type: 'input'; sessionId: string; input: InputView };
 
-export type CoreErrorCode = 'closed' | 'duplicate-session' | 'session-not-found' | 'invalid-state' | 'input-in-flight' | 'duplicate-input' | 'harness-rejected' | 'harness-unknown';
+export type CoreErrorCode = 'closed' | 'duplicate-session' | 'session-not-found' | 'invalid-state' | 'input-in-flight' | 'duplicate-input' | 'harness-rejected' | 'harness-unknown' | 'storage-failed' | 'native-invalid' | 'native-owned';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;
@@ -84,6 +93,7 @@ export interface ShutdownResult {
 export interface InputState {
   readonly inputId: string;
   status: InputStatus;
+  generation?: number;
   accepted?: boolean;
   cancelRequested?: boolean;
   cancelInFlight?: boolean;
@@ -99,4 +109,9 @@ export interface SessionRecord {
   stopRequested: boolean;
   stopInFlight: boolean;
   startOutcomeWhileStopping: PortOutcome | null;
+  native?: NativeBinding;
+  owned?: boolean;
+  stopProven?: boolean;
+  operations: number;
+  deleting?: boolean;
 }
