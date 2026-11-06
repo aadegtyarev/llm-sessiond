@@ -38,8 +38,13 @@ for (const name of ['models', 'settings', 'setModel', 'setThinkingLevel', 'reloa
     const task = name === 'setModel' ? core.setModel('s', { provider: 'fixture', modelId: 'one' })
       : name === 'setThinkingLevel' ? core.setThinkingLevel('s', 'low') : core[name]('s');
     assert.equal(calls, 1);
-    await assert.rejects(core.send('s', 'blocked', ''), invalid);
-    await assert.rejects(core.reply('s', { requestId: 'q', method: 'confirm', confirmed: true }), invalid);
+    if (name === 'models' || name === 'settings') {
+      assert.deepEqual(await core.send('s', 'allowed', ''), { inputId: 'allowed', status: 'pending' });
+      assert.deepEqual(await core.reply('s', { requestId: 'q', method: 'confirm', confirmed: true }), { kind: 'rejected' });
+    } else {
+      await assert.rejects(core.send('s', 'blocked', ''), invalid);
+      await assert.rejects(core.reply('s', { requestId: 'q', method: 'confirm', confirmed: true }), invalid);
+    }
     await assert.rejects(core.settings('s'), invalid);
     await assert.rejects(core.reload('s'), invalid);
     assert.equal((await core.stop('s')).status, 'stopped');
@@ -106,6 +111,8 @@ for (const active of ['send', 'cancel', 'reply'] as const) {
     else pending = core.reply('s', { requestId: 'q', method: 'confirm', confirmed: true });
     if (active !== 'reply') emit({ type: 'input-completed', inputId: 'A' });
     await assert.rejects(core.reload('s'), invalid);
+    await assert.rejects(core.setModel('s', { provider: 'fixture', modelId: 'one' }), invalid);
+    await assert.rejects(core.setThinkingLevel('s', 'low'), invalid);
     await assert.rejects(core.settings('s'), invalid);
     gate.resolve({ kind: 'confirmed' }); ui.resolve({ kind: 'written' });
     await pending;
@@ -176,6 +183,60 @@ test('session-controls: late unknown after stop cannot poison a later generation
   assert.equal((await f.core.send('s', 'new', '')).status, 'pending');
   await f.core.stop('s'); await f.core.shutdown();
 });
+
+for (const query of ['models', 'settings'] as const) {
+  for (const event of ['question', 'completed', 'cancelled'] as const) {
+    test(`session-controls: ${query} permits immediate ${event} subscriber reentry`, async () => {
+      const snapshot = deferred<HarnessControlResult<SessionSettings>>();
+      const catalogue = deferred<ControlResult<readonly NativeModel[]>>();
+      const abort = deferred<{ kind: 'confirmed' }>();
+      const sends: string[] = [], replies: object[] = [];
+      const { core, emit } = await setup({
+        settings: () => snapshot.promise, models: () => catalogue.promise,
+        async send(_id, input) { sends.push(input); return { kind: 'confirmed' }; },
+        async reply(_id, answer) { replies.push(answer); return { kind: 'written' }; },
+        cancel: () => abort.promise,
+      });
+      const first = await core.send('s', 'A', '');
+      let reentry: Promise<unknown> | undefined;
+      core.subscribe(observation => {
+        if (event === 'question' && observation.type === 'question') {
+          reentry = core.reply('s', { requestId: observation.question.requestId, method: 'confirm', confirmed: true }).catch(error => error.code);
+        } else if (observation.type === 'input' && observation.input.inputId === 'A' && observation.input.status === event) {
+          reentry = core.send('s', 'B', '').catch(error => error.code);
+        }
+      });
+      const read = core[query]('s');
+      await assert.rejects(core.settings('s'), invalid);
+      for (const task of [core.setModel('s', { provider: 'fixture', modelId: 'one' }), core.setThinkingLevel('s', 'low'), core.reload('s')]) {
+        await assert.rejects(task, invalid);
+      }
+      let cancelled: Promise<unknown> | undefined;
+      if (event === 'cancelled') {
+        cancelled = core.cancel('s', 'A').catch(error => error.code);
+        emit({ type: 'input-cancelled', inputId: 'A' });
+        assert.equal(reentry, undefined); // Cancel delivery/drain still owns publication.
+        abort.resolve({ kind: 'confirmed' }); await cancelled;
+      } else if (event === 'completed') emit({ type: 'input-completed', inputId: 'A' });
+      else emit({ type: 'question', question: { requestId: 'q', method: 'confirm', title: 'Fixture', message: 'Explicit' } });
+      try {
+        assert.ok(reentry);
+        assert.deepEqual(await reentry, event === 'question' ? { kind: 'written' } : { inputId: 'B', status: 'pending' });
+        assert.deepEqual(first, { inputId: 'A', status: 'pending' });
+        if (event === 'question') assert.deepEqual(replies, [{ requestId: 'q', method: 'confirm', confirmed: true }]);
+        else {
+          assert.deepEqual(sends, ['A', 'B']);
+          if (cancelled) assert.deepEqual(await cancelled, { inputId: 'A', status: 'cancelled' });
+          emit({ type: 'input-failed', inputId: 'A', certainty: 'unknown' });
+          assert.deepEqual(core.get('s').input, { inputId: 'B', status: 'pending' });
+        }
+      } finally {
+        snapshot.resolve(confirmed); catalogue.resolve({ kind: 'confirmed', value: [value.model!] });
+        await read; await core.shutdown();
+      }
+    });
+  }
+}
 
 test('session-controls: shutdown uses cleanup despite outstanding control and ignores late success', async () => {
   const gate = deferred<HarnessControlResult<SessionSettings>>();

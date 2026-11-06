@@ -143,6 +143,6 @@ export interface SessionRecord {
   owned?: boolean;
   stopProven?: boolean;
   operations: number;
-  controlInFlight?: boolean;
+  controlInFlight?: 'query' | 'effect';
   deleting?: boolean;
 }

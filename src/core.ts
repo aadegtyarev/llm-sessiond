@@ -127,7 +127,7 @@ export class SessionCore {
   async send(sessionId: string, inputId: string, text: string): Promise<InputView> {
     this.assertOpen();
     const session = this.requireSession(sessionId);
-    if (session.status !== 'running' || session.stopRequested || session.controlInFlight) throw new CoreError('invalid-state');
+    if (session.status !== 'running' || session.stopRequested || session.controlInFlight === 'effect') throw new CoreError('invalid-state');
     if (((session.input?.status === 'pending' || session.input?.status === 'unknown')
       && (!this.registry || session.input.generation === session.generation)) || session.input?.cancelInFlight) throw new CoreError('input-in-flight');
     if (session.inputIds.has(inputId)) throw new CoreError('duplicate-input');
@@ -162,7 +162,7 @@ export class SessionCore {
     this.assertOpen();
     const session = this.requireSession(sessionId);
     const input = session.input;
-    if (session.status !== 'running' || session.stopRequested || session.controlInFlight || !input
+    if (session.status !== 'running' || session.stopRequested || session.controlInFlight === 'effect' || !input
       || input.inputId !== inputId || input.status !== 'pending'
       || !input.accepted || input.cancelRequested) throw new CoreError('invalid-state');
     const generation = session.generation;
@@ -192,7 +192,7 @@ export class SessionCore {
   async reply(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome> {
     this.assertOpen();
     const session = this.requireSession(sessionId);
-    if (session.stopRequested || session.controlInFlight || (session.status !== 'starting' && session.status !== 'running')) {
+    if (session.stopRequested || session.controlInFlight === 'effect' || (session.status !== 'starting' && session.status !== 'running')) {
       throw new CoreError('invalid-state');
     }
     const generation = session.generation;
@@ -242,7 +242,7 @@ export class SessionCore {
     if (effectful && session.input && (session.input.status === 'pending' || session.input.status === 'unknown')
       && (!this.registry || session.input.generation === session.generation)) throw new CoreError('input-in-flight');
     const generation = session.generation;
-    session.controlInFlight = true;
+    session.controlInFlight = effectful ? 'effect' : 'query';
     session.operations++;
     try {
       let result: HarnessControlResult<T>;
@@ -265,7 +265,7 @@ export class SessionCore {
         this.events.publish({ type: 'session', session: sessionView(session) });
       }
       return Object.freeze({ kind: result.kind });
-    } finally { session.operations--; session.controlInFlight = false; }
+    } finally { session.operations--; session.controlInFlight = undefined; }
   }
 
   async stop(sessionId: string): Promise<SessionView> {

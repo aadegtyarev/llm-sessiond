@@ -112,27 +112,34 @@ export function createPiHarness(config: PiLaunch = {}): HarnessPort {
     async send(sessionId, inputId, text) {
       const owned = sessions.get(sessionId);
       if (!owned?.ready || owned.wire.broken || owned.exit.exited) return { kind: 'unknown' };
-      if (owned.controls.busy) return { kind: 'rejected' };
+      if (owned.controls.exclusive) return { kind: 'rejected' };
       const input = owned.run.begin(inputId);
       if (!input) return { kind: 'unknown' };
-      let outcome: PortOutcome = { kind: 'unknown' };
-      const response = await owned.wire.command('prompt', { message: text }, (record) => {
-        outcome = owned.run.acknowledge(input, record);
-      });
-      if (!response) { owned.run.uncertain(); return { kind: 'unknown' }; }
-      return outcome;
+      owned.controls.beginOrdinary();
+      try {
+        let outcome: PortOutcome = { kind: 'unknown' };
+        const response = await owned.wire.command('prompt', { message: text }, (record) => {
+          outcome = owned.run.acknowledge(input, record);
+        });
+        if (!response) { owned.run.uncertain(); return { kind: 'unknown' }; }
+        return outcome;
+      } finally { owned.controls.endOrdinary(); }
     },
     async cancel(sessionId, inputId) {
       const owned = sessions.get(sessionId);
-      if (!owned || owned.controls.busy) return { kind: 'rejected' };
+      if (!owned || owned.controls.exclusive) return { kind: 'rejected' };
       if (!owned.ready || owned.wire.broken || owned.exit.exited) return { kind: 'unknown' };
-      return owned.run.cancel(inputId, () => owned.wire.command('abort'));
+      owned.controls.beginOrdinary();
+      try { return await owned.run.cancel(inputId, () => owned.wire.command('abort')); }
+      finally { owned.controls.endOrdinary(); }
     },
     async reply(sessionId, answer) {
       const owned = sessions.get(sessionId);
-      if (!owned || owned.controls.busy) return { kind: 'rejected' };
+      if (!owned || owned.controls.exclusive) return { kind: 'rejected' };
       if (owned.wire.broken || owned.exit.exited) return { kind: 'unknown' };
-      return owned.questions.reply(answer);
+      owned.controls.beginOrdinary();
+      try { return await owned.questions.reply(answer); }
+      finally { owned.controls.endOrdinary(); }
     },
     async models(id) { return sessions.get(id)?.controls.models() ?? { kind: 'rejected' }; },
     async settings(id) { return sessions.get(id)?.controls.settings() ?? { kind: 'rejected' }; },

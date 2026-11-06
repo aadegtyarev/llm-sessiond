@@ -18,38 +18,44 @@ interface OwnedControls {
   lostOwnership(): void;
 }
 
-/** Exclusive native command/readback window; lifecycle remains Core-owned. */
+/** Serialized named controls; only effectful windows exclude ordinary command reentry. */
 export function createPiControls(owned: OwnedControls, reloadCommand: string) {
-  let busy = false;
+  let reservation: 'query' | 'effect' | null = null;
+  let ordinaryInFlight = 0;
   let dispatched = false;
   let observedError = false;
   let activity = 0;
   let initialActivity = 0;
   let ownershipLost = false;
   function event(record: RecordValue) {
-    if (busy && record.type === 'extension_error') observedError = true;
-    if (['agent_start', 'auto_compaction_start'].includes(String(record.type))
+    if (reservation && record.type === 'extension_error') observedError = true;
+    if (['agent_start', 'agent_settled', 'auto_compaction_start', 'auto_compaction_end'].includes(String(record.type))
+      || (reservation === 'query' && ['thinking_level_changed', 'model_select'].includes(String(record.type)))
       || (record.type === 'extension_ui_request' && ['confirm', 'select', 'input', 'editor'].includes(String(record.method)))) activity++;
   }
   async function reserve<T>(effectful: boolean, action: () => Promise<ControlResult<T>>): Promise<HarnessControlResult<T>> {
-    if (busy) return { kind: 'rejected' };
+    if (reservation) return { kind: 'rejected' };
     if (ownershipLost) return { kind: 'unknown', ownershipLost: true };
     if (!owned.ready || owned.wire.broken) return { kind: 'unknown' };
-    if (effectful && (!owned.idle || !owned.questionsAdmissible)) return { kind: 'rejected' };
-    busy = true; dispatched = false; observedError = false;
+    if (effectful && (ordinaryInFlight || !owned.idle || !owned.questionsAdmissible)) return { kind: 'rejected' };
+    reservation = effectful ? 'effect' : 'query'; dispatched = false; observedError = false;
+    const overlappedOrdinary = ordinaryInFlight > 0;
     const beforeActivity = activity;
     initialActivity = activity;
     try {
       let result: ControlResult<T>;
       try { result = await action(); } catch { result = { kind: 'unknown' }; }
       if (ownershipLost) return { kind: 'unknown', ownershipLost: true };
+      // A permitted reply/send/cancel or native boundary can separate state from its
+      // current-model capabilities. Discard the query snapshot, never poison the run.
+      if (!effectful && (overlappedOrdinary || beforeActivity !== activity || !owned.ready || owned.wire.broken)) return { kind: 'unknown' };
       if (dispatched && (result.kind !== 'confirmed' || observedError || beforeActivity !== activity
         || !owned.ready || owned.wire.broken || !owned.idle || !owned.questionsQuiescent)) {
         owned.uncertain();
         return { kind: 'unknown', effectUncertain: true };
       }
       return result;
-    } finally { busy = false; dispatched = false; }
+    } finally { reservation = null; dispatched = false; }
   }
   async function catalogue(): Promise<readonly NativeModel[] | null> {
     const response = await owned.wire.command('get_available_models');
@@ -170,6 +176,10 @@ export function createPiControls(owned: OwnedControls, reloadCommand: string) {
     });
   }
   return { event, models, settings, setModel, setThinkingLevel, reload,
-    get busy() { return busy; },
+    get busy() { return reservation !== null; },
+    get exclusive() { return reservation === 'effect'; },
+    // Local write/ACK drain only; Core/run/questions retain lifecycle and input authority.
+    beginOrdinary() { ordinaryInFlight++; activity++; },
+    endOrdinary() { ordinaryInFlight--; activity++; },
   };
 }

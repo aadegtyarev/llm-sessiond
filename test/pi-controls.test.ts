@@ -217,6 +217,49 @@ test('pi-controls: context count loss cannot be reported as preservation', async
   assert.deepEqual(await p.controls.reload(), { kind: 'unknown', effectUncertain: true });
 });
 
+for (const query of ['models', 'settings'] as const) {
+  for (const change of ['ordinary', 'agent_settled', 'thinking_level_changed', 'model_select']) {
+    test(`pi-controls: ${query} ${change} overlap discards mixed snapshot without poisoning`, async () => {
+      const p = peer();
+      let release!: (response: RecordValue) => void;
+      const held = new Promise<RecordValue>(resolve => { release = resolve; });
+      const before = { ...p.state };
+      p.hook(async type => type === (query === 'models' ? 'get_available_models' : 'get_state') ? held : undefined);
+      const read = p.controls[query]();
+      assert.equal(p.controls.busy, true); assert.equal(p.controls.exclusive, false);
+      if (change === 'ordinary') p.controls.beginOrdinary();
+      else p.controls.event({ type: change });
+      p.setState({ model: { provider: 'fixture', id: 'two' }, thinkingLevel: 'high' });
+      p.setLevels(['off', 'low', 'high']); // Old low is still valid: validation alone cannot detect the mixed snapshot.
+      if (change === 'ordinary') p.controls.endOrdinary();
+      release({ success: true, data: query === 'models' ? { models: [before.model] } : before });
+      assert.deepEqual(await read, { kind: 'unknown' }); assert.equal(p.uncertainty, 0);
+      p.hook(undefined);
+      const fresh = await p.controls.settings(); assert.equal(fresh.kind, 'confirmed');
+      if (fresh.kind !== 'confirmed') throw new Error();
+      assert.equal(fresh.value.model?.id, 'two'); assert.equal(fresh.value.thinkingLevel, 'high');
+    });
+  }
+}
+
+test('pi-controls: ordinary command drain excludes every mutator even when run is idle', async () => {
+  const p = peer(); p.controls.beginOrdinary();
+  assert.deepEqual(await p.controls.setModel({ provider: 'fixture', modelId: 'two' }), { kind: 'rejected' });
+  assert.deepEqual(await p.controls.setThinkingLevel('off'), { kind: 'rejected' });
+  assert.deepEqual(await p.controls.reload(), { kind: 'rejected' });
+  assert.deepEqual(p.calls, []);
+  p.controls.endOrdinary();
+  assert.equal((await p.controls.setThinkingLevel('off')).kind, 'confirmed');
+});
+
+test('pi-controls: expected effectful thinking readback event is not a conflicting readonly boundary', async () => {
+  const p = peer(); p.hook(async type => {
+    if (type === 'set_thinking_level') p.controls.event({ type: 'thinking_level_changed', level: 'off' });
+    return undefined;
+  });
+  assert.equal((await p.controls.setThinkingLevel('off')).kind, 'confirmed'); assert.equal(p.uncertainty, 0);
+});
+
 test('pi-controls: read-only failure remains distinct and overlapping commands cannot dispatch', async () => {
   const p = peer();
   let release!: (value: RecordValue) => void;
@@ -224,6 +267,8 @@ test('pi-controls: read-only failure remains distinct and overlapping commands c
   p.hook(async type => type === 'get_state' ? gate : undefined);
   const pending = p.controls.settings();
   assert.equal(p.controls.busy, true);
+  assert.deepEqual(await p.controls.models(), { kind: 'rejected' });
+  assert.deepEqual(await p.controls.settings(), { kind: 'rejected' });
   assert.deepEqual(await p.controls.reload(), { kind: 'rejected' });
   assert.equal(p.calls.length, 1);
   release({ success: false });
