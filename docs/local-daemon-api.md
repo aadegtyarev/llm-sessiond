@@ -107,8 +107,9 @@ subscriber можно отправить новый input в ту же сесс�
 а ID уже зарезервирован. Explicit owned cleanup остаётся возможен; после восстановления
 записи уже наблюдённый stop proof может сохранить clean snapshot без повторного port.stop.
 При `native-invalid` не подменяйте историю пустым файлом: missing/corrupt/replaced и
-attempted-empty history не сбрасываются. Пустая NEW reservation инициализируется только
-до первого launch attempt. `native-owned` означает конфликт binding.
+attempted-empty history не сбрасываются. Header пустой NEW reservation пишет Pi в первой
+launch attempt; eligibility для повторной empty initialization долговечно снимается
+до spawn. `native-owned` означает конфликт binding.
 
 После crash leftover `.llm-sessiond.lock` не удаляется/перехватывается автоматически.
 Оператор сначала независимо доказывает отсутствие прежнего writer/child перед safe

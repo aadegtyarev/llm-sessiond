@@ -182,6 +182,8 @@ permissions engine, SDK/runtime dependency Pi или отдельного histor
 uncertainty, observed-exit cleanup и сохранение launch defaults/resources.
 Interaction regressions проверяют immutable shapes, startup/reentrant replies,
 три concurrent request ID, validation/expiry/duplicates/channel loss и ответы без ACK.
+На Linux также проверены native clarification/tools/questions с явными replies и
+отмена с продолжением контекста в том же owned Pi PID.
 Bounded real Native Pi проверка на Linux подтвердила completed marker → clean stop/shutdown →
 новый daemon без auto-launch → exact file/UUID reopen и recall без повторения marker →
 stop/delete с сохранением unrelated file и observed owned child exit/close. External fake
