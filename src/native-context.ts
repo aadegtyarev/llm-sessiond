@@ -24,8 +24,11 @@ function message(value: unknown, version: number): boolean {
       return content(value.content, 'system')
         && (value.sections === undefined || (record(value.sections)
           && Object.values(value.sections).every(section => section === null || typeof section === 'string')))
-        && ['toolsAdded', 'toolsRemoved'].every(key => value[key] === undefined
-          || (Array.isArray(value[key]) && value[key].every(tool => record(tool) && typeof tool.name === 'string')));
+        && (value.toolsAdded === undefined || (Array.isArray(value.toolsAdded)
+          && value.toolsAdded.every(tool => record(tool) && typeof tool.name === 'string'
+            && typeof tool.description === 'string' && record(tool.parameters))))
+        && (value.toolsRemoved === undefined || (Array.isArray(value.toolsRemoved)
+          && value.toolsRemoved.every(tool => record(tool) && typeof tool.name === 'string')));
     case 'user': return content(value.content, 'user');
     case 'assistant': return content(value.content, 'assistant');
     case 'toolResult': return content(value.content, 'toolResult') && typeof value.toolCallId === 'string'

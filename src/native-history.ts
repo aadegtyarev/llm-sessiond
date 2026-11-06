@@ -30,18 +30,26 @@ function parseNative(text: string, binding: NativeBinding): string {
     || !Number.isFinite(Date.parse(header.timestamp)) || !isAbsolute(header.cwd)
     || canonicalDirectory(header.cwd) !== binding.cwd
     || (binding.nativeId !== null && header.id !== binding.nativeId)) throw new Error();
-  const ids = new Set<string>();
-  for (const entry of lines) {
+  const parents = new Map<string, string | null>();
+  for (const [index, entry] of lines.entries()) {
     if (!entry || typeof entry !== 'object' || typeof entry.type !== 'string' || entry.type === 'session') throw new Error();
     // Legacy v1 is linear; Pi migrates it. V2/v3 must have unambiguous tree references.
     if (!validNativeContextEntry(entry, version)) throw new Error();
     if (version > 1) {
-      if (typeof entry.id !== 'string' || !entry.id || ids.has(entry.id)
-        || (entry.parentId !== null && !ids.has(entry.parentId))) throw new Error();
-      if (entry.type === 'context_edit' && !ids.has(entry.targetId)) throw new Error();
-      ids.add(entry.id);
-      if (entry.type === 'compaction' && !ids.has(entry.firstKeptEntryId)) throw new Error();
-    } else if (entry.type === 'compaction' && entry.firstKeptEntryIndex > lines.length) throw new Error();
+      if (typeof entry.id !== 'string' || !entry.id || parents.has(entry.id)
+        || (entry.parentId !== null && !parents.has(entry.parentId))) throw new Error();
+      if (entry.type === 'context_edit' && !parents.has(entry.targetId)) throw new Error();
+      parents.set(entry.id, entry.parentId);
+      if (entry.type === 'compaction') {
+        // Retain-none refers to self; any retained range must start on this parent chain.
+        let ancestor: string | null = entry.id;
+        while (ancestor !== null && ancestor !== entry.firstKeptEntryId) ancestor = parents.get(ancestor) ?? null;
+        if (ancestor === null) throw new Error();
+      }
+    } else if (entry.type === 'compaction' && entry.firstKeptEntryIndex > index + 1) {
+      // v1 indices include the header; migration assigns the current ID before resolving self.
+      throw new Error();
+    }
   }
   return header.id;
 }
