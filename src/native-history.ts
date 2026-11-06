@@ -1,6 +1,7 @@
 import { lstatSync, readFileSync, realpathSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 import { CoreError, type NativeBinding } from './types.ts';
+import { validNativeContextEntry } from './native-context.ts';
 
 export const NATIVE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -22,8 +23,10 @@ export function checkNative(binding: NativeBinding, allowEmpty = false): string 
 function parseNative(text: string, binding: NativeBinding): string {
   const lines = text.trimEnd().split('\n').map(line => JSON.parse(line));
   const header = lines.shift();
+  // Pi migrates an absent version as v1; an explicit null/unknown version is invalid.
+  const version = header?.version === undefined ? 1 : header.version;
   if (!header || header.type !== 'session' || !NATIVE_ID.test(header.id)
-    || ![1, 2, 3].includes(header.version) || typeof header.timestamp !== 'string'
+    || ![1, 2, 3].includes(version) || typeof header.timestamp !== 'string'
     || !Number.isFinite(Date.parse(header.timestamp)) || !isAbsolute(header.cwd)
     || canonicalDirectory(header.cwd) !== binding.cwd
     || (binding.nativeId !== null && header.id !== binding.nativeId)) throw new Error();
@@ -31,11 +34,14 @@ function parseNative(text: string, binding: NativeBinding): string {
   for (const entry of lines) {
     if (!entry || typeof entry !== 'object' || typeof entry.type !== 'string' || entry.type === 'session') throw new Error();
     // Legacy v1 is linear; Pi migrates it. V2/v3 must have unambiguous tree references.
-    if (header.version > 1) {
+    if (!validNativeContextEntry(entry, version)) throw new Error();
+    if (version > 1) {
       if (typeof entry.id !== 'string' || !entry.id || ids.has(entry.id)
         || (entry.parentId !== null && !ids.has(entry.parentId))) throw new Error();
+      if (entry.type === 'context_edit' && !ids.has(entry.targetId)) throw new Error();
       ids.add(entry.id);
-    }
+      if (entry.type === 'compaction' && !ids.has(entry.firstKeptEntryId)) throw new Error();
+    } else if (entry.type === 'compaction' && entry.firstKeptEntryIndex > lines.length) throw new Error();
   }
   return header.id;
 }
