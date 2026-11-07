@@ -22,7 +22,8 @@ export function createPiQuestions(
   async function reply(answer: QuestionReply): Promise<ReplyOutcome> {
     if (lost) return { kind: 'unknown' };
     if (!answer || typeof answer.requestId !== 'string') return { kind: 'rejected' };
-    if (requests.get(answer.requestId) !== answer.method) return { kind: 'rejected' };
+    const method = requests.get(answer.requestId);
+    if (!method || method !== answer.method) return { kind: 'rejected' };
     const record: RecordValue = { type: 'extension_ui_response', id: answer.requestId };
     if ('cancelled' in answer) {
       if (answer.cancelled !== true || 'value' in answer || 'confirmed' in answer) return { kind: 'rejected' };

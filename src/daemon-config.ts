@@ -17,10 +17,7 @@ export function daemonConfig(value: unknown): { token: string; port: number; lau
   }
   if ('prefixArgs' in launch && (!Array.isArray(launch.prefixArgs)
     || launch.prefixArgs.some(arg => typeof arg !== 'string'))) throw new Error('config');
-  for (const key of ['stopDeadlineMs']) {
-    if (key in launch && (typeof launch[key] !== 'number' || !Number.isFinite(launch[key]) || launch[key] <= 0)) {
-      throw new Error('config');
-    }
-  }
+  if ('stopDeadlineMs' in launch && (typeof launch.stopDeadlineMs !== 'number'
+    || !Number.isFinite(launch.stopDeadlineMs) || launch.stopDeadlineMs <= 0)) throw new Error('config');
   return { token, port: Number(port), launch: launch as PiLaunch };
 }

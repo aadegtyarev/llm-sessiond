@@ -25,7 +25,9 @@ export async function translatorSessionSmoke() {
       const command = { type: 'switch_session', sessionPath: join(root, 'native', 'old.jsonl'), opaque: { nested: [1] } };
       const response = await actor.request(`/sessions/${sessionId}/command`, command);
       assert.deepEqual(response.data.received, { ...command, id: response.id });
-      assert.equal((await actor.request(`/sessions/${sessionId}/command`, { type: 'get_state' })).success, true);
+      const state = await actor.request(`/sessions/${sessionId}/command`, { type: 'get_state' });
+      assert.equal(state.success, true); assert.equal(state.data.cwd, root);
+      assert.deepEqual(state.data.argv, ['--mode', 'rpc']); assert.equal(state.data.packageDir, null);
       assert.equal((await actor.request(`/sessions/${sessionId}/stop`, {})).status, 'stopped');
     }
     await actor.request('/native-sessions', undefined, 404);

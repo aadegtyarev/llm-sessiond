@@ -50,7 +50,8 @@ export interface NativeResponse {
 
 export interface HarnessPort {
   start(sessionId: string, emit: (event: HarnessEvent) => void): Promise<PortOutcome>;
-  // null means the expected response was lost, not a Native refusal.
+  // null means response loss, not Native refusal. Unsupported compact may throw
+  // CoreError('harness-rejected'); an actual Native failure stays a full response.
   command(sessionId: string, command: NativeCommand): Promise<NativeResponse | null>;
   stop(sessionId: string): Promise<PortOutcome>;
   reply?(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome>;

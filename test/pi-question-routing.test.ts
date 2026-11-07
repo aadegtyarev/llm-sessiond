@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { createPiQuestions } from '../src/pi-questions.ts';
 import type { RecordValue } from '../src/pi-wire.ts';
+import type { QuestionReply } from '../src/types.ts';
 import { dialogs, answers } from './pi-interaction-records.ts';
 
 test('pi question routing: original concurrent IDs/methods and exact no-ACK UI frames', async () => {
@@ -18,6 +19,20 @@ test('pi question routing: original concurrent IDs/methods and exact no-ACK UI f
   assert.deepEqual(await router.reply({ requestId: 'select-id', method: 'confirm', confirmed: true }), { kind: 'rejected' });
   assert.equal(frames.length, 3);
 });
+
+for (const answer of [null, {}, { requestId: 'unknown', value: 'x' },
+  { requestId: 'confirm-id', method: 'confirm', confirmed: 'true' },
+  { requestId: 'select-id', method: 'select', value: 1 },
+  { requestId: 'confirm-id', method: 'confirm', confirmed: true, value: 'extra' },
+  { requestId: 'input-id', method: 'input', cancelled: false }]) {
+  test(`pi question routing: invalid transport shape never writes ${JSON.stringify(answer)}`, async () => {
+    let writes = 0;
+    const router = createPiQuestions(() => {}, async () => { writes++; return { kind: 'written' }; });
+    for (const dialog of dialogs) router.event(dialog);
+    assert.deepEqual(await router.reply(answer as unknown as QuestionReply), { kind: 'rejected' });
+    assert.equal(writes, 0);
+  });
+}
 
 test('pi question routing: no wrapper expiry/options/consumption engine; immediate reentry and opaque IDs', async t => {
   t.mock.timers.enable({ apis: ['setTimeout', 'Date'] });

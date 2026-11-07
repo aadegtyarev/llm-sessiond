@@ -6,9 +6,9 @@ import { SessionCore, type CoreEvent } from '../src/core.ts';
 import { apiFixture } from './api-support.ts';
 import { deferred, rejectsCode } from './fake-port.ts';
 
-function fixture(t: TestContext) {
+function fixture(t: TestContext, flags: string[] = []) {
   const harness = createPiHarness({ executable: process.execPath,
-    prefixArgs: [fileURLToPath(new URL('./translator-child.ts', import.meta.url))], stopDeadlineMs: 1000 });
+    prefixArgs: [fileURLToPath(new URL('./translator-child.ts', import.meta.url)), ...flags], stopDeadlineMs: 1000 });
   const core = new SessionCore(harness);
   t.after(async () => {
     const result = await core.shutdown();
@@ -26,6 +26,43 @@ test('pi translator: independent connections, defaults and complete response met
   assert.notEqual(state.pid, (b.data as { pid: number }).pid);
   assert.deepEqual(state.argv, ['--mode', 'rpc']); assert.equal(state.packageDir, null);
   assert.deepEqual(a.optionalMetadata, { fixture: true });
+});
+
+for (const flag of ['loss', 'refusal', 'malformed']) {
+  test(`pi translator: readiness ${flag} never claims running and still permits owned cleanup`, async t => {
+    const { core } = fixture(t, [`--fixture-readiness-${flag}`]);
+    core.create('s'); await rejectsCode(core.start('s'), 'harness-unknown');
+    assert.equal(core.get('s').status, 'unknown');
+    assert.equal((await core.stop('s')).status, 'stopped');
+  });
+}
+
+for (const cleanup of ['stop', 'shutdown'] as const) {
+  test(`pi translator: actual ${cleanup} during pending readiness cannot resurrect source`, async t => {
+    const { core } = fixture(t, ['--fixture-readiness-held']);
+    const entered = deferred<void>();
+    const seen: CoreEvent[] = [];
+    core.subscribe(event => { seen.push(event); if (event.type === 'notification') entered.resolve(); });
+    core.create('s'); const starting = core.start('s');
+    await entered.promise;
+    if (cleanup === 'stop') assert.equal((await core.stop('s')).status, 'stopped');
+    else assert.deepEqual(await core.shutdown(), { stoppedSessionIds: ['s'], uncertainSessionIds: [], failedSessionIds: [] });
+    assert.notEqual((await starting).status, 'running');
+    assert.equal(seen.some(event => event.type === 'session' && event.session.status === 'running'), false);
+  });
+}
+
+test('pi translator: startup question is routed before get_state response and accepts immediate no-ACK reply', async t => {
+  const { core } = fixture(t, ['--fixture-startup-question']);
+  let reply: Promise<unknown> | undefined;
+  core.subscribe(event => {
+    if (event.type === 'question') {
+      assert.equal(core.get('s').status, 'starting');
+      reply = core.reply('s', { requestId: event.question.requestId, method: 'confirm', confirmed: true });
+    }
+  });
+  core.create('s'); assert.equal((await core.start('s')).status, 'running');
+  assert.deepEqual(await reply, { kind: 'written' });
 });
 
 for (const disposition of ['started', 'queued', 'handled']) {
@@ -73,7 +110,7 @@ for (const type of ['fixture_loss', 'fixture_exit']) {
   });
 }
 
-test('pi translator: startup immediate reply has no fabricated RPC ACK or query fence', async t => {
+test('pi translator: immediate subscriber reply has no fabricated RPC ACK or query fence', async t => {
   const { core } = fixture(t); core.create('s'); await core.start('s');
   const replies: Promise<unknown>[] = [];
   core.subscribe(event => {

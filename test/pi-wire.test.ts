@@ -36,6 +36,16 @@ for (const kind of ['write-error', 'write-throw', 'exit', 'close', 'eof', 'malfo
   });
 }
 
+test('pi wire: an already received whole Native response survives loss before local drain', async t => {
+  const f = wireDouble(); t.after(f.cleanup);
+  const command = f.wire.command('compact');
+  const native = { success: false, error: 'native refusal', optionalMetadata: { all: [1] } };
+  f.respond(native);
+  f.child.emit('exit', 0);
+  assert.deepEqual(await command, { type: 'response', id: f.frames[0].id, command: 'compact', ...native });
+  assert.equal(f.losses, 1);
+});
+
 test('pi late duplicate response A never resolves command B', async (t) => {
   const f = wireDouble();
   t.after(f.cleanup);
@@ -88,6 +98,32 @@ test('pi wire correlates reverse responses and events do not complete RPCs', asy
   assert.deepEqual((await first)?.data, { summary: 'whole', tokensBefore: 150000, estimatedTokensAfter: 42, details: [1] });
   assert.equal(f.losses, 0);
 });
+
+test('pi wire: many pending writes share drain handling and correlate all responses in reverse', async t => {
+  const f = wireDouble(); t.after(f.cleanup);
+  const pending = Array.from({ length: 24 }, (_, index) => f.wire.command('prompt', { index }));
+  for (let index = 0; index < pending.length; index++) f.release();
+  assert.equal(f.frames.length, 24);
+  assert.equal(f.stdin.listenerCount('drain'), 1);
+  for (let index = pending.length - 1; index >= 0; index--) f.respond({ data: { index } }, index);
+  const responses = await Promise.all(pending);
+  assert.deepEqual(responses.map(record => record?.data), Array.from({ length: 24 }, (_, index) => ({ index })));
+  assert.equal(f.losses, 0);
+});
+
+for (const invalid of [
+  { type: 'response', id: 2, command: 'prompt', success: true },
+  { type: 'response', id: 'r', command: 2, success: true },
+  { type: 'response', id: 'r', command: 'prompt', success: 'true' },
+  { type: 2 }, [], null,
+]) {
+  test(`pi wire: malformed response envelope fails pending channel ${JSON.stringify(invalid)}`, async t => {
+    const f = wireDouble(); t.after(f.cleanup);
+    const request = f.wire.command('prompt');
+    f.stdout.write(JSON.stringify(invalid) + '\n');
+    assert.equal(await request, null); assert.equal(f.losses, 1);
+  });
+}
 
 test('pi wire: waiting beyond former 10s deadline neither breaks nor blocks abort/UI writes', async t => {
   t.mock.timers.enable({ apis: ['setTimeout'] });

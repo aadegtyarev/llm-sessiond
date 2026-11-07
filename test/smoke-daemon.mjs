@@ -9,7 +9,9 @@ import { apiClient } from './api-client.mjs';
 
 export async function smokeDaemon(cwd) {
   const token = randomBytes(32).toString('base64url');
-  const child = spawn(process.execPath, [fileURLToPath(new URL('../src/daemon-cli.ts', import.meta.url))], { stdio: 'pipe' });
+  const child = spawn(process.execPath, [fileURLToPath(new URL('../src/daemon-cli.ts', import.meta.url))], {
+    stdio: 'pipe', env: { ...process.env, PI_PACKAGE_DIR: 'fixture-parent-package' },
+  });
   let stdout = '', stderr = '';
   child.stdout.on('data', bytes => { stdout += bytes; });
   child.stderr.on('data', bytes => { stderr += bytes; });
