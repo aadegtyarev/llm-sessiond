@@ -1,9 +1,9 @@
 # Compact session core
 
-Компактное TypeScript-ядро и локальный HTTP/JSON + SSE daemon для native Pi сессий:
-создание/регистрация, stop с сохранением истории, exact reopen с контекстом, model/effort controls,
-same-process reload и delete.
-Без trusted storage options ядро по-прежнему работает только в памяти.
+TypeScript-ядро и локальный HTTP/JSON + SSE daemon: маленький транслятор API ↔ Pi RPC.
+Daemon управляет локальными соединениями и своими процессами; Pi управляет историей,
+очередью исполнения, моделями, инструментами и настройками. Команды и полные ответы
+проходят через Core без собственной run/history policy.
 [Контракт ядра](docs/contracts/surfaces/session-core.md); Public API: [src/core.ts](src/core.ts).
 Внешнему HTTP-клиенту импорт TypeScript не нужен.
 
@@ -25,10 +25,8 @@ Node test runner с type stripping, без сборки, моделей и пл�
 
 ## Минимальный сценарий
 
-Команда ниже выполняется из корня checkout после подготовки. `FakePort` —
-**тестовая подделка**, не native adapter: ACK не завершает ввод, завершение
-имитируется отдельным событием. Проверяемый тест того же потока:
-[test/core-flow.test.ts](test/core-flow.test.ts).
+Команда ниже использует **тестовую подделку** `FakePort`, не запускает Pi или модель.
+Проверки общего входа: [core-command.test.ts](test/core-command.test.ts).
 
 ```sh
 node --experimental-strip-types --input-type=module <<'JS'
@@ -40,14 +38,14 @@ const port = new FakePort();
 const core = new SessionCore(port);
 core.create('demo');
 assert.equal((await core.start('demo')).status, 'running');
-assert.equal((await core.send('demo', 'input-1', 'hello')).status, 'pending');
-port.emit('demo', { type: 'input-completed', inputId: 'input-1' });
-assert.equal(core.get('demo').input?.status, 'completed');
+const response = await core.command('demo', { type: 'prompt', message: 'hello' });
+assert.equal(response.type, 'response');
+assert.equal(response.success, true); // Native response, not model-run completion.
 assert.equal((await core.stop('demo')).status, 'stopped');
 assert.deepEqual(await core.shutdown(), {
   stoppedSessionIds: [], uncertainSessionIds: [], failedSessionIds: [],
 });
-console.log('fake-port flow: completed → stopped → shutdown');
+console.log('fake-port flow: response → stopped → shutdown');
 JS
 ```
 
@@ -57,43 +55,28 @@ JS
 config через stdin до EOF, слушает только `127.0.0.1`; bearer auth обязателен даже
 для SSE. Token не передаётся через argv/env/URL. Служба не устанавливается.
 [Нормативный API](docs/contracts/surfaces/local-daemon-api.md) описывает routes,
-DTO, readiness, ограничения и честные unknown outcomes. Сначала SSE ready, затем
-create/start; HTTP ACK и reply written не означают settlement/native consumption.
-`Core.cancel(sessionId, inputId)` и authenticated HTTP cancel позволяют отменить
-активный ввод и продолжить разговор после подтверждённой отмены; запрос и пример —
-в [руководстве клиента](docs/local-daemon-api.md).
-`npm run test:api-smoke` проверяет внешний HTTP/SSE сценарий без модели на Linux
-и Windows; это не full Native Pi Windows certification. Для cleanup используйте
-explicit stop/shutdown; unknown не all-cleaned.
+формы событий, readiness, ограничения и честные ошибки потери канала. Сначала SSE ready,
+затем create/start; `command` передаёт native `type` и параметры, `compact` — короткий
+маршрут к той же команде. `streamingBehavior` выбирает клиент, wrapper default нет.
+Native `success:false` остаётся полным HTTP200; ответ команды не доказывает завершение
+всего run. UI reply `written` означает только локальную запись, не native consumption.
+Для cleanup используйте explicit stop/shutdown; unknown не all-cleaned.
 
-Для постоянных сессий оператор задаёт в stdin config пару `stateDir`/`nativeSessionDir`.
-Native Pi хранит стандартную историю, Core — только registry/binding/current metadata
-и used input IDs. Restart daemon сам не запускает Pi; reopen выполняется явно.
-[Руководство](docs/local-daemon-api.md) показывает настройку и цикл stop/restart/reopen/delete;
-[контракт Core](docs/contracts/surfaces/session-core.md) описывает durability и recovery.
-Каталоги должны быть приватными и эксклюзивно owned: после crash нельзя автоматически
-перехватывать leftover locks или считать чужой процесс остановленным.
-
-Именованные controls позволяют получить native catalogue моделей и фактические settings,
-выбрать model/effort для одной сессии и выполнить reload в том же owned Pi процессе.
-[Сценарий клиента](docs/local-daemon-api.md#настройте-модель-effort-и-выполните-reload)
-описывает readback, quiescence и rejected/unknown; global defaults не меняются.
+`npm run test:api-smoke` запускает два внешних Node fake-child сценария HTTP/SSE.
+CI сохраняет Linux/Windows gate; локальная проверка текущего кандидата выполнена на Linux.
+Реальный Native Pi в этой проверке не запускался. Ни fake smoke, ни прежние Native
+проверки не являются сертификацией текущего Native Pi/provider/Windows поведения.
 
 ## Нецели
 
-Собственного SDK, conversation history/replay engine и автоматических retry нет.
-Registry не копирует prompts/messages/events и не обещает crash-consistent каждый live outcome.
-Ручное сжатие контекста (manual compaction) API пока не предоставляет.
-Native Pi 1.5 RPC entrypoint —
-`createPiHarness` из [src/pi-harness.ts](src/pi-harness.ts), передаваемый в `SessionCore`.
-Нормативные границы — [контракт Pi adapter](docs/contracts/surfaces/pi-text-harness.md).
-Он сохраняет native tools/resources; handled/queued и недоказанные terminal исходы
-оставляют input unknown до явной cleanup. Автоматические тесты используют fake
-Node child; bounded реальная генерация проверена, новые вызовы требуют отдельного
-consent. Поддержаны tool/question/status observations и явный Core.reply в границах
-контракта Pi adapter; written не означает native consumption. UI renderer,
-permissions engine и sandbox не предоставляются.
-Harness владеет моделью, инструментами и процессом; Core — lifecycle/admission и optional
-durable registry. External fake smoke проверен на Linux/Windows, bounded real Native Pi
-stop/restart/exact context recall/delete и controls/readback/same-process reload — на Linux,
-не как universal provider или Native Windows гарантия. Полный перечень ограничений — в нормативном контракте выше.
+Нет собственного SDK, history store/registry, run/input coordinator, permissions engine,
+UI renderer, sandbox, автоматических retry/restart или private reload bridge.
+Сохранённые native files, metadata и locks не читаются и не изменяются daemon.
+Локальные сессии не переживают restart; штатной историей и переходами управляет Pi.
+Native tools сохраняют права дочернего процесса; display payload может содержать
+чувствительные данные и не фильтруется на секреты.
+
+`createPiHarness` из [src/pi-harness.ts](src/pi-harness.ts) использует штатный Pi RPC,
+по умолчанию `--mode rpc`, без принудительных session-флагов и скрытых extensions.
+Нормативные границы: [контракт Pi adapter](docs/contracts/surfaces/pi-text-harness.md).
+Реальные Pi/model/provider проверки требуют отдельного разрешения.

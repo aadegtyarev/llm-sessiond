@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { SessionCore, type PortOutcome } from '../src/core.ts';
+import { SessionCore, type NativeResponse, type PortOutcome } from '../src/core.ts';
 import { deferred, FakePort, rejectsCode } from './fake-port.ts';
 
-const states = ['starting', 'starting-ack', 'running', 'pending-input'] as const;
+const states = ['starting', 'starting-ack', 'running', 'pending-command'] as const;
 const outcomes = ['confirmed', 'rejected', 'unknown', 'throw'] as const;
 
 for (const state of states) {
@@ -14,7 +14,7 @@ for (const state of states) {
           const port = new FakePort();
           const core = new SessionCore(port);
           const startResult = deferred<PortOutcome>();
-          const sendResult = deferred<PortOutcome>();
+          const commandResult = deferred<NativeResponse | null>();
           const firstStop = deferred<PortOutcome>();
           core.create('s');
           if (state.startsWith('starting')) {
@@ -25,8 +25,9 @@ for (const state of states) {
           }
           const startTask = core.start('s');
           if (!state.startsWith('starting')) await startTask;
-          port.sendOperation = () => sendResult.promise;
-          const sendTask = state === 'pending-input' ? core.send('s', 'i', 'private') : null;
+          port.commandOperation = () => commandResult.promise;
+          const commandTask = state === 'pending-command'
+            ? rejectsCode(core.command('s', { type: 'prompt', message: 'private' }), 'harness-unknown') : null;
           port.stop = async (id) => {
             port.stops.push(id);
             if (port.stops.length === 1) {
@@ -46,7 +47,7 @@ for (const state of states) {
           await stopTask;
           assert.deepEqual(port.stops, ['s']); // No automatic retry.
           assert.equal(core.get('s').status, 'unknown');
-          await rejectsCode(core.send('s', 'blocked', 'private'), 'invalid-state');
+          await rejectsCode(core.command('s', { type: 'prompt', message: 'private' }), 'invalid-state');
           const events: unknown[] = [];
           core.subscribe((event) => events.push(event));
           if (cleanup === 'shutdown') {
@@ -60,17 +61,16 @@ for (const state of states) {
             if (next === 'confirmed') assert.equal((await core.stop('s')).status, 'stopped');
             else await rejectsCode(core.stop('s'), next === 'rejected' ? 'harness-rejected' : 'harness-unknown');
             assert.equal(core.get('s').status, next === 'confirmed' ? 'stopped' : 'unknown');
-            await rejectsCode(core.send('s', 'still-blocked', 'private'), 'invalid-state');
+            await rejectsCode(core.command('s', { type: 'prompt', message: 'private' }), 'invalid-state');
           }
           assert.deepEqual(port.stops, ['s', 's']);
           const eventCount = events.length;
           port.emit('s', { type: 'text', text: 'stale' });
-          port.emit('s', { type: 'input-completed', inputId: 'i' });
           startResult.resolve({ kind: 'confirmed' });
           const startView = await startTask;
           if (state === 'starting') assert.notEqual(startView.status, 'running');
-          sendResult.resolve({ kind: 'confirmed' });
-          if (sendTask) assert.deepEqual(await sendTask, { inputId: 'i', status: 'unknown' });
+          commandResult.resolve(null);
+          if (commandTask) await commandTask;
           assert.equal(events.length, eventCount);
           assert.deepEqual(port.stops, ['s', 's']);
         });

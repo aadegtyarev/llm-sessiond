@@ -18,27 +18,23 @@ for (const id of ['.', '..']) {
       { event: 'core', data: { type: 'session', session: sentinel } }]);
     assert.deepEqual(await api.request('/sessions'), [sentinel]);
     assert.equal(port.emitters.size, 0);
-    assert.deepEqual(port.sends, []);
+    assert.deepEqual(port.commands, []);
     assert.deepEqual(port.stops, []);
   });
 }
 
 for (const id of ['.prefix', 'suffix.', 'a..b', '...', '._-']) {
-  test(`daemon dot-containing session ID ${id} stays addressable; body input dot IDs stay valid`, async t => {
+  test(`daemon dot-containing session ID ${id} stays addressable for Native commands`, async t => {
     const port = new FakePort();
     const api = await apiFixture(t, port);
     const stream = await api.stream();
     t.after(() => stream.close());
     assert.equal((await api.running(id)).sessionId, id);
     assert.equal((await api.request(`/sessions/${id}`)).status, 'running');
-    for (const inputId of ['.', '..']) {
-      assert.deepEqual(await api.request(`/sessions/${id}/send`, { inputId, text: 'once' }), { inputId, status: 'pending' });
-      port.emit(id, { type: 'input-completed', inputId });
-      await stream.next(f => f.event === 'core' && f.data.type === 'input' && f.data.input.inputId === inputId && f.data.input.status === 'completed');
-      assert.deepEqual((await api.request(`/sessions/${id}`)).input, { inputId, status: 'completed' });
-      assert.deepEqual(await api.request(`/sessions/${id}/send`, { inputId, text: 'duplicate' }, 409), { error: { code: 'duplicate-input' } });
+    for (const message of ['.', '..']) {
+      assert.equal((await api.request(`/sessions/${id}/command`, { type: 'prompt', message })).success, true);
     }
-    assert.deepEqual(port.sends.map(send => send.inputId), ['.', '..']);
+    assert.deepEqual(port.commands.map(call => call.command.message), ['.', '..']);
     assert.equal((await api.request(`/sessions/${id}/stop`, {})).status, 'stopped');
   });
 }

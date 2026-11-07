@@ -3,9 +3,11 @@ import test from 'node:test';
 import type { CoreEvent } from '../src/types.ts';
 import { createEventPublisher } from '../src/events.ts';
 
-function eventOf(type: 'session' | 'input' | 'text', id: string): CoreEvent {
-  if (type === 'session') return { type, session: { sessionId: id, status: 'created', input: null } };
-  if (type === 'input') return { type, sessionId: id, input: { inputId: id, status: 'pending' } };
+function eventOf(type: CoreEvent['type'], id: string): CoreEvent {
+  if (type === 'session') return { type, session: { sessionId: id, status: 'created' } };
+  if (type === 'tool') return { type, sessionId: id, phase: 'start', toolCallId: id, toolName: 'fixture', args: {} };
+  if (type === 'question') return { type, sessionId: id, question: { requestId: id, method: 'input', title: id } };
+  if (type === 'notification') return { type, sessionId: id, method: 'notify', message: id, level: 'info' };
   return { type, sessionId: id, text: id };
 }
 
@@ -13,8 +15,8 @@ function idOf(event: CoreEvent): string {
   return event.type === 'session' ? event.session.sessionId : event.sessionId;
 }
 
-for (const outerType of ['session', 'input', 'text'] as const) {
-  for (const nestedType of ['session', 'input', 'text'] as const) {
+for (const outerType of ['session', 'text', 'tool', 'question', 'notification'] as const) {
+  for (const nestedType of ['session', 'text', 'tool', 'question', 'notification'] as const) {
     test(`events: FIFO ${outerType} → ${nestedType}, with publish-time recipients`, () => {
       const publisher = createEventPublisher();
       const seen: string[] = [];
@@ -27,7 +29,7 @@ for (const outerType of ['session', 'input', 'text'] as const) {
           publisher.subscribe((next) => { seen.push(`C:${idOf(next)}`); });
           publisher.publish(eventOf('text', 'second'));
         }
-        if (id === 'first') publisher.publish(eventOf('input', 'third'));
+        if (id === 'first') publisher.publish(eventOf('notification', 'third'));
       });
       const removeB = publisher.subscribe((event) => { seen.push(`B:${idOf(event)}`); });
       publisher.publish(eventOf(outerType, 'outer'));

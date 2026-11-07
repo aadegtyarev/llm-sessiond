@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { CoreError, SessionCore, type HarnessEvent, type HarnessPort, type PortOutcome } from '../src/core.ts';
+import { CoreError, SessionCore, type HarnessEvent, type HarnessPort, type NativeCommand, type NativeResponse, type PortOutcome } from '../src/core.ts';
 
 export type Deferred<T> = { promise: Promise<T>; resolve(value: T): void };
 
@@ -11,19 +11,20 @@ export function deferred<T>(): Deferred<T> {
 
 export class FakePort implements HarnessPort {
   readonly emitters = new Map<string, (event: HarnessEvent) => void>();
-  readonly sends: Array<{ sessionId: string; inputId: string; text: string }> = [];
+  readonly commands: Array<{ sessionId: string; command: NativeCommand }> = [];
   readonly stops: string[] = [];
   startOutcome: PortOutcome = { kind: 'confirmed' };
-  sendOperation: () => Promise<PortOutcome> = async () => ({ kind: 'confirmed' });
+  commandOperation: (command: NativeCommand) => Promise<NativeResponse | null> = async command =>
+    ({ type: 'response', id: 'fake-id', command: command.type, success: true });
 
   async start(sessionId: string, emit: (event: HarnessEvent) => void): Promise<PortOutcome> {
     this.emitters.set(sessionId, emit);
     return this.startOutcome;
   }
 
-  async send(sessionId: string, inputId: string, text: string): Promise<PortOutcome> {
-    this.sends.push({ sessionId, inputId, text });
-    return this.sendOperation();
+  async command(sessionId: string, command: NativeCommand): Promise<NativeResponse | null> {
+    this.commands.push({ sessionId, command });
+    return this.commandOperation(command);
   }
 
   async stop(sessionId: string): Promise<PortOutcome> {
