@@ -20,10 +20,12 @@ test('daemon config allows only trusted launch settings and bounded token/port',
   }
 });
 
-test('daemon config: persistence roots are paired trusted settings, never public DTO fields', () => {
-  assert.deepEqual(daemonConfig({ token, stateDir: '/private/state', nativeSessionDir: '/private/native',
-    launch: { cwd: '/private/work' } }), { token, port: 3000, launch: { cwd: '/private/work' },
-    native: { stateDir: '/private/state', nativeSessionDir: '/private/native', cwd: '/private/work' } });
+test('daemon config: no history registry or response-wait deadline settings', () => {
+  assert.throws(() => daemonConfig({ token, stateDir: '/private/state', nativeSessionDir: '/private/native' }));
+  assert.throws(() => daemonConfig({ token, launch: { commandDeadlineMs: 10_000 } }));
+  assert.deepEqual(daemonConfig({ token, launch: { executable: process.execPath, prefixArgs: ['fake.ts'],
+    cwd: '/private/work', stopDeadlineMs: 500 } }), { token, port: 3000, launch: {
+    executable: process.execPath, prefixArgs: ['fake.ts'], cwd: '/private/work', stopDeadlineMs: 500 } });
 });
 
 for (const mode of ['argv', 'bad-json', 'oversize', 'invalid-utf8']) {

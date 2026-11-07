@@ -3,13 +3,15 @@ import test from 'node:test';
 import type { CoreEvent } from '../src/types.ts';
 import { createEventPublisher } from '../src/events.ts';
 
-function eventOf(type: 'session' | 'input' | 'text'): CoreEvent {
-  if (type === 'session') return { type, session: { sessionId: 's', status: 'created', input: null } };
-  if (type === 'input') return { type, sessionId: 's', input: { inputId: 'i', status: 'pending' } };
+function eventOf(type: CoreEvent['type']): CoreEvent {
+  if (type === 'session') return { type, session: { sessionId: 's', status: 'created' } };
+  if (type === 'tool') return { type, sessionId: 's', phase: 'start', toolCallId: 't', toolName: 'fixture', args: {} };
+  if (type === 'question') return { type, sessionId: 's', question: { requestId: 'q', method: 'input', title: 'title' } };
+  if (type === 'notification') return { type, sessionId: 's', method: 'notify', message: 'hello', level: 'info' };
   return { type, sessionId: 's', text: 'hello' };
 }
 
-for (const type of ['session', 'input', 'text'] as const) {
+for (const type of ['session', 'text', 'tool', 'question', 'notification'] as const) {
   for (const asynchronous of [false, true]) {
     test(`events: ${type} fixes recipients across subscription mutation (${asynchronous ? 'async' : 'sync'})`, () => {
       const publisher = createEventPublisher();

@@ -9,7 +9,7 @@ test('daemon validates replies before Core and preserves written/rejected/unknow
   let outcome: ReplyOutcome = { kind: 'written' };
   const replies: unknown[] = [];
   const api = await apiFixture(t, { ...{
-    start: port.start.bind(port), send: port.send.bind(port), stop: port.stop.bind(port),
+    start: port.start.bind(port), command: port.command.bind(port), stop: port.stop.bind(port),
     async reply(id: string, answer: unknown) { replies.push({ id, answer }); return outcome; },
   } });
   await api.running();
@@ -22,7 +22,7 @@ test('daemon validates replies before Core and preserves written/rejected/unknow
   for (const kind of ['written', 'rejected', 'unknown'] as const) {
     outcome = { kind };
     assert.deepEqual(await api.request('/sessions/s/reply', { requestId: 'q', method: 'confirm', confirmed: true }), { kind });
-    assert.equal((await api.request('/sessions/s')).input, null);
+    assert.deepEqual(await api.request('/sessions/s'), { sessionId: 's', status: 'running' });
   }
   assert.equal(replies.length, 3);
 });
@@ -33,7 +33,7 @@ test('daemon shutdown closes admission immediately and reports uncertain/failed 
   const stops: string[] = [];
   const port = new FakePort();
   const api = await apiFixture(t, {
-    start: port.start.bind(port), send: port.send.bind(port),
+    start: port.start.bind(port), command: port.command.bind(port),
     async stop(id) {
       stops.push(id);
       if (id === 'a') { entered.resolve(); return gate.promise; }
@@ -60,7 +60,7 @@ test('daemon permits immediate HTTP reply to startup question before start ACK',
       return ready.promise;
     },
     async reply() { ready.resolve({ kind: 'confirmed' }); return { kind: 'written' }; },
-    async send() { return { kind: 'confirmed' }; }, async stop() { return { kind: 'confirmed' }; },
+    async command() { return null; }, async stop() { return { kind: 'confirmed' }; },
   });
   const stream = await api.stream();
   await api.request('/sessions', { sessionId: 's' });

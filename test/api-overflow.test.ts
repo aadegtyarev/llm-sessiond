@@ -42,8 +42,8 @@ test('daemon TCP stream overflow closes only the slow consumer; Core and fast st
   });
   assert.equal(lost, true);
   assert.equal((await api.request('/sessions/s')).status, 'running');
-  assert.equal((await api.request('/sessions/s/send', { inputId: 'after-overflow', text: 'still usable' })).status, 'pending');
-  port.emit('s', { type: 'input-completed', inputId: 'after-overflow' });
-  await fast.next(f => f.event === 'core' && f.data.type === 'input' && f.data.input.status === 'completed');
-  assert.equal(port.sends.length, 1);
+  assert.equal((await api.request('/sessions/s/command', { type: 'prompt', message: 'still usable' })).success, true);
+  port.emit('s', { type: 'text', text: 'after-overflow' });
+  await fast.next(f => f.event === 'core' && f.data.type === 'text' && f.data.text === 'after-overflow');
+  assert.equal(port.commands.length, 1);
 });

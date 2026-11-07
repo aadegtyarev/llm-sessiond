@@ -19,7 +19,7 @@ for (const record of [...tools, ...dialogs, ...notifications]) {
     port.emit('s', observation);
     assert.equal(seen.at(-1)?.type, observation.type);
     assert.equal(Object.isFrozen(seen.at(-1)), true);
-    assert.equal(core.get('s').input, null);
+    assert.deepEqual(core.get('s'), { sessionId: 's', status: 'starting' });
     start.resolve({ kind: 'confirmed' });
     await starting;
     port.emit('s', observation);
@@ -70,18 +70,18 @@ for (const record of [...tools, ...dialogs, ...notifications]) {
   });
 }
 
-test('interaction-core: reply admission, exceptions, late result and input independence', async () => {
+test('interaction-core: reply admission, exceptions and late result', async () => {
   const port = new FakePort();
   const pending = deferred<ReplyOutcome>();
   const calls: [string, QuestionReply][] = [];
-  const core = new SessionCore({ ...port, start: port.start.bind(port), send: port.send.bind(port),
+  const core = new SessionCore({ ...port, start: port.start.bind(port), command: port.command.bind(port),
     stop: port.stop.bind(port), reply: async (id, reply) => { calls.push([id, reply]); return pending.promise; } });
   core.create('s');
   await rejectsCode(core.reply('s', answers[0]), 'invalid-state');
   await rejectsCode(core.reply('absent', answers[0]), 'session-not-found');
-  await core.start('s'); await core.send('s', 'i', 'text');
+  await core.start('s');
   const result = core.reply('s', answers[0]);
-  assert.equal(core.get('s').input?.status, 'pending');
+  assert.equal(core.get('s').status, 'running');
   assert.deepEqual(calls, [['s', answers[0]]]);
   await core.stop('s'); pending.resolve({ kind: 'written' });
   assert.deepEqual(await result, { kind: 'unknown' });
@@ -93,12 +93,12 @@ test('interaction-core: reply admission, exceptions, late result and input indep
   await other.core.shutdown();
 });
 
-test('interaction-core: reply exception is unknown, not input settlement', async () => {
+test('interaction-core: reply exception is unknown, not Native consumption', async () => {
   const port = new FakePort();
-  const core = new SessionCore({ start: port.start.bind(port), send: port.send.bind(port),
+  const core = new SessionCore({ start: port.start.bind(port), command: port.command.bind(port),
     stop: port.stop.bind(port), reply: async () => { throw new Error('private'); } });
   core.create('s'); await core.start('s');
   assert.deepEqual(await core.reply('s', answers[0]), { kind: 'unknown' });
-  assert.equal(core.get('s').input, null);
+  assert.deepEqual(core.get('s'), { sessionId: 's', status: 'running' });
   await core.shutdown();
 });
