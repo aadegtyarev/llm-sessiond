@@ -55,11 +55,11 @@ GET без body. Query/fragment/percent-encoded paths и Origin отклоняю
 | POST `/sessions/:sessionId/send` | `{inputId,text}` → InputView |
 | POST `/sessions/:sessionId/cancel` | `{inputId}` → InputView целевого ввода |
 | POST `/sessions/:sessionId/reply` | QuestionReply → `{kind: written/rejected/unknown}` |
-| GET `/sessions/:sessionId/models` | → ControlResult<NativeModel[]> |
-| GET `/sessions/:sessionId/settings` | → ControlResult<SessionSettings> |
-| POST `/sessions/:sessionId/model` | `{provider,modelId}` → ControlResult<SessionSettings> |
-| POST `/sessions/:sessionId/thinking-level` | `{level}` → ControlResult<SessionSettings> |
-| POST `/sessions/:sessionId/reload` | `{}` → ControlResult<SessionSettings> |
+| GET `/sessions/:sessionId/models` | → `ControlResult<NativeModel[]>` |
+| GET `/sessions/:sessionId/settings` | → `ControlResult<SessionSettings>` |
+| POST `/sessions/:sessionId/model` | `{provider,modelId}` → `ControlResult<SessionSettings>` |
+| POST `/sessions/:sessionId/thinking-level` | `{level}` → `ControlResult<SessionSettings>` |
+| POST `/sessions/:sessionId/reload` | `{}` → `ControlResult<SessionSettings>` |
 | POST `/sessions/:sessionId/stop` | `{}` → SessionView; история сохраняется |
 | POST `/sessions/:sessionId/delete` | `{}` → `{deleted:true}`; native stopped без незавершённых операций |
 | POST `/shutdown` | `{}` → `{stoppedSessionIds,uncertainSessionIds,failedSessionIds}` |
