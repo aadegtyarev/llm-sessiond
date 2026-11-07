@@ -1,5 +1,10 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import type { PortOutcome } from './types.ts';
+import { fileURLToPath } from 'node:url';
+import { realpathSync } from 'node:fs';
+import { RELOAD_ENV } from './pi-reload-extension.ts';
+
+export const reloadExtensionPath = realpathSync(fileURLToPath(new URL('./pi-reload-extension.ts', import.meta.url)));
 
 export interface PiLaunch {
   executable?: string;
@@ -38,10 +43,13 @@ export function trackPiExit(child: ChildProcessWithoutNullStreams) {
   return { stop, get exited() { return exited; } };
 }
 
-export function launchPi(config: PiLaunch, sessionFile?: string): ChildProcessWithoutNullStreams {
+export function launchPi(config: PiLaunch, sessionFile?: string, reloadCommand?: string): ChildProcessWithoutNullStreams {
   const env = { ...process.env };
   delete env.PI_PACKAGE_DIR;
+  delete env[RELOAD_ENV];
+  if (reloadCommand) env[RELOAD_ENV] = reloadCommand;
   return spawn(config.executable ?? 'pi', [
     ...(config.prefixArgs ?? []), '--mode', 'rpc', ...(sessionFile ? ['--session', sessionFile] : ['--no-session']),
+    ...(reloadCommand ? ['--extension', reloadExtensionPath] : []),
   ], { cwd: config.cwd, env, shell: false, stdio: 'pipe' });
 }

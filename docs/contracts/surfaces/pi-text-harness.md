@@ -20,7 +20,9 @@ commandDeadlineMs (default 10000), stopDeadlineMs (default 5000); оба кон�
 нет picker/resume, ID/prefix/global поиска или неявного fork. Cwd берётся из binding.
 Adapter намеренно не отключает native tools/resources; trusted launch config
 контролирует оператор. `shell:false`; текст передаётся только как JSON data.
-Child env — копия parent env без `PI_PACKAGE_DIR`; parent/global env не меняется.
+Child env — копия parent env без `PI_PACKAGE_DIR` с private reload command nonce;
+parent/global env не меняется. Adapter явно подключает shipped reload extension,
+не отключая остальные штатные native resources.
 Start подтверждается коррелированным успешным `get_state` с проверкой state,
 не spawn/задержкой; недоказанная readiness даёт unknown и сохраняет child для cleanup.
 При native binding readiness дополнительно требует совпадения correlated state
@@ -52,8 +54,53 @@ Header versions1/2/3 поддерживаются; только отсутств
 
 Stop сохраняет native history. Explicit Core reopen stopped запускает новый owned child
 на том же точном файле/UUID; прошлый child адаптера должен иметь observed exit.
-История не replay-ится вручную и не копируется в registry. Отдельного delete_session RPC
-нет: после доказанного stop точный file и metadata удаляет Core.
+История не replay-ится вручную и не копируется в registry. До launch Core pin/save
+исходный prefix reference (длина + SHA256; registry пишет v2, читает v1/v2).
+Adapter выводит из точного prefix metadata выбранной native ветки. После spawn,
+до confirmed readiness, он восстанавливает точные model/effort штатными setter RPC
+и проверяет фактический state и capabilities текущей модели. CLI defaults не proof;
+startup уже может дописать defaults и выполнить resource effects, append-free запуск
+не обещан. Native virtual-model selection различается с physical response по native
+catalogue; недоступная/неоднозначная selection не заменяется другой моделью.
+Неудачная попытка сохраняет исходный reference; prefix mismatch или неуспешная legacy
+migration fail-closed, без принятия нового tail, rollback/reset/automatic repair.
+Только verified readiness плюс durable Core barrier очищают reference.
+Отдельного delete_session RPC нет: после доказанного stop точный file и metadata удаляет Core.
+
+## Model/effort controls и genuine reload
+
+`models` вызывает native `get_available_models` и возвращает только provider/id/optional
+name. `settings` читает native state и `get_available_thinking_levels`: model либо null,
+thinkingLevel и availableThinkingLevels текущей модели. Raw model/config/auth поля
+не передаются. `setModel({provider,modelId})` проверяет точную пару в native catalogue;
+`setThinkingLevel(level)` проверяет capabilities текущей модели. После штатного setter
+требуются correlated identity/settings readback и quiescence, не echo/ACK.
+Нет cycling, automatic fallback, `persist:true` или изменения global defaults.
+
+Controls сериализуются. Queries допускают ordinary send/reply/cancel reentry;
+activity/overlap делает snapshot unknown без отравления run. Effectful controls требуют
+ready idle, отсутствия streaming/compaction/pending messages, unresolved questions и
+незавершённых ordinary write/ACK. Written answer не доказывает consumption: отдельный
+native idle barrier разрешает завершить question fence. Conflicting effects отклоняются.
+Наблюдаемая потеря sessionId/file ownership синхронно ломает wire до следующих foreign
+frames; неопределённый dispatched effect требует explicit stop через Core. Не всякий
+readonly unknown означает ownership loss или испорченную сессию.
+
+`reload` использует shipped private extension, регистрирующую nonce-command только для
+owned launch. До отправки проверяются единственность команды, description и exact
+source provenance (extension path, CLI/temporary/top-level). Handler вызывает
+`await context.reload()` и возвращается: это reload native resources в том же owned
+Pi PID/session, не restart и не model prompt. Подтверждение требует success + handled,
+отсутствия наблюдённого extension_error, identity/settings readback, idle/quiescence,
+неуменьшившегося messageCount и повторной проверки helper. Отсутствующий/неверный helper
+не отправляется как prompt; uncertain completion не объявляется успехом.
+Это bounded proof, не сертификат отсутствия silent-loader diagnostics, фоновых ошибок
+или враждебных extensions. Обычные native tools/resources остаются enabled.
+
+Публичный результат — confirmed(value), rejected либо unknown; подробности admission
+и generation fences — в [контракте Core](session-core.md). Реализация:
+[pi-controls.ts](../../../src/pi-controls.ts), [private helper](../../../src/pi-reload-extension.ts),
+[startup restoration](../../../src/pi-startup.ts).
 
 ## Output, ownership и terminal
 
@@ -166,7 +213,8 @@ send получит unknown, explicit stop использует сохранён
 Нет гарантии finished-all-background, cleanup descendants/remote ресурсов,
 полной UI/permission parity, произвольного session replacement или sandbox.
 Не происходит скрытого approve/cancel. Native tools сохраняют права child.
-Нет общей native inference/model/auth end-to-end гарантии или полной native parity.
+Named controls/readback не дают общей native inference/provider/auth end-to-end
+гарантии или полной native parity.
 Автоматические тесты проверяют fake RPC protocol; отдельно разрешённая native
 валидация не заменяет это покрытие и не расширяет гарантии адаптера.
 Реальная генерация требует отдельного consent. Поддержаны только описанные
@@ -188,7 +236,11 @@ Bounded real Native Pi проверка на Linux подтвердила comple
 новый daemon без auto-launch → exact file/UUID reopen и recall без повторения marker →
 stop/delete с сохранением unrelated file и observed owned child exit/close. External fake
 HTTP/SSE smoke, включая persistence/restart/delete и cancellation/replies, проверен на Linux
-и actual Windows CI. Full suite/typecheck проверены на Linux, не как full-suite Windows
+и actual Windows CI, в том числе persisted model/effort и reopen с fake child.
+Bounded Native Linux проверка controls/readback и genuine private reload прошла в одном
+Pi PID с сохранением fixture/context/settings и без генерации. Она не доказывает actual
+second-Pi reopen после смены модели или semantic recall при нуле генераций.
+Full suite/typecheck проверены на Linux, не как full-suite Windows
 или Native Pi Windows certification. Это не universal provider/auth, native timeout,
 всех background jobs или descendant/remote cleanup гарантия.
 Правила lifecycle — [метаконтракт](../meta-contract.md).

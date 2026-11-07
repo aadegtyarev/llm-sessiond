@@ -3,7 +3,7 @@ import { PassThrough, Writable } from 'node:stream';
 import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { createPiWire, type RecordValue } from '../src/pi-wire.ts';
 
-export function wireDouble(deadline = 100) {
+export function wireDouble(deadline = 100, event?: (record: RecordValue) => void) {
   const stdout = new PassThrough();
   const stderr = new PassThrough();
   const frames: RecordValue[] = [];
@@ -16,7 +16,7 @@ export function wireDouble(deadline = 100) {
   const events: RecordValue[] = [];
   let losses = 0;
   const wire = createPiWire(child as unknown as ChildProcessWithoutNullStreams,
-    deadline, (record) => events.push(record), () => { losses++; });
+    deadline, (record) => { events.push(record); event?.(record); }, () => { losses++; });
   function respond(extra: object = {}, index = frames.length - 1) {
     stdout.write(JSON.stringify({ type: 'response', id: frames[index].id,
       command: frames[index].type, success: true, ...extra }) + '\n');

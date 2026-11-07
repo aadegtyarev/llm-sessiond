@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { SessionCore } from '../src/core.ts';
 import { final, fixture } from './pi-support.ts';
+import { reloadExtensionPath } from '../src/pi-process.ts';
 
 test('pi Unicode fragmented CRLF output is session scoped and filtered', async (t) => {
   const f = await fixture(t);
@@ -29,7 +30,7 @@ test('pi separate processes and native resource launch defaults', async (t) => {
   assert.notEqual(reports[0].pid, reports[1].pid);
   for (const report of reports) {
     assert.equal(report.override, false);
-    assert.deepEqual(report.args, ['--mode', 'rpc', '--no-session']);
+    assert.deepEqual(report.args, ['--mode', 'rpc', '--no-session', '--extension', reloadExtensionPath]);
   }
 });
 

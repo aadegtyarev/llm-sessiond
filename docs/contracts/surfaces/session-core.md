@@ -31,6 +31,40 @@ registry не копирует prompts, messages или события. Paths и
 
 Сигнатуры и типы: [core.ts](../../../src/core.ts), [types.ts](../../../src/types.ts). Управление жизненным циклом: [harness-session.ts](../../../src/harness-session.ts); события и проекции: [events.ts](../../../src/events.ts).
 
+## Именованные model/effort/reload controls
+
+Optional методы `HarnessPort` доступны через Core:
+
+| Операция Core | Confirmed value |
+| --- | --- |
+| `models(sessionId)` | `readonly NativeModel[]`: provider, id, optional name |
+| `settings(sessionId)` | `SessionSettings`: model либо null, thinkingLevel, availableThinkingLevels |
+| `setModel(sessionId, {provider,modelId})` | SessionSettings после native readback |
+| `setThinkingLevel(sessionId, level)` | SessionSettings после native readback |
+| `reload(sessionId)` | SessionSettings после доказанного same-process reload |
+
+`ControlResult<T>` — `{kind:'confirmed',value:T}`, `{kind:'rejected'}` или
+`{kind:'unknown'}`. Отсутствующий optional метод даёт rejected; ошибки admission
+остаются CoreError. Значения копируются и замораживаются, private port evidence
+не выходит наружу. Native catalogue/settings не являются registry или global defaults.
+Доступные thinking levels относятся только к текущей модели.
+
+Core допускает control только в running без stop, другой control или незавершённой
+операции. Queries `models/settings` сериализуются среди controls, но не создают
+исключительный запрет ordinary send/reply/cancel: их безопасный reentry сохраняется
+по собственным правилам admission. При intervening activity adapter может вернуть
+unknown вместо устаревшего snapshot, не отравляя обычный run. Effectful model/effort/reload
+не допускаются при pending/unknown input текущего поколения и блокируют обычный
+send/reply/cancel до завершения. Adapter дополнительно проверяет idle/quiescence,
+вопросы и drain локальных write/ACK; ACK сам по себе не settlement/consumption.
+
+Stop/смена поколения делают поздний результат unknown. Если adapter доказывает потерю
+ownership или неопределённость уже отправленного эффекта, Core переводит сессию в
+unknown, запрашивает stop и закрывает ordinary admission до explicit cleanup. Обычный
+неопределённый readonly snapshot сам по себе этого не делает. Автоматических retry,
+model fallback, изменения global defaults или универсального query/RPC gateway нет.
+Конкретные native проверки и reload proof — в [контракте Pi](pi-text-harness.md).
+
 ## Ввод, события и идентичность
 
 В текущем поколении сессии не более одного незавершённого ввода: `pending` и `unknown`
@@ -83,7 +117,7 @@ completion. Admission fence reopen/delete держится через checkpoint
 
 После завершившейся неопределённой попытки новый явный `stop` или последующий первый `shutdown` достигает harness. Исход новой попытки отражается честно; её `rejected` не отменяет предыдущую неопределённость и запрет sends. Автоматических retry, replay и fallback нет.
 
-`shutdown()` сразу закрывает приём: create/catalogue/register/start/send/cancel/reply/stop/delete/get/list/subscribe после этого сообщают `closed`. Уже начатые операции могут завершиться. Ядро обходит собственные сессии и пропускает уже `stopped`; в in-memory режиме
+`shutdown()` сразу закрывает приём: create/catalogue/register/start/send/cancel/reply/models/settings/setModel/setThinkingLevel/reload/stop/delete/get/list/subscribe после этого сообщают `closed`. Уже начатые операции могут завершиться. Ядро обходит собственные сессии и пропускает уже `stopped`; в in-memory режиме
 также пропускает `failed`. Для остальных выполняет cleanup. Native unowned dirty
 records не исключаются из отчёта: они попадают в uncertain, не вызывая stop чужого процесса.
 
@@ -133,7 +167,17 @@ header UUID/cwd, структурой истории и обязательным
 Missing/corrupt/replaced/неоднозначная история не заменяется пустой. Metadata filenames
 с lowercase base32/prefix сохраняют case-sensitive ID semantics и Windows-safe addressing.
 
-Registry хранит только текущие metadata, binding, поколения/used IDs и delete intent.
+Registry пишет schema v2 и читает v1/v2. Помимо текущих metadata, binding,
+поколений/used IDs и delete intent он хранит optional startup reference:
+`{prefixByteLength,sha256}` исходного native prefix, не settings/history mirror.
+Reference проверяется и долговечно сохраняется до launch; selected-branch model/effort
+из этого prefix восстанавливает adapter после spawn до подтверждённой readiness.
+Startup может уже дописать defaults и выполнить resource effects. Неуспешная попытка
+сохраняет исходный reference между stop/retry/restart, не принимает новый tail за выбор.
+Только verified readiness и успешный durable save очищают reference. Укороченный или
+изменённый prefix fail-closed; неуспешная legacy migration не rebases reference и требует
+ручного recovery. Rollback, автоматического repair или reset истории нет.
+
 Clean-stop/restart — гарантия сохранения текущего outcome; каждый live terminal/SSE event
 не журналируется. Crash-consistent outcome snapshots, event history/replay, ревизии домена
 и собственная история разговора не предоставляются. Locks не координируют сторонний Pi,
@@ -142,7 +186,7 @@ secure erase всех следов, rollback tool effects или гаранти�
 
 ## Ограничения и нецели
 
-Вне поверхности: SQLite, permissions engine, универсальный callback-протокол, controls модели/effort/reload, каталоги моделей и settings controls, команды расширения, изображения, планирование, цикл агента, нативные адаптеры, CLI, HTTP/WS/API-версии, SDK, реестры возможностей и query-контроллеры. Они не являются требованиями этого контракта.
+Вне поверхности: SQLite, permissions engine, универсальный callback-протокол, raw RPC и произвольные команды расширения, manual compaction API, изображения, планирование, цикл агента, реализации нативных адаптеров, CLI, HTTP/WS/API-версии, SDK, реестры возможностей и универсальные query-контроллеры. Они не являются требованиями этого контракта.
 
 Lifecycle/admission authority и интерфейсы находятся в types.ts/core.ts/events.ts/harness-session.ts.
 Конкретный disk I/O и validation вынесены в [native-registry.ts](../../../src/native-registry.ts),
@@ -161,4 +205,8 @@ stop-proof retry, stopped-only delete/partial retry и fail-closed locks/startup
 [External API test](../../../test/native-api.test.ts) проходит через реальные Core/adapter/HTTP/SSE
 с fake Node child. Bounded real Native Pi Linux validation подтверждает clean daemon restart,
 exact file/UUID reopen, completed recall без повторения marker и stop/delete с сохранением
-unrelated file и observed owned exits. Это не универсальная provider/platform гарантия.
+unrelated file и observed owned exits. Controls regressions проверяют exact selection,
+authoritative readback, persisted settings/reopen, startup-prefix/legacy failure paths,
+query reentry и unknown/ownership fences. Bounded Native Linux controls/readback/reload
+проверены отдельно без генерации; это не actual post-change second-Pi reopen или semantic
+recall proof этой проверки и не универсальная provider/platform гарантия.

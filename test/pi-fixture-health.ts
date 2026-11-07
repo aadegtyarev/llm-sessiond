@@ -18,6 +18,16 @@ export function fixtureHealth() {
     stop: (...args) => run('stop', () => port.stop(...args)),
     ...(port.cancel ? { cancel: (...args: Parameters<NonNullable<HarnessPort['cancel']>>) =>
       run('cancel', () => port.cancel!(...args)) } : {}),
+    ...(port.models ? { models: (...args: Parameters<NonNullable<HarnessPort['models']>>) =>
+      run('models', () => port.models!(...args)) } : {}),
+    ...(port.settings ? { settings: (...args: Parameters<NonNullable<HarnessPort['settings']>>) =>
+      run('settings', () => port.settings!(...args)) } : {}),
+    ...(port.setModel ? { setModel: (...args: Parameters<NonNullable<HarnessPort['setModel']>>) =>
+      run('setModel', () => port.setModel!(...args)) } : {}),
+    ...(port.setThinkingLevel ? { setThinkingLevel: (...args: Parameters<NonNullable<HarnessPort['setThinkingLevel']>>) =>
+      run('setThinkingLevel', () => port.setThinkingLevel!(...args)) } : {}),
+    ...(port.reload ? { reload: (...args: Parameters<NonNullable<HarnessPort['reload']>>) =>
+      run('reload', () => port.reload!(...args)) } : {}),
     ...(port.reply ? { reply: (...args: Parameters<NonNullable<HarnessPort['reply']>>) =>
       run('reply', () => port.reply!(...args)) } : {}),
   });

@@ -51,12 +51,50 @@ export async function nativeSessionSmoke() {
     assert.equal(files.length, 1);
     const file = join(nativeSessionDir, files[0]);
     assert.equal(readFileSync(file, 'utf8'), ''); // Daemon reserves, never writes a header.
+    writeFileSync(join(root, 'plugin-version'), 'v1');
     await first.api.request('/sessions/saved/start', {});
+    const initialResource = await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'notification'
+      && frame.data.statusKey === 'fixture-resource');
+    const sameResourceIdentity = initialResource.data.statusText.slice(2);
+    assert.equal(initialResource.data.statusText, `v1${sameResourceIdentity}`);
     await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'tool' && frame.data.toolCallId === 'startup-resource');
     const nativeId = JSON.parse(readFileSync(file, 'utf8').split('\n')[0]).id;
     const marker = 'external-context-marker-compact';
     await first.api.request('/sessions/saved/send', { inputId: 'remember', text: marker });
     await completed(first.stream, 'remember');
+    const models = await first.api.request('/sessions/saved/models');
+    assert.deepEqual(models, { kind: 'confirmed', value: [
+      { provider: 'fixture', id: 'one', name: 'One' }, { provider: 'fixture', id: 'two', name: 'Two' },
+    ] });
+    const initialSettings = await first.api.request('/sessions/saved/settings');
+    assert.equal(initialSettings.value.model.id, 'one');
+    assert.deepEqual(initialSettings.value.availableThinkingLevels, ['off', 'low', 'high']);
+    assert.equal((await first.api.request('/sessions/saved/thinking-level', { level: 'high' })).value.thinkingLevel, 'high');
+    const selected = await first.api.request('/sessions/saved/model', { provider: 'fixture', modelId: 'two' });
+    assert.equal(selected.value.model.id, 'two'); assert.equal(selected.value.thinkingLevel, 'off');
+    assert.deepEqual(selected.value.availableThinkingLevels, ['off']);
+    assert.deepEqual(await first.api.request('/sessions/saved/thinking-level', { level: 'high' }), { kind: 'rejected' });
+    writeFileSync(join(root, 'plugin-version'), 'v2');
+    assert.deepEqual(await first.api.request('/sessions/saved/reload', {}), selected);
+    await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'notification'
+      && frame.data.statusText === `v2${sameResourceIdentity}`);
+    await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'notification'
+      && frame.data.method === 'notify' && frame.data.message === 'fixture-reloaded');
+    assert.deepEqual(await first.api.request('/sessions/saved/settings'), selected);
+    assert.equal(JSON.stringify([models, selected]).includes('private'), false);
+    await first.api.request('/sessions/saved/send', { inputId: 'post-reload-recall', text: 'recall' });
+    await completed(first.stream, 'post-reload-recall');
+    await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'text' && frame.data.text === marker);
+    await first.api.request('/sessions/saved/send', { inputId: 'post-reload-wait', text: 'fixture:wait-controls' });
+    assert.equal((await first.api.request('/sessions/saved/cancel', { inputId: 'post-reload-wait' })).status, 'cancelled');
+    await first.api.request('/sessions/saved/send', { inputId: 'post-reload-question', text: 'fixture:questions-controls' });
+    await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'question' && frame.data.question.requestId === 'controls-question');
+    assert.deepEqual(await first.api.request('/sessions/saved/reply', { requestId: 'controls-question', method: 'confirm', confirmed: true }), { kind: 'written' });
+    await completed(first.stream, 'post-reload-question');
+    await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'text'
+      && frame.data.text === `reply-consumed:${sameResourceIdentity.split(':')[1]}`);
+    assert.deepEqual(await first.api.request('/sessions/saved/reload', {}), selected); // Ordered idle readback settles written UI ID.
+    assert.deepEqual(await first.api.request('/sessions/saved/reply', { requestId: 'controls-question', method: 'confirm', confirmed: true }), { kind: 'rejected' });
     await first.api.request('/sessions/saved/delete', {}, 409);
     await first.api.request('/sessions/saved/stop', {});
     await first.api.request('/sessions', { sessionId: 'empty' });
@@ -84,6 +122,7 @@ export async function nativeSessionSmoke() {
     assert.deepEqual(await second.api.request('/native-sessions'), [{ nativeId }]);
     await second.api.request('/sessions/duplicate/register', { nativeId }, 409);
     await second.api.request('/sessions/saved/start', {}); // Exact reopen, same registered file.
+    assert.deepEqual(await second.api.request('/sessions/saved/settings'), selected);
     await second.api.request('/sessions/saved/send', { inputId: 'remember', text: 'must-not-run' }, 409);
     await second.api.request('/sessions/saved/send', { inputId: 'recall', text: 'recall' });
     await completed(second.stream, 'recall');
@@ -127,6 +166,7 @@ export async function nativeSessionSmoke() {
     for (const name of health) assert.equal(readFileSync(join(root, name), 'utf8'), 'healthy');
     console.log(JSON.stringify({ nativeSessionSmoke: 'passed', platform: process.platform,
       context: 'external marker -> clean stop/shutdown -> new daemon -> exact recall, no marker replay',
+      controls: 'catalogue -> effort -> model clamp -> genuine fake reload v1/v2 same PID/native context/settings -> native history reopen readback',
       registry: 'empty record + used IDs + no auto-launch + trusted exact UUID import + Windows-safe case-sensitive IDs', deletion: 'stopped only; unrelated file preserved' }));
   } finally {
     for (const stream of streams) await stream.close();

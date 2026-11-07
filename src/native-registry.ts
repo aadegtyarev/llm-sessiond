@@ -7,6 +7,7 @@ import { createSessionRecord } from './harness-session.ts';
 
 export interface NativeOptions { stateDir: string; nativeSessionDir: string; cwd?: string }
 const ID = /^[A-Za-z0-9._-]{1,128}$/;
+const onlyKeys = (value: object, keys: readonly string[]) => Object.keys(value).every(key => keys.includes(key));
 
 /** Concrete metadata I/O only. Core owns admission, transitions and runtime ownership. */
 export class NativeRegistry {
@@ -53,7 +54,7 @@ export class NativeRegistry {
     const temporary = join(this.stateDir, `.${randomUUID()}.tmp`);
     let fd: number | undefined;
     try {
-      const data = { version: 1, id: session.id, status: session.status,
+      const data = { version: 2, id: session.id, status: session.status,
         input: session.input && { inputId: session.input.inputId, status: session.input.status, generation: session.input.generation },
         inputIds: [...session.inputIds], generation: session.generation,
         native: session.native, deleting: session.deleting === true };
@@ -75,7 +76,8 @@ export class NativeRegistry {
         const file = join(this.stateDir, name);
         nativeIdentity(file);
         const data = JSON.parse(readFileSync(file, 'utf8'));
-        if (data.version !== 1 || this.path(data.id) !== file
+        if (![1, 2].includes(data.version) || !onlyKeys(data, ['version', 'id', 'status', 'input', 'inputIds', 'generation', 'native', 'deleting'])
+          || this.path(data.id) !== file
           || !['created', 'starting', 'running', 'stopped', 'failed', 'unknown'].includes(data.status)
           || !Number.isSafeInteger(data.generation) || data.generation < 0
           || !Array.isArray(data.inputIds) || data.inputIds.some((id: unknown) => typeof id !== 'string')
@@ -85,6 +87,14 @@ export class NativeRegistry {
           || typeof binding.cwd !== 'string' || canonicalDirectory(binding.cwd) !== binding.cwd
           || (binding.identity !== null && typeof binding.identity !== 'string')
           || (binding.nativeId !== null && (typeof binding.nativeId !== 'string' || !NATIVE_ID.test(binding.nativeId)))) throw new Error();
+        if (!onlyKeys(binding, ['file', 'cwd', 'nativeId', 'identity', 'fresh', ...(data.version === 2 ? ['startupReference'] : [])])) throw new Error();
+        if (binding.startupReference !== undefined) {
+          const ref = binding.startupReference;
+          if (!ref || typeof ref !== 'object' || Array.isArray(ref) || !onlyKeys(ref, ['prefixByteLength', 'sha256'])
+            || !Number.isSafeInteger(ref.prefixByteLength) || ref.prefixByteLength <= 0
+            || typeof ref.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(ref.sha256)
+            || binding.fresh || binding.identity === null) throw new Error();
+        }
         const session = createSessionRecord(data.id);
         session.native = binding;
         session.generation = data.generation + 1;
@@ -94,7 +104,7 @@ export class NativeRegistry {
         session.status = clean ? data.status : 'unknown';
         session.stopRequested = !clean;
         if (data.input !== null) {
-          if (!data.input || !session.inputIds.has(data.input.inputId)
+          if (!data.input || !onlyKeys(data.input, ['inputId', 'status', 'generation']) || !session.inputIds.has(data.input.inputId)
             || !Number.isSafeInteger(data.input.generation) || data.input.generation < 0 || data.input.generation > data.generation
             || !['pending', 'completed', 'failed', 'cancelled', 'unknown'].includes(data.input.status)) throw new Error();
           session.input = { inputId: data.input.inputId, status: clean ? data.input.status : 'unknown', generation: data.input.generation };

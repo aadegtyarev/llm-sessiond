@@ -2,6 +2,18 @@ import type { CoreEvent, HarnessPort, InputView, PortOutcome, SessionRecord, Shu
 import { acceptHarnessEvent, inputView, sessionView } from './events.ts';
 import type { NativeRegistry } from './native-registry.ts';
 import { checkNative } from './native-history.ts';
+import { pinNativeStartup } from './native-startup.ts';
+
+function saveNativeReadiness(session: SessionRecord, registry: NativeRegistry): void {
+  const native = { ...session.native!, nativeId: checkNative(session.native!) };
+  // This attempt pinned/derived selection BEFORE launch. Trusted native migration may
+  // rewrite legacy bytes; only verified port readiness + valid current history can clear.
+  // A failed attempt retains the old pin and cannot silently adopt a rewritten prefix.
+  delete native.startupReference;
+  // Keep the in-memory reference until the actual durable readiness barrier succeeds.
+  registry.save({ ...session, native });
+  session.native = native;
+}
 
 
 export function createSessionRecord(id: string): SessionRecord {
@@ -18,6 +30,7 @@ export async function startHarnessSession(
   registry?: NativeRegistry,
 ): Promise<PortOutcome | null> {
   const previous = session.status;
+  if (registry) pinNativeStartup(session.native!);
   const nativeStart = session.native && { ...session.native };
   session.status = 'starting';
   if (registry) {
@@ -48,8 +61,8 @@ export async function startHarnessSession(
   session.status = outcome.kind === 'confirmed' ? 'running' : outcome.kind === 'rejected' ? 'failed' : 'unknown';
   if (registry) {
     try {
-      if (outcome.kind === 'confirmed') session.native!.nativeId = checkNative(session.native!);
-      registry.save(session);
+      if (outcome.kind === 'confirmed') saveNativeReadiness(session, registry);
+      else registry.save(session);
     } catch (error) {
       session.status = 'unknown'; session.stopRequested = true; session.generation++;
       throw error;
@@ -89,8 +102,10 @@ export async function stopHarnessSession(
     if (startOutcome && session.status === 'starting') {
       session.status = startOutcome.kind === 'confirmed' ? 'running' : startOutcome.kind === 'rejected' ? 'failed' : 'unknown';
       if (registry) {
-        try { registry.save(session); }
-        catch (error) { session.status = 'unknown'; session.stopRequested = true; session.generation++; throw error; }
+        try {
+          if (startOutcome.kind === 'confirmed') saveNativeReadiness(session, registry);
+          else registry.save(session);
+        } catch (error) { session.status = 'unknown'; session.stopRequested = true; session.generation++; throw error; }
       }
       notify({ type: 'session', session: sessionView(session) });
     }

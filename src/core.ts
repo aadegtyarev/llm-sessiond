@@ -1,3 +1,5 @@
+import { modelSnapshot, settingsSnapshot } from './session-settings.ts';
+import type { ControlResult, HarnessControlResult, ModelChoice, NativeModel, SessionSettings } from './types.ts';
 import { CoreError, type CoreEvent, type HarnessPort, type InputView, type PortOutcome, type QuestionReply, type ReplyOutcome, type SessionRecord, type SessionView, type ShutdownResult } from './types.ts';
 import { createEventPublisher, inputView, sessionView } from './events.ts';
 import { callPort, createSessionRecord, startHarnessSession, stopAllHarnessSessions, stopHarnessSession } from './harness-session.ts';
@@ -5,6 +7,7 @@ import { NativeRegistry, type NativeOptions } from './native-registry.ts';
 import { checkNative } from './native-history.ts';
 export { CoreError } from './types.ts';
 export type { NativeOptions } from './native-registry.ts';
+export type { ControlResult, ModelChoice, NativeModel, SessionSettings } from './types.ts';
 export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, InputStatus, InputView, PortOutcome, SessionStatus, SessionView, ShutdownResult, DisplayValue, InteractionEvent, NativeQuestion, QuestionMethod, QuestionReply, ReplyOutcome } from './types.ts';
 
 export class SessionCore {
@@ -124,7 +127,7 @@ export class SessionCore {
   async send(sessionId: string, inputId: string, text: string): Promise<InputView> {
     this.assertOpen();
     const session = this.requireSession(sessionId);
-    if (session.status !== 'running' || session.stopRequested) throw new CoreError('invalid-state');
+    if (session.status !== 'running' || session.stopRequested || session.controlInFlight === 'effect') throw new CoreError('invalid-state');
     if (((session.input?.status === 'pending' || session.input?.status === 'unknown')
       && (!this.registry || session.input.generation === session.generation)) || session.input?.cancelInFlight) throw new CoreError('input-in-flight');
     if (session.inputIds.has(inputId)) throw new CoreError('duplicate-input');
@@ -159,7 +162,7 @@ export class SessionCore {
     this.assertOpen();
     const session = this.requireSession(sessionId);
     const input = session.input;
-    if (session.status !== 'running' || session.stopRequested || !input
+    if (session.status !== 'running' || session.stopRequested || session.controlInFlight === 'effect' || !input
       || input.inputId !== inputId || input.status !== 'pending'
       || !input.accepted || input.cancelRequested) throw new CoreError('invalid-state');
     const generation = session.generation;
@@ -189,7 +192,7 @@ export class SessionCore {
   async reply(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome> {
     this.assertOpen();
     const session = this.requireSession(sessionId);
-    if (session.stopRequested || (session.status !== 'starting' && session.status !== 'running')) {
+    if (session.stopRequested || session.controlInFlight === 'effect' || (session.status !== 'starting' && session.status !== 'running')) {
       throw new CoreError('invalid-state');
     }
     const generation = session.generation;
@@ -200,6 +203,69 @@ export class SessionCore {
     finally { session.operations--; }
     if (session.generation !== generation || session.stopRequested) return { kind: 'unknown' };
     return Object.freeze({ kind: outcome.kind });
+  }
+
+  models(sessionId: string): Promise<ControlResult<readonly NativeModel[]>> {
+    return this.control(sessionId, false, () => this.port.models?.(sessionId), models =>
+      Object.freeze(models.map(model => {
+        const copy = modelSnapshot(model);
+        if (!copy) throw new Error('invalid model');
+        return copy;
+      })));
+  }
+
+  settings(sessionId: string): Promise<ControlResult<SessionSettings>> {
+    return this.control(sessionId, false, () => this.port.settings?.(sessionId), settingsSnapshot);
+  }
+
+  setModel(sessionId: string, choice: ModelChoice): Promise<ControlResult<SessionSettings>> {
+    const selected = Object.freeze({ provider: choice.provider, modelId: choice.modelId });
+    return this.control(sessionId, true, () => this.port.setModel?.(sessionId, selected), settingsSnapshot);
+  }
+
+  setThinkingLevel(sessionId: string, level: string): Promise<ControlResult<SessionSettings>> {
+    return this.control(sessionId, true, () => this.port.setThinkingLevel?.(sessionId, level), settingsSnapshot);
+  }
+
+  reload(sessionId: string): Promise<ControlResult<SessionSettings>> {
+    return this.control(sessionId, true, () => this.port.reload?.(sessionId), settingsSnapshot);
+  }
+
+  private async control<T>(sessionId: string, effectful: boolean,
+    operation: () => Promise<HarnessControlResult<T>> | undefined, copy: (value: T) => T,
+  ): Promise<ControlResult<T>> {
+    this.assertOpen();
+    const session = this.requireSession(sessionId);
+    if (session.status !== 'running' || session.stopRequested || session.operations || session.controlInFlight) {
+      throw new CoreError('invalid-state');
+    }
+    if (effectful && session.input && (session.input.status === 'pending' || session.input.status === 'unknown')
+      && (!this.registry || session.input.generation === session.generation)) throw new CoreError('input-in-flight');
+    const generation = session.generation;
+    session.controlInFlight = effectful ? 'effect' : 'query';
+    session.operations++;
+    try {
+      let result: HarnessControlResult<T>;
+      try { result = await operation() ?? { kind: 'rejected' }; }
+      catch { result = { kind: 'unknown', ...(effectful ? { effectUncertain: true as const } : {}) }; }
+      if (session.generation !== generation || session.stopRequested || session.status !== 'running') {
+        return Object.freeze({ kind: 'unknown' });
+      }
+      if (result.kind === 'confirmed') {
+        try { return Object.freeze({ kind: 'confirmed', value: copy(result.value) }); }
+        catch { result = { kind: 'unknown', ...(effectful ? { effectUncertain: true as const } : {}) }; }
+      }
+      if (result.ownershipLost || (effectful && result.effectUncertain)) {
+        // Settings/resources or source ownership are uncertain. Existing explicit cleanup only.
+        session.status = 'unknown'; session.stopRequested = true; session.generation++;
+        if (session.input?.status === 'pending') {
+          session.input.status = 'unknown';
+          this.events.publish({ type: 'input', sessionId, input: inputView(session.input) });
+        }
+        this.events.publish({ type: 'session', session: sessionView(session) });
+      }
+      return Object.freeze({ kind: result.kind });
+    } finally { session.operations--; session.controlInFlight = undefined; }
   }
 
   async stop(sessionId: string): Promise<SessionView> {
