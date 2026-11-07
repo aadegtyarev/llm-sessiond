@@ -30,6 +30,7 @@ for (const state of ['starting', 'running'] as const) {
       await f.until(() => outcomes.length === 3, 'startup questions published');
       assert.deepEqual(await Promise.all(outcomes), answers.map(() => ({ kind: 'written' })));
       assert.ok('view' in await start);
+      await f.phase('ready');
       const phases = f.phases();
       assert.ok(phases.indexOf('startup-questions') < phases.indexOf('ui-response:confirm-id'));
       assert.ok(phases.indexOf('ui-response:input-id') < phases.indexOf('startup-replies-consumed'));
