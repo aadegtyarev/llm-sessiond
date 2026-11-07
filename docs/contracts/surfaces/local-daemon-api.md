@@ -13,30 +13,22 @@ CORS, browser UI или auth-free health endpoint.
 ## Конфигурация и readiness
 
 Node 24 checkout CLI получает один JSON config через stdin до EOF, ≤65536 bytes:
-`{token,port?,launch?,stateDir?,nativeSessionDir?}`. Token — 32–256 characters `A-Z a-z 0-9 _ -`, не argv/env/URL.
+`{token,port?,launch?}`. Token — 32–256 characters `A-Z a-z 0-9 _ -`, не argv/env/URL.
 На каждом API запросе, включая SSE, обязателен `Authorization: Bearer <token>`;
 loopback не заменяет auth. Config хранится приватно, на Windows с ограниченным ACL.
 Port — integer 0–65535, default3000; 0 выбирает свободный. Launch — trusted operator
-config: executable/prefixArgs/cwd/commandDeadlineMs/stopDeadlineMs по контракту Pi.
-HTTP не принимает executable/config/raw RPC; права Native Pi не ограничены sandbox.
-`stateDir` и `nativeSessionDir` — optional пара непустых trusted operator paths.
-Без пары действует in-memory режим с `--no-session`. С парой Core хранит metadata
-в stateDir, а Pi — стандартные native files непосредственно в nativeSessionDir.
-New session cwd — launch.cwd либо cwd daemon; import использует cwd native header.
-Registry/binding paths и private launch config не входят в HTTP DTO.
-CLI stdout JSON `listening.host/port` подтверждает bind, SSE `ready` — только подписку.
-Readiness Native Pi проверяется коррелированным get_state harness при start, не spawn/таймером.
-При reopen pin/save исходного native prefix выполняется до launch; восстановление точных
-model/effort и readback — после spawn до confirmed readiness/public running. Startup
-может уже дописать defaults/resources effects; append-free запуск не обещан.
+config: executable/prefixArgs/cwd/stopDeadlineMs по контракту Pi. HTTP не меняет launch
+config/executable; команды — Native RPC data, не generic executable gateway.
+Pi tools работают с правами child, не sandbox. Старые `stateDir/nativeSessionDir` и
+`commandDeadlineMs` больше не config: неизвестные поля отклоняются до эффектов.
 
-Canonical roots эксклюзивно заняты Core locks. Второй compliant daemon с любым общим
-root отказывает до командных эффектов. Startup acquire/load/bind/address failure
-откатывает свои ресурсы через Core cleanup и закрывает listener; uncertain cleanup
-не освобождает ownership как будто child остановлен. Clean shutdown освобождает свои
-locks. Crash leftovers не удаляются автоматически: safe operator recovery требует
-независимого доказательства отсутствия старого writer/child. Детали durability и
-ограничения filesystem trust — в [контракте Core](session-core.md).
+CLI stdout `listening.host/port` подтверждает bind, SSE `ready` — подписку.
+Start требует correlated successful `get_state` с object data; spawn/таймер не readiness.
+По умолчанию запуск — `--mode rpc`, без forced session flags/private extensions.
+Локальные записи только в памяти, после restart список пуст. Pi владеет history/files/
+persistence/transitions; daemon не читает, не мигрирует и не удаляет старые native
+files/metadata/locks. Нет registry/locks, import/delete или startup settings restoration.
+Listener startup failure закрывает Core/listener; чужие процессы не принимаются под управление.
 
 ## HTTP/JSON
 
@@ -46,84 +38,58 @@ GET без body. Query/fragment/percent-encoded paths и Origin отклоняю
 
 | Метод и путь | Body → result |
 | --- | --- |
-| POST `/sessions` | `{sessionId}` → SessionView; native-режим резервирует NEW empty file |
-| GET `/sessions` | → SessionView[] |
-| GET `/sessions/:sessionId` | → SessionView |
-| GET `/native-sessions` | → `[{nativeId}]` trusted catalogue; только native-режим |
-| POST `/sessions/:sessionId/register` | `{nativeId}` → created SessionView; без запуска, только native-режим |
-| POST `/sessions/:sessionId/start` | `{}` → SessionView; created или native explicit reopen stopped |
-| POST `/sessions/:sessionId/send` | `{inputId,text}` → InputView |
-| POST `/sessions/:sessionId/cancel` | `{inputId}` → InputView целевого ввода |
+| POST `/sessions` | `{sessionId}` → local created SessionView |
+| GET `/sessions` | → local SessionView[] |
+| GET `/sessions/:sessionId` | → local SessionView |
+| POST `/sessions/:sessionId/start` | `{}` → SessionView; только created |
+| POST `/sessions/:sessionId/command` | native object с непустым `type` → полный Native response |
+| POST `/sessions/:sessionId/compact` | строго `{}` либо `{customInstructions:string}` → тот же command |
 | POST `/sessions/:sessionId/reply` | QuestionReply → `{kind: written/rejected/unknown}` |
-| GET `/sessions/:sessionId/models` | → `ControlResult<NativeModel[]>` |
-| GET `/sessions/:sessionId/settings` | → `ControlResult<SessionSettings>` |
-| POST `/sessions/:sessionId/model` | `{provider,modelId}` → `ControlResult<SessionSettings>` |
-| POST `/sessions/:sessionId/thinking-level` | `{level}` → `ControlResult<SessionSettings>` |
-| POST `/sessions/:sessionId/reload` | `{}` → `ControlResult<SessionSettings>` |
-| POST `/sessions/:sessionId/stop` | `{}` → SessionView; история сохраняется |
-| POST `/sessions/:sessionId/delete` | `{}` → `{deleted:true}`; native stopped без незавершённых операций |
+| POST `/sessions/:sessionId/stop` | `{}` → SessionView; только observed owned exit/close подтверждает stop |
 | POST `/shutdown` | `{}` → `{stoppedSessionIds,uncertainSessionIds,failedSessionIds}` |
 | GET `/events` | SSE ready/core frames |
 
-Session/input IDs: 1–128 ASCII `A-Z a-z 0-9 . _ -`. Только для sessionId исключены
-ровно `.`/`..` (URL dot-segments); другие dot-containing IDs и dot input IDs допустимы.
-Case-sensitive `Foo`/`foo`, `.leading`, `CON` и ID длины128 сохраняют свои semantics;
-private metadata basenames кодируются в lowercase base32 с безопасным prefix, не raw ID.
-[DTO](../../../src/types.ts): SessionView содержит sessionId/status/input либо null;
-InputView — inputId/status. Reply: opaque непустой requestId, method confirm/select/input,
-confirmed:boolean для confirm, value:string для select/input либо cancelled:true вместо
-ответа; extra fields отклоняются. Отдельного length cap requestId нет; body limit действует.
-Cancel принимает только указанный допустимый input ID и строгий body без дополнительных полей; auth проверяется до операции. `cancelled` — статус существующего события `input`, не новый тип SSE. HTTP200 с `unknown` не подтверждает отмену; ошибки admission или отказ harness возвращают HTTP409. Пока control отмены не завершён, новый send блокирован; подтверждённый `cancelled` позволяет продолжить тот же разговор. `cancelled` в QuestionReply отменяет ответ на вопрос, а не input.
-HTTP ACK не settlement: pending/unknown блокируют следующий send. Reply written — только
-local write, не native receipt/consumption; replies не создают input и не завершают его.
+Session IDs: 1–128 ASCII `A-Z a-z 0-9 . _ -`, кроме ровно `.`/`..` (URL dot-segments).
+Case-sensitive `Foo/foo`, `.leading`, `CON` и length128 остаются адресуемыми.
+[SessionView](../../../src/types.ts) содержит только `sessionId/status`, не input/run/history.
+QuestionReply: opaque непустой requestId, method confirm/select/input, confirmed:boolean
+для confirm, value:string для select/input либо cancelled:true вместо ответа; extra fields
+отклоняются. Отдельного length cap requestId нет; body limit действует. `written` — только
+local callback + drain stdin, не Native ACK/receipt/consumption. Штатное отсутствие ACK
+не даёт harness-unknown. Shape/маршрут проверяются локально; expiry/options решает Pi.
 
-Controls возвращают HTTP200 с `{kind:"confirmed",value:…}`, `{kind:"rejected"}` либо
-`{kind:"unknown"}`; это не HTTP error mapping. Admission/schema/auth errors сохраняют
-обычные статусы ниже. `NativeModel` содержит только непустые provider/id и optional name;
-`SessionSettings` — model либо null, thinkingLevel и availableThinkingLevels только
-текущей модели. Model body требует непустые строки provider/modelId, thinking body —
-непустой level; дополнительные поля (включая persist) отклоняются, reload body ровно `{}`.
-Выбирайте точные значения из native catalogue/readback, не фиксированный список моделей
-или effort. Никаких raw RPC/config/global defaults/произвольных commands через HTTP нет.
+### Native команды и полные ответы
 
-Models/settings — сериализованные queries, не exclusive lock на ordinary send/reply/cancel.
-Пересечение может дать unknown snapshot без порчи сессии. Model/effort/reload требуют
-quiescent running и исключительного окна: pending/unknown input, ordinary write/ACK,
-streaming/compaction и unresolved questions препятствуют эффекту. Setter подтверждается
-только native readback; недоступное не заменяется fallback. Reload — genuine native
-`context.reload()` через проверенный private helper в том же owned Pi процессе,
-не restart. Отсутствующий helper не превращается в prompt модели. Неопределённый эффект
-или ownership loss закрывают ordinary admission до explicit cleanup. Silent-loader и
-всех background jobs health не сертифицируются; подробный proof — в [Pi contract](pi-text-harness.md).
+`/command` передаёт объект без wrapper envelope, например
+`{"type":"prompt","message":"Привет","streamingBehavior":"followUp"}`.
+Клиент выбирает streamingBehavior; default не добавляется. Адаптер генерирует свой RPC id.
+Native type/параметры передаются без allowlist, file/domain guards, settings mirror,
+своей очереди или автоматических post-command proofs. Локальные access/lifecycle и
+transport/schema validation сохраняются; command доступен только в running без stop.
 
-Catalogue `/native-sessions` (не `/models`) содержит только однозначные native UUID валидных canonical regular `.jsonl`
-непосредственно trusted root. Нет произвольных HTTP paths, recursive/global Pi search
-или выбора symlink/hardlink/неоднозначного UUID. Register проверяет единственного
-логического владельца binding. New allocation nonce не является native UUID: header
-пишет Pi при первой инициализации, binding/readiness подтверждаются до start success.
+Полный response сохраняет `id/type/command/success/data` либо `error` и все optional
+поля. Например compact сохраняет summary/firstKeptEntryId/tokensBefore и предоставленные
+estimatedTokensAfter/usage/details. Native `success:false` остаётся HTTP200 с полным
+response. Unsupported compact адаптера — HTTP409 harness-rejected; физически потерянный
+ожидаемый response — HTTP409 harness-unknown, не invented Native error.
 
-Подтверждённый clean stop/shutdown сохраняет native историю и clean metadata snapshot. Новый daemon
-восстанавливает registry/current outcome и used IDs без запуска модели; start явно
-открывает тот же file/UUID с контекстом, не повторяя messages. Dirty restore — unknown
-без ownership прежнего child; stop/shutdown не подменяют его остановку ответом нового port.
-Clean stopped с прежним unknown input может reopen и принять новый ID, не меняя старый исход.
+`/compact` строго проверяет тело и вызывает тот же Core.command с native type compact.
+Busy/queued/handled/started/refusal определяет Pi. Несколько pending RPC допускаются;
+ответы коррелируются по id, не FIFO. Нет response-wait deadline, wait-triggered abort,
+restart/retry или глобальной сериализации ожидания: abort/UI reply доступны при долгом
+compact. Промежуточные/tool/agent события не завершают RPC/run. Native Pi 1.5 compact
+начинает с await abort() и не продолжает прерванный run.
 
-Delete требует durable intent и проверки точного registered file/identity, затем удаления
-file и metadata. Partial failure остаётся ошибкой; явный matching retry может завершить
-ранее записанный intent. Missing/corrupt/replaced либо attempted-empty история не
-сбрасывается в новый разговор. Неуспешный startup сохраняет исходный prefix reference
-между попытками; prefix mismatch/неуспешная migration требуют ручного recovery, не
-принятия startup tail, автоматического repair или rollback. Startup ничего не удаляет; unrelated files/tool effects
-сохраняются. Журналирования каждого live terminal/SSE event, crash-consistent outcomes
-и автоматического repair/replay/retry нет.
+Legacy send/cancel/model/settings/reload/history URLs и Core methods не сохраняются.
+Если операции нет в Pi RPC, daemon не эмулирует её через private helper/SDK.
 
 ## Ошибки и конечные пределы
 
 JSON ошибки: `{"error":{"code":"…"}}`. HTTP401 auth; 400 transport/json/schema;
 413 body-too-large; 415 content-type; 404 route; 405 method; 503 closed/stream-limit;
 500 internal без private exception. CoreError даёт409 и безопасный code: closed,
-duplicate-session/session-not-found/invalid-state/input-in-flight/duplicate-input/
-harness-rejected/harness-unknown/storage-failed/native-invalid/native-owned. HTTP200 с unknown не подтверждает успешный исход.
+duplicate-session/session-not-found/invalid-state/harness-rejected/harness-unknown.
+HTTP200 reply unknown не подтверждает доставку; Native success:false остаётся product response.
 Malformed/oversize body отклоняется до Core. Request body ≤65536 bytes, headers ≤8192;
 request timeout15s, headers timeout10s. HTTP parser может закрыть неполный канал или
 вернуть bare400/408; transport failure не доказывает отсутствие command effect.
@@ -135,10 +101,10 @@ Node writable buffer и следующего frame. Overflow/oversize event за
 
 Сначала GET/events и `event: ready` с `data: {}`, затем create/start: startup question
 может прийти до HTTP start ACK. Подписка установлена до ready; дальше `event: core`,
-`data: <CoreEvent>` и пустая строка. Все6типов: session/input/text/tool/question/notification.
-Порядок FIFO и source/generation gating сохраняются по Core. Session/native IDs
-передаются точно; text/tool/question/notification session-scoped, без выдуманной
-input correlation. Публичные JSON snapshots не дают mutable доступа к Core records.
+`data: <CoreEvent>` и пустая строка. Пять типов: session/text/tool/question/notification.
+Порядок FIFO и source/generation gating сохраняются по Core. Session IDs передаются точно; text/tool/question/notification session-scoped, без
+выдуманной input correlation. Tool start: toolCallId/toolName/args; update: те же IDs,
+args/partialResult; end: IDs, result/isError/optional durationMs. Публичные JSON snapshots не дают mutable доступа к Core records.
 Нет истории, SSE IDs, replay/resume или восстановления полноты после stream loss.
 
 ## Разрыв связи и shutdown
@@ -151,33 +117,26 @@ Shutdown сразу прекращает admission, использует existin
 Unknown не all-cleaned: owned child может остаться жив; выход daemon в этом случае
 не гарантируется. Stopped подтверждается наблюдённым exit/close owned child либо
 локально для created по контракту Core; kill return/EOF/timeout не доказательства.
-Clean-stop success требует сохранённого snapshot. Если metadata write не удалась после
-observed owned exit, явный cleanup при восстановлении записи может использовать cached
-stop proof без нового port.stop. Reopen/delete остаются fenced через stop checkpoint,
-публикации и результат. Registry recovery не является SSE replay: после reconnect нужны
-current get/list и явные действия клиента.
+Незавершённые RPC без полученного response при stop/shutdown дают harness-unknown;
+уже полученный Native response сохраняется. Late callbacks не оживляют соединение.
+После reconnect доступны только current get/list и явные действия, не event replay.
 
 ## Privacy, права и ограничения
 
 Token не логируется/не публикуется/не наследуется Native Pi через startup config.
-Private exceptions/config/raw RPC/stderr не идут в API. Явный display text может
+Private exceptions/config/stderr не идут в API; полный Native response — согласованный
+product output, не разрешение публиковать orchestration diagnostics. Явный display text может
 содержать чувствительные данные: secret filtering не обещан. Native tools сохраняют
 права child. Нет sandbox, descendant/remote cleanup guarantees, deployment/service
-installation, SDK, permissions engine, manual compaction API,
-UI/harnessd/Telegram/ClaudeCode или generic executable gateway. Native history принадлежит
-Pi, registry не зеркалирует prompts/events. Locks координируют только compliant daemons;
-нет защиты от стороннего Pi/hostile same-user filesystem mutation, PID adoption/lease
-engine, secure erase всех следов или rollback remote/tool effects.
+installation, SDK, permissions engine, UI/harnessd/Telegram/ClaudeCode или generic
+executable gateway. Native history принадлежит Pi; собственного registry/locks нет.
+Нет hostile same-user filesystem защиты, PID adoption, secure erase или rollback tool effects.
 
 ## Проверенная platform boundary
 
-Оба внешних HTTP/SSE fake-native smoke проверены на Linux и actual Windows CI:
-observations/replies/cancellation/продолжение и persistent registry/restart/exact recall/
-register/delete, включая portable ID semantics. Full suite/typecheck проверены на Linux.
-Bounded real Native Pi Linux проверка подтвердила clean daemon restart, exact file/UUID
-reopen, completed context recall без marker replay, stop/delete/unrelated preservation
-и observed owned child exits. Linux/Windows external fake smoke также проверяет
-persisted model/effort readback/reopen. Bounded Native Linux controls/readback/private
-same-process reload проверены без генерации; это не actual second-Pi post-change reopen
-или semantic recall proof этой проверки. Это не Native Pi Windows/full-suite Windows certification,
-универсальная provider/auth, native timeout, all-background или remote cleanup гарантия.
+Полный fake-child/port/wire/API/SSE suite и typecheck проверены на Linux. Оба внешних
+fake smoke — [HTTP/SSE](../../../test/api-external-smoke.mjs) и
+[portable sessions/data](../../../test/translator-session-smoke.mjs) — прошли на Linux
+и в actual Windows CI. Обязательный smoke gate и gitleaks прошли в CI.
+Реальный Native Pi/provider не запускался; нет full-suite Windows certification,
+universal provider/auth, all-background, Native Windows или remote cleanup гарантии.

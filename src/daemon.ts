@@ -1,18 +1,18 @@
 import { createServer, type ServerResponse } from 'node:http';
-import { SessionCore, CoreError, type HarnessPort, type NativeOptions } from './core.ts';
+import { SessionCore, CoreError, type HarnessPort } from './core.ts';
 import { authenticate, requestBody } from './daemon-request.ts';
 import { ApiError, fields } from './daemon-schema.ts';
 import { openEventStream, STREAM_CLIENTS } from './daemon-stream.ts';
 import { route } from './daemon-routes.ts';
 
-export interface DaemonOptions { token: string; port: number; harness: HarnessPort; native?: NativeOptions }
+export interface DaemonOptions { token: string; port: number; harness: HarnessPort }
 
-export async function listenDaemon({ token, port, harness, native }: DaemonOptions) {
+export async function listenDaemon({ token, port, harness }: DaemonOptions) {
   if (!/^[A-Za-z0-9_-]{32,256}$/.test(token) || !Number.isInteger(port) || port < 0 || port > 65535) {
     throw new Error('invalid daemon settings');
   }
   const server = createServer({ maxHeaderSize: 8192, requestTimeout: 15_000, headersTimeout: 10_000 });
-  const core = new SessionCore(harness, native);
+  const core = new SessionCore(harness);
   const streams = new Set<() => void>();
   let closing = false;
   let shutdownTask: ReturnType<SessionCore['shutdown']> | undefined;
@@ -76,7 +76,7 @@ export async function listenDaemon({ token, port, harness, native }: DaemonOptio
     address = server.address();
     if (!address || typeof address === 'string') throw new Error('invalid address');
   } catch (error) {
-    // Core owns gate release: uncertain cleanup must remain fail-closed even on startup.
+    // Close the local lifecycle and listener if binding fails.
     try { await shutdown(); }
     finally { await new Promise<void>(resolve => server.close(() => resolve())); }
     throw error;

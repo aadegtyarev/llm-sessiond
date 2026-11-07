@@ -1,16 +1,9 @@
 export type SessionStatus = 'created' | 'starting' | 'running' | 'stopped' | 'failed' | 'unknown';
-export type InputStatus = 'pending' | 'completed' | 'failed' | 'cancelled' | 'unknown';
 export type PortOutcome = { kind: 'confirmed' } | { kind: 'rejected' } | { kind: 'unknown' };
-
-export interface InputView {
-  readonly inputId: string;
-  readonly status: InputStatus;
-}
 
 export interface SessionView {
   readonly sessionId: string;
   readonly status: SessionStatus;
-  readonly input: InputView | null;
 }
 
 // Display payloads are snapshots, not private RPC records or secret-filtered text.
@@ -41,68 +34,35 @@ export type InteractionEvent =
   | { readonly type: 'notification'; readonly method: 'setStatus'; readonly statusKey: string; readonly statusText?: string }
   | { readonly type: 'notification'; readonly method: 'notify'; readonly message: string; readonly level: 'info' | 'warning' | 'error' };
 
-export type HarnessEvent =
-  | InteractionEvent
-  | { type: 'text'; text: string }
-  | { type: 'input-completed'; inputId: string }
-  | { type: 'input-cancelled'; inputId: string }
-  | { type: 'input-failed'; inputId: string; certainty: 'definitive' | 'unknown' };
+export type HarnessEvent = InteractionEvent | { type: 'text'; text: string };
 
-// Private exact-file binding; never part of public views or HTTP input.
-export interface NativeStartupReference {
-  readonly prefixByteLength: number;
-  readonly sha256: string;
+export interface NativeCommand {
+  readonly type: string;
+  readonly [key: string]: unknown;
 }
-export interface NativeBinding {
-  startupReference?: NativeStartupReference;
-  file: string;
-  cwd: string;
-  nativeId: string | null;
-  identity: string | null;
-  fresh: boolean;
-}
-
-export interface NativeModel {
-  readonly provider: string;
+export interface NativeResponse {
+  readonly type: 'response';
   readonly id: string;
-  readonly name?: string;
+  readonly command: string;
+  readonly success: boolean;
+  readonly [key: string]: unknown;
 }
-export interface ModelChoice { readonly provider: string; readonly modelId: string }
-export interface SessionSettings {
-  readonly model: NativeModel | null;
-  readonly thinkingLevel: string;
-  // Native capabilities of the CURRENT model only.
-  readonly availableThinkingLevels: readonly string[];
-}
-export type ControlResult<T> = { readonly kind: 'confirmed'; readonly value: T }
-  | { readonly kind: 'rejected' | 'unknown' };
-// Private port evidence; Core removes this marker from public results.
-export type HarnessControlResult<T> = ControlResult<T> & {
-  readonly effectUncertain?: true;
-  readonly ownershipLost?: true;
-};
 
 export interface HarnessPort {
-  start(sessionId: string, emit: (event: HarnessEvent) => void, native?: NativeBinding): Promise<PortOutcome>;
-  send(sessionId: string, inputId: string, text: string): Promise<PortOutcome>;
+  start(sessionId: string, emit: (event: HarnessEvent) => void): Promise<PortOutcome>;
+  // null means response loss, not Native refusal. Unsupported compact may throw
+  // CoreError('harness-rejected'); an actual Native failure stays a full response.
+  command(sessionId: string, command: NativeCommand): Promise<NativeResponse | null>;
   stop(sessionId: string): Promise<PortOutcome>;
   reply?(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome>;
-  models?(sessionId: string): Promise<HarnessControlResult<readonly NativeModel[]>>;
-  settings?(sessionId: string): Promise<HarnessControlResult<SessionSettings>>;
-  setModel?(sessionId: string, choice: ModelChoice): Promise<HarnessControlResult<SessionSettings>>;
-  setThinkingLevel?(sessionId: string, level: string): Promise<HarnessControlResult<SessionSettings>>;
-  reload?(sessionId: string): Promise<HarnessControlResult<SessionSettings>>;
-  // Confirmed acknowledges control delivery, never input settlement.
-  cancel?(sessionId: string, inputId: string): Promise<PortOutcome>;
 }
 
 export type CoreEvent =
   | (InteractionEvent & { readonly sessionId: string })
   | { type: 'text'; sessionId: string; text: string }
-  | { type: 'session'; session: SessionView }
-  | { type: 'input'; sessionId: string; input: InputView };
+  | { type: 'session'; session: SessionView };
 
-export type CoreErrorCode = 'closed' | 'duplicate-session' | 'session-not-found' | 'invalid-state' | 'input-in-flight' | 'duplicate-input' | 'harness-rejected' | 'harness-unknown' | 'storage-failed' | 'native-invalid' | 'native-owned';
+export type CoreErrorCode = 'closed' | 'duplicate-session' | 'session-not-found' | 'invalid-state' | 'harness-rejected' | 'harness-unknown';
 
 export class CoreError extends Error {
   readonly code: CoreErrorCode;
@@ -120,29 +80,11 @@ export interface ShutdownResult {
   readonly failedSessionIds: readonly string[];
 }
 
-export interface InputState {
-  readonly inputId: string;
-  status: InputStatus;
-  generation?: number;
-  accepted?: boolean;
-  cancelRequested?: boolean;
-  cancelInFlight?: boolean;
-  cancelledWhileCancelling?: boolean;
-}
-
 export interface SessionRecord {
   readonly id: string;
   status: SessionStatus;
-  input: InputState | null;
-  readonly inputIds: Set<string>;
   generation: number;
   stopRequested: boolean;
   stopInFlight: boolean;
   startOutcomeWhileStopping: PortOutcome | null;
-  native?: NativeBinding;
-  owned?: boolean;
-  stopProven?: boolean;
-  operations: number;
-  controlInFlight?: 'query' | 'effect';
-  deleting?: boolean;
 }

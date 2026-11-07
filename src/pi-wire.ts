@@ -9,13 +9,19 @@ export function object(value: unknown): RecordValue {
 }
 
 export function createPiWire(
-  child: ChildProcessWithoutNullStreams, deadlineMs: number,
+  child: ChildProcessWithoutNullStreams,
   event: (record: RecordValue) => void, lost: () => void,
 ) {
   let broken = false;
   let buffer = '';
   const decoder = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true });
   const writes = new Set<() => void>();
+  const drains = new Set<() => void>();
+  child.stdin.on('drain', () => {
+    const waiting = [...drains];
+    drains.clear();
+    for (const ready of waiting) ready();
+  });
   const pending = new Map<string, {
     command: string; finish: (record: RecordValue | null) => void;
   }>();
@@ -41,7 +47,7 @@ export function createPiWire(
           || typeof record.success !== 'boolean') { fail(); break; }
         const request = pending.get(record.id);
         if (!request) continue; // Late/unrelated replies never claim a newer command.
-        if (record.command !== request.command || typeof record.success !== 'boolean') {
+        if (record.command !== request.command) {
           fail(); break;
         }
         request.finish(record);
@@ -56,28 +62,25 @@ export function createPiWire(
   child.on('close', fail);
   child.stderr.resume();
   child.stderr.on('error', fail);
-  function command(type: string, data: RecordValue = {}, ack?: (r: RecordValue) => void) {
+  function command(type: string, data: RecordValue = {}) {
     return new Promise<RecordValue | null>((resolve) => {
       if (broken) { resolve(null); return; }
       const id = randomUUID();
       let response: RecordValue | null = null;
       let written = false;
       let drained = true;
-      const timer = setTimeout(fail, deadlineMs);
       const finish = (record: RecordValue | null) => {
         if (!pending.delete(id)) return;
-        clearTimeout(timer);
-        child.stdin.off('drain', onDrain);
+        drains.delete(onDrain);
         resolve(record);
       };
       const ready = () => { if (response && written && drained) finish(response); };
       const onDrain = () => { drained = true; ready(); };
       pending.set(id, { command: type, finish: (r) => {
-        if (!r) finish(null);
+        if (!r) finish(response); // A received Native response survives subsequent local channel loss.
         else {
           if (response) { fail(); return; }
           response = r;
-          ack?.(r); // Wire ownership precedes subsequent events, not Promise continuations.
           ready();
         }
       } });
@@ -87,7 +90,7 @@ export function createPiWire(
           written = true;
           ready();
         });
-        if (!drained) child.stdin.once('drain', onDrain);
+        if (!drained) drains.add(onDrain);
       } catch { fail(); }
     });
   }
@@ -101,14 +104,12 @@ export function createPiWire(
       const finish = () => {
         if (settled) return;
         settled = true;
-        clearTimeout(timer);
         writes.delete(finish);
-        child.stdin.off('drain', onDrain);
+        drains.delete(onDrain);
         resolve({ kind: broken ? 'unknown' : 'written' });
       };
       const ready = () => { if (written && drained) finish(); };
       const onDrain = () => { drained = true; ready(); };
-      const timer = setTimeout(fail, deadlineMs);
       writes.add(finish);
       try {
         drained = child.stdin.write(JSON.stringify(record) + '\n', (error) => {
@@ -116,7 +117,7 @@ export function createPiWire(
           written = true;
           ready();
         });
-        if (!drained) child.stdin.once('drain', onDrain);
+        if (!drained) drains.add(onDrain);
       } catch { fail(); }
     });
   }

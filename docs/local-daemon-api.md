@@ -46,123 +46,76 @@ JS
 ```
 
 Для работы с сессией подключите `/events` с тем же Authorization header и дождитесь
-`event: ready`. Только затем create/start/send; обрабатывайте события уже во время start.
-На question отправляйте явный reply с точными requestId/method. HTTP ACK не settlement,
-reply written не native consumption. Не повторяйте команды автоматически после разрыва;
-проверьте текущее состояние и при необходимости явно остановите сессию.
+`event: ready`. Только затем create/start/command; обрабатывайте события уже во время start.
+На question отправляйте явный reply с точными requestId/method. Ответ команды не доказывает
+завершение model run, reply written не native consumption. Не повторяйте команды
+автоматически после разрыва; при необходимости явно остановите локальную сессию.
 
-Для отмены конкретного активного ввода отправьте authenticated POST
-`/sessions/:sessionId/cancel` с JSON `{inputId}`. Результат — `InputView` этого ввода;
-только статус `cancelled` в HTTP/SSE доказывает отменённое завершение, не сам запрос
-или ACK. Пока control command в полёте, следующий send также заблокирован, даже
-если ввод естественно завершился. Неверный/неактивный ID, неподтверждённый send или
-повторный cancel отклоняются. При `unknown` новый send запрещён: нужен explicit stop.
-Наблюдаемый `cancelled` публикуется после завершения control fence: уже из его
-subscriber можно отправить новый input в ту же сессию без перезапуска Pi и потери
-контекста, не ожидая отдельного HTTP ACK. Tool effects не откатываются.
+Для сообщения используйте authenticated POST `/sessions/:sessionId/command`:
 
-Полный воспроизводимый внешний client→CLI→fakeNative сценарий без модели:
-`npm run test:api-smoke`. Его [JS client](../test/api-client.mjs) не импортирует Core/TS;
-[сценарий](../test/api-external-smoke.mjs) показывает ready, операции, явные ответы
-и targeted cancel → продолжение разговора.
+```json
+{"type":"prompt","message":"Привет","streamingBehavior":"followUp"}
+```
 
-## Сохраните и повторно откройте native-сессию
+Тело — native объект, без wrapper envelope. `streamingBehavior` выбирает клиент;
+если поле отсутствует, daemon его не добавляет. Адаптер генерирует собственный RPC `id`.
+Ответ Pi возвращается целиком: `id/type/command/success/data` либо `error`, включая
+все optional поля. Native отказ (`success:false`) — HTTP200, не API error.
+Настройки, `abort`, переходы сессий и другие команды идут через тот же `/command`;
+их возможности и семантика принадлежат Pi, не wrapper. Списка разрешённых типов нет.
+Нет автоматических readback/proof запросов после команд.
 
-Полные routes и гарантии — в [API contract](contracts/surfaces/local-daemon-api.md),
-порядок записи/recovery — в [контракте Core](contracts/surfaces/session-core.md).
-Без storage settings остаётся in-memory режим с `--no-session`.
+Полный воспроизводимый client→CLI→Node fake-child сценарий без Pi и модели:
+`npm run test:api-smoke`. [JS client](../test/api-client.mjs) не импортирует Core/TS;
+[сценарий](../test/api-external-smoke.mjs) проверяет независимые соединения,
+полные ответы, события, явные UI replies и конкурентные compact/abort.
 
-1. Добавьте в приватный stdin config парные непустые `stateDir` и `nativeSessionDir`.
-   Первый каталог хранит metadata, второй — непосредственные native `.jsonl` files.
-   Ограничьте права обоих каталогов/Windows ACL. Для новых сессий cwd — `launch.cwd`
-   либо cwd daemon; импорт сохраняет cwd native header. Это trusted operator paths,
-   не поля HTTP request.
-2. Подключите authenticated SSE и дождитесь ready. `POST /sessions {sessionId}`
-   резервирует NEW empty file; затем `POST /sessions/:sessionId/start {}` запускает Pi.
-   Header пишет Pi, allocation filename не является native UUID. Native resources
-   могут действовать уже при startup; sandbox не предоставляется.
-3. Отправьте `send` с новым inputId и дождитесь input completed в SSE/current state.
-   HTTP ACK не settlement; pending/unknown текущего поколения блокируют следующий send.
-4. Выполните `POST /sessions/:sessionId/stop {}`, затем `POST /shutdown {}`. История
-   сохраняется. Проверьте clean результат: unknown не all-cleaned. Never-launched empty
-   records тоже сохраняются и могут быть остановлены локально без Pi.
-5. Запустите новый daemon с теми же roots. Registry восстанавливается без auto-launch;
-   снова подключите SSE до `start`. Откройте прежний sessionId через `start {}` и отправьте
-   новый inputId. Контекст и выбранные model/effort берутся из той же native истории:
-   до launch сохраняется reference исходного prefix, после spawn настройки восстанавливаются
-   до подтверждённой readiness. Startup уже может дописать defaults/resources effects;
-   это не append-free запуск. Не пересылайте прошлые messages вручную. Used IDs остаются
-   использованными; старый unknown после доказанного
-   stop/reopen не становится completed, но не блокирует input нового поколения.
-6. Для удаления выполните explicit stop, затем `POST /sessions/:sessionId/delete {}`.
-   `{deleted:true}` означает удаление зарегистрированного native file и metadata, не
-   чужих файлов или tool effects. Pending операции блокируют delete. Partial failure
-   остаётся ошибкой; matching explicit retry может завершить durable delete intent.
+## Сожмите контекст
 
-Чтобы зарегистрировать существующую owned историю в configured native root, запросите
-`GET /native-sessions`, затем `POST /sessions/:sessionId/register {nativeId}`. Register
-не запускает Pi. Catalogue не ищет по всему Pi home; raw path не принимается. Невалидные
-файлы, symlink/hardlink selection и неоднозначные UUID не предлагаются; binding уже
-зарегистрированной сессии не получает второго владельца. Сторонний Pi/writer должен
-быть независимо остановлен оператором: daemon не принимает чужой PID под управление.
+POST `/sessions/:sessionId/compact` принимает строго `{}` либо:
 
-При `storage-failed` не повторяйте ввод автоматически: новый эффект мог быть не допущен,
-а ID уже зарезервирован. Explicit owned cleanup остаётся возможен; после восстановления
-записи уже наблюдённый stop proof может сохранить clean snapshot без повторного port.stop.
-При `native-invalid` не подменяйте историю пустым файлом: missing/corrupt/replaced и
-attempted-empty history не сбрасываются. Header пустой NEW reservation пишет Pi в первой
-launch attempt; eligibility для повторной empty initialization долговечно снимается
-до spawn. `native-owned` означает конфликт binding.
+```json
+{"customInstructions":"Сохрани решения и открытые задачи"}
+```
 
-Если reopen не подтвердил readiness, reference исходного prefix сохраняется между
-попытками; не принимайте дописанные startup defaults за новый выбор. Несовпадение prefix
-или неуспешная native migration требует ручного recovery, не reset/rollback истории.
+Это короткий маршрут к `/command` с `type:"compact"`. Дополнительные поля и нестроковые
+инструкции дают HTTP400. Полный native результат сохраняет `summary`, `firstKeptEntryId`,
+`tokensBefore` и любые optional metadata. Unsupported compact адаптера — HTTP409
+`harness-rejected`; физическая потеря ожидаемого ответа — HTTP409 `harness-unknown`.
+Нормальное ожидание не становится ошибкой и не запускает abort/restart/retry.
 
-После crash leftover `.llm-sessiond.lock` не удаляется/перехватывается автоматически.
-Оператор сначала независимо доказывает отсутствие прежнего writer/child перед safe
-recovery собственных каталогов. Dirty metadata остаётся unknown и unowned для нового
-daemon; его собственный пустой port не может подтвердить остановку старого child.
-Не обещаны crash-consistent outcome каждого live события, event replay, secure erase,
-hostile same-user filesystem защита или rollback внешних effects.
+Запросы могут ждать одновременно; ответы коррелируются по `id`, не по порядку прибытия.
+Долгий compact не блокирует запись `abort` или UI reply. Pi сам решает busy/queued/handled,
+приём и отказ. Native Pi 1.5 compact начинает с `await abort()` и не продолжает
+прерванный run; daemon не обещает противоположного.
 
-## Настройте модель, effort и выполните reload
+## Локальная сессия и история Pi
 
-Используйте тот же bearer header и running sessionId; GET отправляйте без body,
-POST — с `Content-Type: application/json` и строгим JSON body:
+`POST /sessions {sessionId}` создаёт запись только в памяти; `start {}` запускает свой Pi.
+`get/list` показывают локальные `sessionId/status`, не историю и не model-run status.
+Несколько локальных сессий имеют независимые процессы и RPC channels. Stop не даёт права
+повторно запустить ту же локальную запись; после restart daemon список пуст.
 
-| Метод и путь | Body → confirmed value |
-| --- | --- |
-| GET `/sessions/:sessionId/models` | → массив `{provider,id,name?}` |
-| GET `/sessions/:sessionId/settings` | → `{model,thinkingLevel,availableThinkingLevels}` |
-| POST `/sessions/:sessionId/model` | `{provider,modelId}` → settings |
-| POST `/sessions/:sessionId/thinking-level` | `{level}` → settings |
-| POST `/sessions/:sessionId/reload` | `{}` → settings |
+Pi владеет native history/persistence и переходами. Daemon не хранит registry,
+не выделяет/импортирует/удаляет native files, не разбирает headers и не восстанавливает
+settings из истории. Старые saved files, metadata и locks остаются нетронутыми:
+автоматической миграции или уборки нет. `stateDir/nativeSessionDir` больше не config;
+старый config с этими полями отклоняется без эффектов. Для штатных Pi history-команд
+используйте общий `/command`, без wrapper target-file guards или settings mirror.
 
-1. Получите `models` именно работающего Pi. Выберите нужную пару из ответа и отправьте
-   `{provider: choice.provider, modelId: choice.id}` в `/model`; не угадывайте model ID.
-   `/native-sessions` — catalogue историй на диске, не моделей.
-2. Дождитесь `{kind:"confirmed",value:settings}`. `value` — проверенный native readback,
-   не echo запроса. Выберите `level` из `settings.availableThinkingLevels` текущей модели
-   и отправьте в `/thinking-level`. Смена модели может изменить доступные уровни;
-   универсального списка effort нет. `model` в settings может быть `null`.
-3. Для перечитывания native resources вызовите `/reload` только в quiescent сессии:
-   без активного/unknown input, streaming, compaction или незавершённых вопросов/записей.
-   Это genuine `context.reload()` в том же owned Pi PID/native session, не restart.
-   Private helper должен быть доказан до вызова; его отсутствие не становится prompt модели.
+## Ответьте на вопрос
 
-Результаты controls — HTTP200 с `{kind:"confirmed",value:…}`, `{kind:"rejected"}`
-или `{kind:"unknown"}`. Только confirmed подтверждает настройки/reload. Ошибки admission,
-схемы и auth используют обычные HTTP errors по контракту. Не повторяйте эффект после
-unknown автоматически: проверьте состояние и выполните explicit stop, если сессия fenced.
-Недоступная модель/effort не заменяется fallback; global defaults и `persist:true` API нет.
+POST `/sessions/:sessionId/reply` использует исходный `requestId` и `method`:
 
-Controls сериализуются друг с другом. Readonly query не запрещает обычные send/reply/cancel
-при их собственной admission: пересечение может сделать снимок unknown без порчи сессии.
-Эффектные controls требуют исключительного окна и блокируют конфликтующие операции.
-Потеря ownership или неопределённый эффект закрывают ordinary admission до cleanup.
-Reload проверяет helper, handled completion, отсутствие наблюдённых extension errors и
-readback identity/settings/quiescence; это не сертификат silent-loader/background health.
-Raw RPC, произвольные extension commands и manual compaction API не предоставляются.
+```json
+{"requestId":"question-id","method":"confirm","confirmed":true}
+```
+
+Для select/input передайте `value:string`; для отмены любого вопроса — `cancelled:true`
+вместо ответа. Extra fields отклоняются. `{"kind":"written"}` означает только local
+callback + drain stdin, не Native ACK, receipt или consumption. Pi определяет expiry,
+options и дальнейшее исполнение. Wrapper проверяет форму и маршрут вопроса; он не
+строит permission/idle/consumption engine и не отправляет скрытых ответов.
 
 ## 4. Завершите работу
 
@@ -171,5 +124,7 @@ Raw RPC, произвольные extension commands и manual compaction API н
 Читайте сводку: unknown не all-cleaned и не гарантирует выход процесса.
 После завершения удалите owned config. Разрыв SSE сам по себе сессию не останавливает;
 replay нет. Display text не secret-filtered, Native tools сохраняют права child.
-Проверенный Windows сценарий — API fake smoke, не full Native Pi certification;
-границы платформ и cleanup определяет [нормативный API](contracts/surfaces/local-daemon-api.md).
+Полный fake Node suite и typecheck проверены на Linux. Оба внешних fake smoke прошли
+на Linux и в actual Windows CI; обязательный smoke gate и gitleaks прошли в CI.
+Это не full-suite Windows certification; реальный Native Pi/provider не запускался.
+Границы cleanup определяет [нормативный API](contracts/surfaces/local-daemon-api.md).

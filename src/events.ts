@@ -1,14 +1,9 @@
-import type { CoreEvent, HarnessEvent, InputView, SessionRecord, SessionStatus, SessionView } from './types.ts';
+import type { CoreEvent, HarnessEvent, SessionRecord, SessionStatus, SessionView } from './types.ts';
 
-export function inputView(input: InputView): InputView {
-  return Object.freeze({ inputId: input.inputId, status: input.status });
-}
-
-export function sessionView(session: { id: string; status: SessionStatus; input: InputView | null }): SessionView {
+export function sessionView(session: { id: string; status: SessionStatus }): SessionView {
   return Object.freeze({
     sessionId: session.id,
     status: session.status,
-    input: session.input ? inputView(session.input) : null,
   });
 }
 
@@ -32,31 +27,9 @@ export function acceptHarnessEvent(
   event: HarnessEvent,
   notify: (event: CoreEvent) => void,
 ): void {
-  if (session.generation !== generation) return;
-  if (event.type === 'tool' || event.type === 'question' || event.type === 'notification') {
-    if (session.stopRequested || (session.status !== 'starting' && session.status !== 'running')) return;
-    notify(snapshot({ ...event, sessionId: session.id }));
-    return;
-  }
-  if (session.status !== 'running') return;
-  if (event.type === 'text') {
-    notify({ type: 'text', sessionId: session.id, text: event.text });
-    return;
-  }
-  if (!session.input || session.input.inputId !== event.inputId || (session.input.status !== 'pending' && session.input.status !== 'unknown')) return;
-  if (session.input.cancelledWhileCancelling) return;
-  if (event.type === 'input-cancelled') {
-    if (!session.input.cancelRequested) return;
-    if (session.input.cancelInFlight) {
-      // Publish only after the control fence opens, so subscribers can send immediately.
-      session.input.cancelledWhileCancelling = true;
-      return;
-    }
-  }
-  session.input.status = event.type === 'input-completed' ? 'completed'
-    : event.type === 'input-cancelled' ? 'cancelled'
-    : event.certainty === 'definitive' ? 'failed' : 'unknown';
-  notify({ type: 'input', sessionId: session.id, input: inputView(session.input) });
+  if (session.generation !== generation || session.stopRequested
+    || (session.status !== 'starting' && session.status !== 'running')) return;
+  notify(snapshot({ ...event, sessionId: session.id }));
 }
 
 export function createEventPublisher() {

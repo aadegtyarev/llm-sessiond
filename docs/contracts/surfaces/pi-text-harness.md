@@ -4,139 +4,55 @@
 
 `createPiHarness(PiLaunch)` из [pi-harness.ts](../../../src/pi-harness.ts) реализует
 `HarnessPort` для штатного Native Pi 1.5 subprocess RPC.
-Потребитель — [SessionCore](session-core.md), который владеет lifecycle/admission
-и optional durable registry. Adapter не становится вторым владельцем registry.
-Adapter владеет процессом и wire/run state: один owned child на логическую сессию.
-Pi владеет agent/model/tool loop, tools, skills, MCP, extensions и templates.
+Потребитель — [SessionCore](session-core.md), который владеет локальным lifecycle/access.
+Adapter владеет одним своим child и RPC channel на локальную сессию, framing, backpressure
+и request-id correlation. Pi владеет native session/history/transitions/persistence,
+execution queue, settings, acceptance/refusal, agent/model/tool loop и native resources.
 Это доверительная граница штатного RPC и native resources, не защита от
 произвольной враждебной extension или поддельного протокола.
 
 ## Запуск и ввод
 
-`PiLaunch` задаёт trusted executable (default `pi`), prefixArgs, cwd и deadlines:
-commandDeadlineMs (default 10000), stopDeadlineMs (default 5000); оба конечные >0.
-Без native binding аргументы — `--mode rpc --no-session`, без initial prompt/resume.
-При trusted binding от Core используется только точный `--mode rpc --session <absolute file>`;
-нет picker/resume, ID/prefix/global поиска или неявного fork. Cwd берётся из binding.
-Adapter намеренно не отключает native tools/resources; trusted launch config
-контролирует оператор. `shell:false`; текст передаётся только как JSON data.
-Child env — копия parent env без `PI_PACKAGE_DIR` с private reload command nonce;
-parent/global env не меняется. Adapter явно подключает shipped reload extension,
-не отключая остальные штатные native resources.
-Start подтверждается коррелированным успешным `get_state` с проверкой state,
-не spawn/задержкой; недоказанная readiness даёт unknown и сохраняет child для cleanup.
-При native binding readiness дополнительно требует совпадения correlated state
-`sessionId`/`sessionFile` с actual header UUID и exact canonical path; проверяются
-cwd и file identity. Core сохраняет подтверждённый binding до running success.
-Unique command ID и запись input существуют до write. JSONL использует LF,
-optional terminal CR, streaming UTF8, непрерывное чтение и stdin backpressure.
+`PiLaunch`: trusted executable (default `pi`), prefixArgs, cwd, `stopDeadlineMs`
+(default 5000, finite >0). По умолчанию добавляется только `--mode rpc`, без принудительных
+`--session/--no-session` и private extensions. Штатным session behavior владеет Pi.
+Оператор контролирует trusted launch и права native resources; `shell:false`, команды —
+JSON data. Child env копирует parent без `PI_PACKAGE_DIR`; global env не меняется.
 
-## Native история и повторное открытие
+Start требует коррелированный успешный `get_state` с object data, не spawn/таймер.
+Нет session-file identity proof, history parsing, model/effort restoration или idle policy.
+Неуспешная readiness оставляет owned child доступным для explicit cleanup.
 
-Pi сам пишет стандартные header/history/context. Core до первого launch сохраняет
-intent и эксклюзивно выделяет zero-byte file mode0600 (`wx`). Имя allocation — nonce,
-не native UUID. Native startup tools/resources могут иметь эффекты до первого prompt,
-поэтому fencing начинается перед launch, а не только перед отправкой текста.
+Все native команды идут через один `command`: адаптер генерирует UUID `id` до write,
+передаёт native `type`/параметры без allowlist/defaults и возвращает весь response,
+включая Native error и optional metadata. Ответы нескольких pending запросов могут
+приходить в обратном порядке; корреляция только по `id` с проверкой command/type/success.
+`success:false` не transport loss. Нет автоматических proof/readback запросов после команд.
+JSONL использует LF/optional CR, streaming UTF8, непрерывное чтение и stdin backpressure.
 
-Empty initialization допустима только для NEW reservation, ещё не проходившей launch
-attempt. Durable start intent снимает eligibility до запуска. Attempted/unknown empty
-history не инициализируется повторно после stop; никогда не запускавшаяся пустая запись
-остаётся startable. Existing missing/empty/corrupt/replaced history не заменяется новым
-разговором. Безопасность allocation/import/reopen/delete и root ownership определяет
-[контракт Core](session-core.md).
+## Ожидание и граница native семантики
 
-Файлы — canonical regular, без symlink/hardlink selection и неоднозначного binding.
-Header versions1/2/3 поддерживаются; только отсутствие version означает legacy v1.
-Проверяются обязательные известные context payloads, native Tool/ToolReference формы
-и compaction retention: legacy index не указывает вперёд; modern target — self retain-none
-либо ancestor текущей ветки. Unknown extension entries/roles и opaque metadata не
-превращаются в универсальную schema/replay модель daemon.
+Busy/queued/handled/started/refusal принадлежат Pi. Нет wrapper execution queue,
+run/input coordinator, response-wait deadlines или wait-triggered abort/restart/retry.
+Долгий compact не сериализует ожидание ответов и не блокирует abort/UI reply.
+Промежуточные/tool/agent события не завершают RPC и не доказывают model-run completion.
+Pi 1.5 compact начинает с `await abort()` и не продолжает прерванный run.
 
-Stop сохраняет native history. Explicit Core reopen stopped запускает новый owned child
-на том же точном файле/UUID; прошлый child адаптера должен иметь observed exit.
-История не replay-ится вручную и не копируется в registry. До launch Core pin/save
-исходный prefix reference (длина + SHA256; registry пишет v2, читает v1/v2).
-Adapter выводит из точного prefix metadata выбранной native ветки. После spawn,
-до confirmed readiness, он восстанавливает точные model/effort штатными setter RPC
-и проверяет фактический state и capabilities текущей модели. CLI defaults не proof;
-startup уже может дописать defaults и выполнить resource effects, append-free запуск
-не обещан. Native virtual-model selection различается с physical response по native
-catalogue; недоступная/неоднозначная selection не заменяется другой моделью.
-Неудачная попытка сохраняет исходный reference; prefix mismatch или неуспешная legacy
-migration fail-closed, без принятия нового tail, rollback/reset/automatic repair.
-Только verified readiness плюс durable Core barrier очищают reference.
-Отдельного delete_session RPC нет: после доказанного stop точный file и metadata удаляет Core.
+Native history/files/transitions и настройки не валидируются/зеркалируются adapter.
+Старые files/metadata/locks не читаются, не мигрируют, не удаляются. Native history-команды
+передаются без target-file guards. Если операции нет в RPC, она не эмулируется SDK,
+private extension или собственным controller.
 
-## Model/effort controls и genuine reload
-
-`models` вызывает native `get_available_models` и возвращает только provider/id/optional
-name. `settings` читает native state и `get_available_thinking_levels`: model либо null,
-thinkingLevel и availableThinkingLevels текущей модели. Raw model/config/auth поля
-не передаются. `setModel({provider,modelId})` проверяет точную пару в native catalogue;
-`setThinkingLevel(level)` проверяет capabilities текущей модели. После штатного setter
-требуются correlated identity/settings readback и quiescence, не echo/ACK.
-Нет cycling, automatic fallback, `persist:true` или изменения global defaults.
-
-Controls сериализуются. Queries допускают ordinary send/reply/cancel reentry;
-activity/overlap делает snapshot unknown без отравления run. Effectful controls требуют
-ready idle, отсутствия streaming/compaction/pending messages, unresolved questions и
-незавершённых ordinary write/ACK. Written answer не доказывает consumption: отдельный
-native idle barrier разрешает завершить question fence. Conflicting effects отклоняются.
-Наблюдаемая потеря sessionId/file ownership синхронно ломает wire до следующих foreign
-frames; неопределённый dispatched effect требует explicit stop через Core. Не всякий
-readonly unknown означает ownership loss или испорченную сессию.
-
-`reload` использует shipped private extension, регистрирующую nonce-command только для
-owned launch. До отправки проверяются единственность команды, description и exact
-source provenance (extension path, CLI/temporary/top-level). Handler вызывает
-`await context.reload()` и возвращается: это reload native resources в том же owned
-Pi PID/session, не restart и не model prompt. Подтверждение требует success + handled,
-отсутствия наблюдённого extension_error, identity/settings readback, idle/quiescence,
-неуменьшившегося messageCount и повторной проверки helper. Отсутствующий/неверный helper
-не отправляется как prompt; uncertain completion не объявляется успехом.
-Это bounded proof, не сертификат отсутствия silent-loader diagnostics, фоновых ошибок
-или враждебных extensions. Обычные native tools/resources остаются enabled.
-
-Публичный результат — confirmed(value), rejected либо unknown; подробности admission
-и generation fences — в [контракте Core](session-core.md). Реализация:
-[pi-controls.ts](../../../src/pi-controls.ts), [private helper](../../../src/pi-reload-extension.ts),
-[startup restoration](../../../src/pi-startup.ts).
-
-## Output, ownership и terminal
+## Output и source routing
 
 Текст — только assistant `text_delta`, session-scoped, не привязан к input.
 Thinking, stderr, raw RPC/errors/private config и повторный message_end text
-не публикуются. Tool/question/notification публикуются только в нормализованной
+не публикуются как события; это не сужение полного command response. Tool/question/notification публикуются только в нормализованной
 форме для отображения, не как исходный RPC record. Assistant/tool/question и другой
 явный display text не очищается от возможного чувствительного содержания.
-Собственный ACK(id,started) и причинный следующий `agent_start` связывают run
-с точным inputId; ACK не terminal. Поздние replies/continuations A не меняют B.
-`agent_end`, промежуточные error и native retry/recovery не завершают input.
-Кандидат terminal — `agent_settled` с финальным assistant message своего run.
-Обязательная Native форма assistant проверяется до использования stopReason
-([pi-assistant.ts](../../../src/pi-assistant.ts)); optional metadata остаётся opaque.
-Поздний malformed assistant сбрасывает прежнее evidence. Определённые обычные исходы без доказанной отмены:
-
-| Final stopReason | settled.aborted | Harness terminal |
-| --- | --- | --- |
-| stop | false | input-completed |
-| error | false | input-failed, certainty definitive |
-| aborted | true | input-failed, certainty definitive |
-
-Length/toolUse/прочие reason, missing/malformed/conflicting/unproved evidence —
-unknown, не completed. Коррелированный prompt success=false до acceptance даёт rejected.
-Handled/queued/неизвестная disposition даёт PortOutcome unknown без присвоения
-последующего анонимного run этому input. Native команды/background extensions
-могут продолжать работу и session text; их completion этому input не обещан.
-Core блокирует следующий send при unknown до explicit cleanup, без retry/replay.
-Потеря канала/write или ACK deadline даёт unknown; асинхронная потеря активного
-подтверждённого run публикует input-failed certainty unknown.
-
-## Отмена активного ввода
-
-Для точно зарезервированного owned input с подтверждённым started и его `agent_start` adapter отправляет штатный RPC abort. Отдельное доказательство `input-cancelled` требует совпадающий успешный и завершившийся ответ abort после native waitForIdle, собственный wire `agent_settled.aborted=true` и отсутствие конфликтующего run или ранее принятого естественного terminal. Один ACK, сигнал или extension file не доказывают settlement. DTO и stopReason assistant не являются ни доказательством, ни veto этой независимой control-цепочки; обязательная DTO-проверка обычных completed/failed исходов остаётся без изменений.
-
-Неподтверждённая отмена, потеря канала или deadline дают unknown и требуют explicit stop; автоматических retry, replay, restart и hard-stop нет. После доказанной отмены продолжение использует ту же сессию и owned Pi PID с контекстом ранее завершённых сообщений. Выполненные эффекты tools не откатываются; остановка descendants, remote jobs или инструментов, игнорирующих abort, не гарантируется.
+Полный correlated Native response возвращается только вызывающему command; события
+не превращаются в raw-event stream. Текст не получает выдуманный inputId.
+События source/generation gated в Core; native session switch не меняет локальный маршрут.
 
 ## Tool, question и notification observations
 
@@ -178,25 +94,18 @@ Widgets, titles, editor и произвольный renderer/native UI parity н
 | Метод | Явный ответ |
 | --- | --- |
 | confirm | confirmed: boolean |
-| select | value: string из исходных options |
+| select | value: string |
 | input | value: string |
 | любой из трёх | cancelled: true вместо confirmed/value |
 
-Неверные ID/method/shape/option и повторная локальная отправка уже использованного
-ответа дают rejected без записи. Дублирующий native request ID становится ambiguous,
-а не заменяет прежний вопрос. Известный expiry, ambiguous ID или потеря канала
-дают unknown; новой записи/replay при этом нет. По optional timeout adapter ведёт
-локальный deadline, но момент native expiry раньше наблюдения точно не известен.
+Проверяются shape и маршрут известного requestId/method именно этого соединения;
+неверные дают rejected без write. Сохраняется исходный Native id. Expiry/options,
+повторные ответы, consumption/idle/permission semantics определяет Pi, не adapter.
 
-Ответ помечается использованным до write, включая concurrent вызовы; неудачная
-или неопределённая запись не даёт права автоматического повторения.
-`extension_ui_response` не имеет normal command ACK. `written` означает только
-успешный локальный stdin callback и снятое backpressure, НЕ receipt/consumption Pi.
-Ошибка, потеря канала или write deadline дают unknown. Даже written не доказывает,
-что native вопрос ещё не истёк/не был отменён: Pi не публикует универсального
-cancellation event. Потребление можно доказать лишь отдельным дальнейшим evidence,
-не исходом write. Replies не завершают input, не создают send и не обходят stop.
-Скрытых approve/cancel, retry/replay/fallback нет.
+`extension_ui_response` не имеет normal command ACK. `written` — только успешный local
+stdin callback + drain, НЕ receipt/consumption Pi. Физическая ошибка/loss дают unknown;
+нет write deadline или invented Native response из-за отсутствия штатного ACK.
+После stop/loss маршрут закрыт. Автоматических approve/cancel/retry/replay нет.
 
 Реализация нормализации и ответа: [pi-interaction-events.ts](../../../src/pi-interaction-events.ts),
 [pi-questions.ts](../../../src/pi-questions.ts), [pi-wire.ts](../../../src/pi-wire.ts).
@@ -209,38 +118,24 @@ abort ACK и timeout не доказательства остановки. Unkno
 для новой явной cleanup; старые события после stop не публикуются.
 HarnessPort не имеет отдельного async session-status события: после idle exit
 `Core.get` не обещает автоматически актуальный process-liveness; следующий
-send получит unknown, explicit stop использует сохранённый факт выхода.
-Нет гарантии finished-all-background, cleanup descendants/remote ресурсов,
-полной UI/permission parity, произвольного session replacement или sandbox.
-Не происходит скрытого approve/cancel. Native tools сохраняют права child.
-Named controls/readback не дают общей native inference/provider/auth end-to-end
-гарантии или полной native parity.
-Автоматические тесты проверяют fake RPC protocol; отдельно разрешённая native
-валидация не заменяет это покрытие и не расширяет гарантии адаптера.
-Реальная генерация требует отдельного consent. Поддержаны только описанные
-observations/replies, не произвольный native parity. Нет собственного UI renderer,
-permissions engine, SDK/runtime dependency Pi или отдельного history store адаптера;
-стандартная история принадлежит Pi, durable registry — Core. Это не sandbox,
-координация стороннего Pi/writer или hostile same-user filesystem защита.
+command получит harness-unknown, explicit stop использует сохранённый факт выхода.
+Framing/schema error, write error, EOF, child error/exit/close и explicit stop закрывают
+wire и все ожидающие без response RPC как unknown. Уже полученный полный Native response
+не теряется при последующем разрыве до local drain. Нормальное ожидание не ломает wire.
+
+Нет гарантии finished-all-background, descendant/remote cleanup, UI/permission parity,
+provider/auth correctness или sandbox. Native tools сохраняют права child. Нет SDK,
+private bridge, собственного UI renderer/history store/registry или same-user filesystem
+защиты. Реальные Pi/model/provider проверки требуют отдельного consent.
 
 ## Проверки
 
-`npm run typecheck` и `npm test`: fake Node RPC child и bounded run/wire tests
-проверяют ownership, mandatory DTO/malformed outcomes, output/privacy, retries,
-uncertainty, observed-exit cleanup и сохранение launch defaults/resources.
-Interaction regressions проверяют immutable shapes, startup/reentrant replies,
-три concurrent request ID, validation/expiry/duplicates/channel loss и ответы без ACK.
-На Linux также проверены native clarification/tools/questions с явными replies и
-отмена с продолжением контекста в том же owned Pi PID.
-Bounded real Native Pi проверка на Linux подтвердила completed marker → clean stop/shutdown →
-новый daemon без auto-launch → exact file/UUID reopen и recall без повторения marker →
-stop/delete с сохранением unrelated file и observed owned child exit/close. External fake
-HTTP/SSE smoke, включая persistence/restart/delete и cancellation/replies, проверен на Linux
-и actual Windows CI, в том числе persisted model/effort и reopen с fake child.
-Bounded Native Linux проверка controls/readback и genuine private reload прошла в одном
-Pi PID с сохранением fixture/context/settings и без генерации. Она не доказывает actual
-second-Pi reopen после смены модели или semantic recall при нуле генераций.
-Full suite/typecheck проверены на Linux, не как full-suite Windows
-или Native Pi Windows certification. Это не universal provider/auth, native timeout,
-всех background jobs или descendant/remote cleanup гарантия.
+`npm run typecheck`, `npm test`, `npm run test:api-smoke`: Node fake-child/wire/API/SSE
+проверяют полные success/error/optional responses, reverse id correlation, delayed/busy
+команды, independent connections, UTF8/backpressure, no-ACK replies, tool payloads,
+реальные fake-channel loss/stop/shutdown races и privacy. Старые history/run/controls/
+private-reload proofs удалены, не оставлены параллельным legacy путём.
+Полный fake suite и typecheck проверены на Linux; оба внешних fake smoke прошли на Linux
+и в actual Windows CI. Обязательный smoke gate и gitleaks прошли в CI.
+Это не full-suite Windows certification; реальный Native Pi/provider не запускался.
 Правила lifecycle — [метаконтракт](../meta-contract.md).

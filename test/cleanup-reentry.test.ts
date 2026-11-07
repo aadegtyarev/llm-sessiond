@@ -37,7 +37,7 @@ for (const cleanup of ['stop', 'shutdown'] as const) {
     };
     const cleanupTask = core.stop('s1');
     await reentry;
-    await rejectsCode(core.send('s1', 'blocked', 'private'), 'invalid-state');
+    await rejectsCode(core.command('s1', { type: 'prompt', message: 'private' }), 'invalid-state');
     if (cleanup === 'stop') await rejectsCode(core.stop('s1'), 'harness-unknown');
     else assert.deepEqual(await core.shutdown(), {
       stoppedSessionIds: [], uncertainSessionIds: ['s1'], failedSessionIds: [],
@@ -49,12 +49,12 @@ for (const cleanup of ['stop', 'shutdown'] as const) {
   });
 }
 
-test('rejected stop without prior uncertainty restores send admission', async () => {
+test('rejected stop without prior uncertainty restores command admission', async () => {
   const { core, port } = await running();
   port.stop = async () => ({ kind: 'rejected' });
   await rejectsCode(core.stop('s1'), 'harness-rejected');
   assert.equal(core.get('s1').status, 'running');
-  assert.equal((await core.send('s1', 'i', 'private')).status, 'pending');
+  assert.equal((await core.command('s1', { type: 'prompt', message: 'private' })).success, true);
 });
 
 test('rejected cleanup after uncertainty still permits a later explicit confirmation', async () => {
@@ -63,7 +63,7 @@ test('rejected cleanup after uncertainty still permits a later explicit confirma
     port.stop = async (id) => { port.stops.push(id); return { kind }; };
     if (kind === 'confirmed') assert.equal((await core.stop('s1')).status, 'stopped');
     else await rejectsCode(core.stop('s1'), kind === 'unknown' ? 'harness-unknown' : 'harness-rejected');
-    await rejectsCode(core.send('s1', 'blocked', 'private'), 'invalid-state');
+    await rejectsCode(core.command('s1', { type: 'prompt', message: 'private' }), 'invalid-state');
   }
   assert.deepEqual(port.stops, ['s1', 's1', 's1']);
 });
