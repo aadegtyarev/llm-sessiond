@@ -63,9 +63,10 @@ Native `success:false` остаётся полным HTTP200; ответ ком�
 Для cleanup используйте explicit stop/shutdown; unknown не all-cleaned.
 
 `npm run test:api-smoke` запускает два внешних Node fake-child сценария HTTP/SSE.
-CI сохраняет Linux/Windows gate; локальная проверка текущего кандидата выполнена на Linux.
-Реальный Native Pi в этой проверке не запускался. Ни fake smoke, ни прежние Native
-проверки не являются сертификацией текущего Native Pi/provider/Windows поведения.
+Полный fake suite и typecheck проверены на Linux; оба внешних fake smoke прошли на Linux
+и в actual Windows CI. Linux/Windows smoke gate и gitleaks прошли в CI.
+Реальный Native Pi/provider не запускался; это не full-suite Windows или Native Pi
+сертификация.
 
 ## Нецели
 

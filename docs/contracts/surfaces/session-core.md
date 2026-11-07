@@ -6,7 +6,7 @@
 маршрутизация команд/ответов и session-scoped событий. Pi владеет native sessions/history,
 переходами, persistence, execution queue, моделью, tools и настройками. Core не второй harness.
 
-Контракт описывает текущий локальный код; независимая приёмка кандидата ещё требуется. Правила изменения контрактов: [метаконтракт](../meta-contract.md).
+Контракт описывает текущую поверхность ядра. Правила изменения контрактов: [метаконтракт](../meta-contract.md).
 
 `new SessionCore(port)` хранит только локальные записи в памяти. Native registry, file
 allocation/import/delete, locks, header parsing, startup restoration и settings mirrors нет.
@@ -127,5 +127,6 @@ source gates, immutable snapshots, FIFO/recipient isolation, tool/question paylo
 no-ACK replies. [External API test](../../../test/native-api.test.ts) проверяет portable
 соединения, forwarding history-команд и нетронутые старые данные, не Native recall.
 Устаревшие history/run/settings-proof suites удалены вместе с ответственностями.
-Текущая локальная валидация — Linux fake tests; Windows и независимый review ожидаются.
-Прежние реальные Native результаты не являются валидацией текущего изменения.
+Полный fake suite и typecheck проверены на Linux; оба внешних fake smoke — на Linux
+и в actual Windows CI. Обязательный smoke gate и gitleaks прошли в CI.
+Реальный Native Pi/provider не запускался; full-suite Windows certification не заявляется.

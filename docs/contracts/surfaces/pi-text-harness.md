@@ -135,7 +135,7 @@ private bridge, собственного UI renderer/history store/registry ил
 команды, independent connections, UTF8/backpressure, no-ACK replies, tool payloads,
 реальные fake-channel loss/stop/shutdown races и privacy. Старые history/run/controls/
 private-reload proofs удалены, не оставлены параллельным legacy путём.
-Текущий локальный кандидат проверяется на Linux без настоящего Pi/provider.
-Windows smoke остаётся required CI gate, здесь не запускался; independent review ожидается.
-Прежние Native evidence не подтверждают post-change поведение.
+Полный fake suite и typecheck проверены на Linux; оба внешних fake smoke прошли на Linux
+и в actual Windows CI. Обязательный smoke gate и gitleaks прошли в CI.
+Это не full-suite Windows certification; реальный Native Pi/provider не запускался.
 Правила lifecycle — [метаконтракт](../meta-contract.md).

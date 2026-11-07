@@ -134,10 +134,9 @@ executable gateway. Native history принадлежит Pi; собственн
 
 ## Проверенная platform boundary
 
-Текущий локальный кандидат проверяется Linux fake-child/port/wire/API/SSE tests,
-без настоящего Pi/provider. Оба внешних smoke пути сохраняют translator assertions:
-[HTTP/SSE](../../../test/api-external-smoke.mjs) и
-[portable sessions/data](../../../test/translator-session-smoke.mjs).
-Windows smoke остаётся required CI gate; здесь Windows и independent review не выполнялись.
-Прежние Native evidence не являются post-change validation. Нет universal provider/auth,
-all-background, Native Windows или remote cleanup гарантии.
+Полный fake-child/port/wire/API/SSE suite и typecheck проверены на Linux. Оба внешних
+fake smoke — [HTTP/SSE](../../../test/api-external-smoke.mjs) и
+[portable sessions/data](../../../test/translator-session-smoke.mjs) — прошли на Linux
+и в actual Windows CI. Обязательный smoke gate и gitleaks прошли в CI.
+Реальный Native Pi/provider не запускался; нет full-suite Windows certification,
+universal provider/auth, all-background, Native Windows или remote cleanup гарантии.

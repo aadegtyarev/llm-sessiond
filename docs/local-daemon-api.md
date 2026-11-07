@@ -124,6 +124,7 @@ options и дальнейшее исполнение. Wrapper проверяет
 Читайте сводку: unknown не all-cleaned и не гарантирует выход процесса.
 После завершения удалите owned config. Разрыв SSE сам по себе сессию не останавливает;
 replay нет. Display text не secret-filtered, Native tools сохраняют права child.
-Текущий локальный кандидат проверяется fake Node suites на Linux; Windows smoke остаётся
-обязательным CI gate, но здесь не запускался. Реальных Native запусков в этой проверке нет.
+Полный fake Node suite и typecheck проверены на Linux. Оба внешних fake smoke прошли
+на Linux и в actual Windows CI; обязательный smoke gate и gitleaks прошли в CI.
+Это не full-suite Windows certification; реальный Native Pi/provider не запускался.
 Границы cleanup определяет [нормативный API](contracts/surfaces/local-daemon-api.md).
