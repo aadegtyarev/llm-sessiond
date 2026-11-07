@@ -27,10 +27,27 @@ export function createPiControls(owned: OwnedControls, reloadCommand: string) {
   let activity = 0;
   let initialActivity = 0;
   let ownershipLost = false;
+  let compactPhase: 'waiting' | 'started' | 'completed' | 'invalid' | null = null;
+  let compactResult: RecordValue | null = null;
+  function compactionResult(value: unknown): RecordValue | null {
+    const result = object(value);
+    return typeof result.summary === 'string' && typeof result.firstKeptEntryId === 'string' && result.firstKeptEntryId
+      && typeof result.tokensBefore === 'number' && Number.isFinite(result.tokensBefore) && result.tokensBefore >= 0
+      && typeof result.estimatedTokensAfter === 'number' && Number.isFinite(result.estimatedTokensAfter) && result.estimatedTokensAfter >= 0
+      ? result : null;
+  }
   function event(record: RecordValue) {
+    if (record.type === 'compaction_start' || record.type === 'compaction_end') {
+      if (compactPhase === null) activity++;
+      else if (record.type === 'compaction_start' && record.reason === 'manual' && compactPhase === 'waiting') compactPhase = 'started';
+      else if (record.type === 'compaction_end' && record.reason === 'manual' && compactPhase === 'started'
+        && record.aborted === false && record.willRetry === false && record.errorMessage === undefined
+        && (compactResult = compactionResult(record.result))) compactPhase = 'completed';
+      else compactPhase = 'invalid';
+    }
     if (reservation && record.type === 'extension_error') observedError = true;
     if (['agent_start', 'agent_settled', 'auto_compaction_start', 'auto_compaction_end'].includes(String(record.type))
-      || (reservation === 'query' && ['thinking_level_changed', 'model_select'].includes(String(record.type)))
+      || ((reservation === 'query' || compactPhase !== null) && ['thinking_level_changed', 'model_select'].includes(String(record.type)))
       || (record.type === 'extension_ui_request' && ['confirm', 'select', 'input', 'editor'].includes(String(record.method)))) activity++;
   }
   async function reserve<T>(effectful: boolean, action: () => Promise<ControlResult<T>>): Promise<HarnessControlResult<T>> {
@@ -175,7 +192,32 @@ export function createPiControls(owned: OwnedControls, reloadCommand: string) {
       return { kind: 'confirmed', value: actual.settings };
     });
   }
-  return { event, models, settings, setModel, setThinkingLevel, reload,
+  // Event callbacks can advance the phase across an awaited wire/readback operation.
+  function compactCompleted() { return compactPhase === 'completed'; }
+  function compact(instructions?: string): Promise<HarnessControlResult<void>> {
+    return reserve<void>(true, async () => {
+      const before = await read();
+      if (!before) return { kind: 'unknown' };
+      // Native manual compact first aborts. Never send it while an ordinary run/UI/write is active.
+      if (!quiescent(before.state) || observedError || initialActivity !== activity) return { kind: 'rejected' };
+      compactPhase = 'waiting'; compactResult = null;
+      dispatched = true;
+      try {
+        let completedAtAck = false;
+        const response = await owned.wire.command('compact', instructions === undefined ? {} : { customInstructions: instructions }, record => {
+          const result = compactionResult(record.data);
+          completedAtAck = record.success === true && compactCompleted() && !!result && !!compactResult
+            && ['summary', 'firstKeptEntryId', 'tokensBefore', 'estimatedTokensAfter'].every(key => result[key] === compactResult![key]);
+        });
+        if (response?.success !== true || !completedAtAck) return { kind: 'unknown' };
+        const actual = await read();
+        if (!actual || !compactCompleted() || !quiescent(actual.state)
+          || !sameModel(before.settings, actual.settings) || before.settings.thinkingLevel !== actual.settings.thinkingLevel) return { kind: 'unknown' };
+        return { kind: 'confirmed', value: undefined };
+      } finally { compactPhase = null; compactResult = null; }
+    });
+  }
+  return { event, models, settings, setModel, setThinkingLevel, reload, compact,
     get busy() { return reservation !== null; },
     get exclusive() { return reservation === 'effect'; },
     // Local write/ACK drain only; Core/run/questions retain lifecycle and input authority.

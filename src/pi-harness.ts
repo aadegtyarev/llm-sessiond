@@ -146,6 +146,7 @@ export function createPiHarness(config: PiLaunch = {}): HarnessPort {
     async setModel(id, choice) { return sessions.get(id)?.controls.setModel(choice) ?? { kind: 'rejected' }; },
     async setThinkingLevel(id, level) { return sessions.get(id)?.controls.setThinkingLevel(level) ?? { kind: 'rejected' }; },
     async reload(id) { return sessions.get(id)?.controls.reload() ?? { kind: 'rejected' }; },
+    async compact(id, instructions) { return sessions.get(id)?.controls.compact(instructions) ?? { kind: 'rejected' }; },
     async stop(sessionId) {
       const owned = sessions.get(sessionId);
       if (!owned) return { kind: 'rejected' };

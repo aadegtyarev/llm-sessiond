@@ -231,6 +231,11 @@ export class SessionCore {
     return this.control(sessionId, true, () => this.port.reload?.(sessionId), settingsSnapshot);
   }
 
+  compact(sessionId: string, instructions?: string): Promise<ControlResult<void>> {
+    // Native owns summary/history; no private compaction payload crosses this boundary.
+    return this.control(sessionId, true, () => this.port.compact?.(sessionId, instructions), () => undefined);
+  }
+
   private async control<T>(sessionId: string, effectful: boolean,
     operation: () => Promise<HarnessControlResult<T>> | undefined, copy: (value: T) => T,
   ): Promise<ControlResult<T>> {

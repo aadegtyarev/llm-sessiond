@@ -50,6 +50,23 @@ function handle(command: Record<string, any>) {
     out({ type: 'message_update', assistantMessageEvent: { type: 'text_delta', delta: `reply-consumed:${process.pid}` } });
     out(result); out(settled()); return;
   }
+  if (command.type === 'compact') {
+    appendFileSync(join(evidence, `${process.pid}.compactions`), JSON.stringify(command) + '\n');
+    out({ type: 'compaction_start', reason: 'manual' });
+    if (mode === 'compact-refused' || options.compactRefusal || entries.filter(record => record.type === 'message').length < 4) {
+      out({ type: 'compaction_end', reason: 'manual', aborted: mode === 'compact-refused' || !!options.compactRefusal, willRetry: false });
+      out({ type: 'response', id: command.id, command: command.type, success: false, error: 'private refusal or too small' }); return;
+    }
+    // This fake Pi alone projects remembered context and writes standard compaction history.
+    const previous = entries.findLast(record => record.type === 'compaction');
+    const remembered = entries.find(record => record.type === 'message' && record.message?.role === 'user');
+    const summary = String(previous?.summary ?? remembered?.message.content ?? 'no-context');
+    const result = { summary, firstKeptEntryId: leaf!, tokensBefore: 100, estimatedTokensAfter: 20,
+      details: { private: 'native-only' } };
+    entry({ type: 'compaction', summary, firstKeptEntryId: leaf, tokensBefore: 100 });
+    out({ type: 'compaction_end', reason: 'manual', result, aborted: false, willRetry: false });
+    out({ type: 'response', id: command.id, command: command.type, success: true, data: result }); return;
+  }
   if (command.type === 'get_available_models') {
     out({ type: 'response', id: command.id, command: command.type, success: true,
       data: { models: options.unavailable ? [] : options.models ?? [{ provider: 'fixture', id: 'one', name: 'One', api: 'fake-api', headers: { Authorization: 'private' }, baseUrl: 'private' },
@@ -105,7 +122,8 @@ function handle(command: Record<string, any>) {
   }
   if (command.type !== 'prompt') throw new Error();
   const remembered = entries.find(record => record.type === 'message' && record.message?.role === 'user');
-  const result = command.message === 'recall' ? String(remembered?.message.content ?? 'no-context') : 'marker-recorded';
+  const compacted = entries.findLast(record => record.type === 'compaction');
+  const result = command.message === 'recall' ? String(compacted?.summary ?? remembered?.message.content ?? 'no-context') : 'marker-recorded';
   entry({ type: 'message', message: { role: 'user', content: command.message, timestamp: Date.now() } });
   out({ type: 'response', id: command.id, command: 'prompt', success: true, data: { disposition: 'started' } });
   out({ type: 'agent_start' });

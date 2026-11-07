@@ -28,6 +28,8 @@ export function fixtureHealth() {
       run('setThinkingLevel', () => port.setThinkingLevel!(...args)) } : {}),
     ...(port.reload ? { reload: (...args: Parameters<NonNullable<HarnessPort['reload']>>) =>
       run('reload', () => port.reload!(...args)) } : {}),
+    ...(port.compact ? { compact: (...args: Parameters<NonNullable<HarnessPort['compact']>>) =>
+      run('compact', () => port.compact!(...args)) } : {}),
     ...(port.reply ? { reply: (...args: Parameters<NonNullable<HarnessPort['reply']>>) =>
       run('reply', () => port.reply!(...args)) } : {}),
   });
