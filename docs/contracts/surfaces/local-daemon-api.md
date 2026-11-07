@@ -26,6 +26,9 @@ New session cwd — launch.cwd либо cwd daemon; import использует 
 Registry/binding paths и private launch config не входят в HTTP DTO.
 CLI stdout JSON `listening.host/port` подтверждает bind, SSE `ready` — только подписку.
 Readiness Native Pi проверяется коррелированным get_state harness при start, не spawn/таймером.
+При reopen pin/save исходного native prefix выполняется до launch; восстановление точных
+model/effort и readback — после spawn до confirmed readiness/public running. Startup
+может уже дописать defaults/resources effects; append-free запуск не обещан.
 
 Canonical roots эксклюзивно заняты Core locks. Второй compliant daemon с любым общим
 root отказывает до командных эффектов. Startup acquire/load/bind/address failure
@@ -52,6 +55,11 @@ GET без body. Query/fragment/percent-encoded paths и Origin отклоняю
 | POST `/sessions/:sessionId/send` | `{inputId,text}` → InputView |
 | POST `/sessions/:sessionId/cancel` | `{inputId}` → InputView целевого ввода |
 | POST `/sessions/:sessionId/reply` | QuestionReply → `{kind: written/rejected/unknown}` |
+| GET `/sessions/:sessionId/models` | → ControlResult<NativeModel[]> |
+| GET `/sessions/:sessionId/settings` | → ControlResult<SessionSettings> |
+| POST `/sessions/:sessionId/model` | `{provider,modelId}` → ControlResult<SessionSettings> |
+| POST `/sessions/:sessionId/thinking-level` | `{level}` → ControlResult<SessionSettings> |
+| POST `/sessions/:sessionId/reload` | `{}` → ControlResult<SessionSettings> |
 | POST `/sessions/:sessionId/stop` | `{}` → SessionView; история сохраняется |
 | POST `/sessions/:sessionId/delete` | `{}` → `{deleted:true}`; native stopped без незавершённых операций |
 | POST `/shutdown` | `{}` → `{stoppedSessionIds,uncertainSessionIds,failedSessionIds}` |
@@ -69,7 +77,26 @@ Cancel принимает только указанный допустимый i
 HTTP ACK не settlement: pending/unknown блокируют следующий send. Reply written — только
 local write, не native receipt/consumption; replies не создают input и не завершают его.
 
-Catalogue содержит только однозначные native UUID валидных canonical regular `.jsonl`
+Controls возвращают HTTP200 с `{kind:"confirmed",value:…}`, `{kind:"rejected"}` либо
+`{kind:"unknown"}`; это не HTTP error mapping. Admission/schema/auth errors сохраняют
+обычные статусы ниже. `NativeModel` содержит только непустые provider/id и optional name;
+`SessionSettings` — model либо null, thinkingLevel и availableThinkingLevels только
+текущей модели. Model body требует непустые строки provider/modelId, thinking body —
+непустой level; дополнительные поля (включая persist) отклоняются, reload body ровно `{}`.
+Выбирайте точные значения из native catalogue/readback, не фиксированный список моделей
+или effort. Никаких raw RPC/config/global defaults/произвольных commands через HTTP нет.
+
+Models/settings — сериализованные queries, не exclusive lock на ordinary send/reply/cancel.
+Пересечение может дать unknown snapshot без порчи сессии. Model/effort/reload требуют
+quiescent running и исключительного окна: pending/unknown input, ordinary write/ACK,
+streaming/compaction и unresolved questions препятствуют эффекту. Setter подтверждается
+только native readback; недоступное не заменяется fallback. Reload — genuine native
+`context.reload()` через проверенный private helper в том же owned Pi процессе,
+не restart. Отсутствующий helper не превращается в prompt модели. Неопределённый эффект
+или ownership loss закрывают ordinary admission до explicit cleanup. Silent-loader и
+всех background jobs health не сертифицируются; подробный proof — в [Pi contract](pi-text-harness.md).
+
+Catalogue `/native-sessions` (не `/models`) содержит только однозначные native UUID валидных canonical regular `.jsonl`
 непосредственно trusted root. Нет произвольных HTTP paths, recursive/global Pi search
 или выбора symlink/hardlink/неоднозначного UUID. Register проверяет единственного
 логического владельца binding. New allocation nonce не является native UUID: header
@@ -84,7 +111,9 @@ Clean stopped с прежним unknown input может reopen и принят�
 Delete требует durable intent и проверки точного registered file/identity, затем удаления
 file и metadata. Partial failure остаётся ошибкой; явный matching retry может завершить
 ранее записанный intent. Missing/corrupt/replaced либо attempted-empty история не
-сбрасывается в новый разговор. Startup ничего не удаляет; unrelated files/tool effects
+сбрасывается в новый разговор. Неуспешный startup сохраняет исходный prefix reference
+между попытками; prefix mismatch/неуспешная migration требуют ручного recovery, не
+принятия startup tail, автоматического repair или rollback. Startup ничего не удаляет; unrelated files/tool effects
 сохраняются. Журналирования каждого live terminal/SSE event, crash-consistent outcomes
 и автоматического repair/replay/retry нет.
 
@@ -134,7 +163,7 @@ Token не логируется/не публикуется/не наследу�
 Private exceptions/config/raw RPC/stderr не идут в API. Явный display text может
 содержать чувствительные данные: secret filtering не обещан. Native tools сохраняют
 права child. Нет sandbox, descendant/remote cleanup guarantees, deployment/service
-installation, SDK, permissions engine, API model/effort/reload/manual compaction,
+installation, SDK, permissions engine, manual compaction API,
 UI/harnessd/Telegram/ClaudeCode или generic executable gateway. Native history принадлежит
 Pi, registry не зеркалирует prompts/events. Locks координируют только compliant daemons;
 нет защиты от стороннего Pi/hostile same-user filesystem mutation, PID adoption/lease
@@ -147,5 +176,8 @@ observations/replies/cancellation/продолжение и persistent registry/
 register/delete, включая portable ID semantics. Full suite/typecheck проверены на Linux.
 Bounded real Native Pi Linux проверка подтвердила clean daemon restart, exact file/UUID
 reopen, completed context recall без marker replay, stop/delete/unrelated preservation
-и observed owned child exits. Это не Native Pi Windows/full-suite Windows certification,
+и observed owned child exits. Linux/Windows external fake smoke также проверяет
+persisted model/effort readback/reopen. Bounded Native Linux controls/readback/private
+same-process reload проверены без генерации; это не actual second-Pi post-change reopen
+или semantic recall proof этой проверки. Это не Native Pi Windows/full-suite Windows certification,
 универсальная provider/auth, native timeout, all-background или remote cleanup гарантия.

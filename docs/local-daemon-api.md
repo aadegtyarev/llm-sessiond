@@ -88,8 +88,11 @@ subscriber можно отправить новый input в ту же сесс�
    records тоже сохраняются и могут быть остановлены локально без Pi.
 5. Запустите новый daemon с теми же roots. Registry восстанавливается без auto-launch;
    снова подключите SSE до `start`. Откройте прежний sessionId через `start {}` и отправьте
-   новый inputId. Контекст берётся из того же native file/UUID: не пересылайте прошлые
-   messages вручную. Used IDs остаются использованными; старый unknown после доказанного
+   новый inputId. Контекст и выбранные model/effort берутся из той же native истории:
+   до launch сохраняется reference исходного prefix, после spawn настройки восстанавливаются
+   до подтверждённой readiness. Startup уже может дописать defaults/resources effects;
+   это не append-free запуск. Не пересылайте прошлые messages вручную. Used IDs остаются
+   использованными; старый unknown после доказанного
    stop/reopen не становится completed, но не блокирует input нового поколения.
 6. Для удаления выполните explicit stop, затем `POST /sessions/:sessionId/delete {}`.
    `{deleted:true}` означает удаление зарегистрированного native file и metadata, не
@@ -111,12 +114,55 @@ attempted-empty history не сбрасываются. Header пустой NEW r
 launch attempt; eligibility для повторной empty initialization долговечно снимается
 до spawn. `native-owned` означает конфликт binding.
 
+Если reopen не подтвердил readiness, reference исходного prefix сохраняется между
+попытками; не принимайте дописанные startup defaults за новый выбор. Несовпадение prefix
+или неуспешная native migration требует ручного recovery, не reset/rollback истории.
+
 После crash leftover `.llm-sessiond.lock` не удаляется/перехватывается автоматически.
 Оператор сначала независимо доказывает отсутствие прежнего writer/child перед safe
 recovery собственных каталогов. Dirty metadata остаётся unknown и unowned для нового
 daemon; его собственный пустой port не может подтвердить остановку старого child.
 Не обещаны crash-consistent outcome каждого live события, event replay, secure erase,
 hostile same-user filesystem защита или rollback внешних effects.
+
+## Настройте модель, effort и выполните reload
+
+Используйте тот же bearer header и running sessionId; GET отправляйте без body,
+POST — с `Content-Type: application/json` и строгим JSON body:
+
+| Метод и путь | Body → confirmed value |
+| --- | --- |
+| GET `/sessions/:sessionId/models` | → массив `{provider,id,name?}` |
+| GET `/sessions/:sessionId/settings` | → `{model,thinkingLevel,availableThinkingLevels}` |
+| POST `/sessions/:sessionId/model` | `{provider,modelId}` → settings |
+| POST `/sessions/:sessionId/thinking-level` | `{level}` → settings |
+| POST `/sessions/:sessionId/reload` | `{}` → settings |
+
+1. Получите `models` именно работающего Pi. Выберите нужную пару из ответа и отправьте
+   `{provider: choice.provider, modelId: choice.id}` в `/model`; не угадывайте model ID.
+   `/native-sessions` — catalogue историй на диске, не моделей.
+2. Дождитесь `{kind:"confirmed",value:settings}`. `value` — проверенный native readback,
+   не echo запроса. Выберите `level` из `settings.availableThinkingLevels` текущей модели
+   и отправьте в `/thinking-level`. Смена модели может изменить доступные уровни;
+   универсального списка effort нет. `model` в settings может быть `null`.
+3. Для перечитывания native resources вызовите `/reload` только в quiescent сессии:
+   без активного/unknown input, streaming, compaction или незавершённых вопросов/записей.
+   Это genuine `context.reload()` в том же owned Pi PID/native session, не restart.
+   Private helper должен быть доказан до вызова; его отсутствие не становится prompt модели.
+
+Результаты controls — HTTP200 с `{kind:"confirmed",value:…}`, `{kind:"rejected"}`
+или `{kind:"unknown"}`. Только confirmed подтверждает настройки/reload. Ошибки admission,
+схемы и auth используют обычные HTTP errors по контракту. Не повторяйте эффект после
+unknown автоматически: проверьте состояние и выполните explicit stop, если сессия fenced.
+Недоступная модель/effort не заменяется fallback; global defaults и `persist:true` API нет.
+
+Controls сериализуются друг с другом. Readonly query не запрещает обычные send/reply/cancel
+при их собственной admission: пересечение может сделать снимок unknown без порчи сессии.
+Эффектные controls требуют исключительного окна и блокируют конфликтующие операции.
+Потеря ownership или неопределённый эффект закрывают ordinary admission до cleanup.
+Reload проверяет helper, handled completion, отсутствие наблюдённых extension errors и
+readback identity/settings/quiescence; это не сертификат silent-loader/background health.
+Raw RPC, произвольные extension commands и manual compaction API не предоставляются.
 
 ## 4. Завершите работу
 

@@ -1,7 +1,8 @@
 # Compact session core
 
 Компактное TypeScript-ядро и локальный HTTP/JSON + SSE daemon для native Pi сессий:
-создание/регистрация, stop с сохранением истории, clean restart, exact reopen с контекстом и delete.
+создание/регистрация, stop с сохранением истории, exact reopen с контекстом, model/effort controls,
+same-process reload и delete.
 Без trusted storage options ядро по-прежнему работает только в памяти.
 [Контракт ядра](docs/contracts/surfaces/session-core.md); Public API: [src/core.ts](src/core.ts).
 Внешнему HTTP-клиенту импорт TypeScript не нужен.
@@ -73,11 +74,16 @@ Native Pi хранит стандартную историю, Core — толь�
 Каталоги должны быть приватными и эксклюзивно owned: после crash нельзя автоматически
 перехватывать leftover locks или считать чужой процесс остановленным.
 
+Именованные controls позволяют получить native catalogue моделей и фактические settings,
+выбрать model/effort для одной сессии и выполнить reload в том же owned Pi процессе.
+[Сценарий клиента](docs/local-daemon-api.md#настройте-модель-effort-и-выполните-reload)
+описывает readback, quiescence и rejected/unknown; global defaults не меняются.
+
 ## Нецели
 
 Собственного SDK, conversation history/replay engine и автоматических retry нет.
 Registry не копирует prompts/messages/events и не обещает crash-consistent каждый live outcome.
-API управления model/effort/reload и manual compaction не предоставляется.
+Ручное сжатие контекста (manual compaction) API пока не предоставляет.
 Native Pi 1.5 RPC entrypoint —
 `createPiHarness` из [src/pi-harness.ts](src/pi-harness.ts), передаваемый в `SessionCore`.
 Нормативные границы — [контракт Pi adapter](docs/contracts/surfaces/pi-text-harness.md).
@@ -89,4 +95,5 @@ consent. Поддержаны tool/question/status observations и явный Co
 permissions engine и sandbox не предоставляются.
 Harness владеет моделью, инструментами и процессом; Core — lifecycle/admission и optional
 durable registry. External fake smoke проверен на Linux/Windows, bounded real Native Pi
-stop/restart/exact context recall/delete — на Linux, не как universal provider или Native Windows гарантия. Полный перечень ограничений — в нормативном контракте выше.
+stop/restart/exact context recall/delete и controls/readback/same-process reload — на Linux,
+не как universal provider или Native Windows гарантия. Полный перечень ограничений — в нормативном контракте выше.
