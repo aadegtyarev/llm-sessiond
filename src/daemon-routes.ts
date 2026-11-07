@@ -11,7 +11,7 @@ export function route(core: SessionCore, method: string, path: string, body: Rec
     if (method === 'POST') { fields(body, ['sessionId']); return core.create(sessionId(body.sessionId)); }
     throw new ApiError(405, 'method');
   }
-  const match = /^\/sessions\/([^/]+)(?:\/(start|send|reply|cancel|stop|delete|register|models|settings|model|thinking-level|reload))?$/.exec(path);
+  const match = /^\/sessions\/([^/]+)(?:\/(start|send|reply|cancel|stop|delete|register|models|settings|model|thinking-level|reload|compact))?$/.exec(path);
   if (!match) throw new ApiError(404, 'route');
   const id = sessionId(match[1]);
   const operation = match[2];
@@ -31,6 +31,11 @@ export function route(core: SessionCore, method: string, path: string, body: Rec
     fields(body, ['level']);
     if (typeof body.level !== 'string' || !body.level) throw new ApiError(400, 'schema');
     return core.setThinkingLevel(id, body.level);
+  }
+  if (operation === 'compact') {
+    fields(body, Object.hasOwn(body, 'instructions') ? ['instructions'] : []);
+    if (Object.hasOwn(body, 'instructions') && typeof body.instructions !== 'string') throw new ApiError(400, 'schema');
+    return core.compact(id, body.instructions as string | undefined);
   }
   if (operation === 'register') {
     fields(body, ['nativeId']);

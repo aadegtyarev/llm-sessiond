@@ -85,7 +85,20 @@ export async function nativeSessionSmoke() {
     await first.api.request('/sessions/saved/send', { inputId: 'post-reload-recall', text: 'recall' });
     await completed(first.stream, 'post-reload-recall');
     await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'text' && frame.data.text === marker);
+    await first.api.request('/sessions/saved/compact', {}, 401, { headers: {} });
+    await first.api.request('/sessions/saved/compact', { abort: true }, 400);
+    const beforeCompact = first.stream.events.length;
+    assert.deepEqual(await first.api.request('/sessions/saved/compact', { instructions: 'Preserve the remembered facts.' }), { kind: 'confirmed' });
+    assert.equal(first.stream.events.slice(beforeCompact).some(frame => frame.event === 'core' && frame.data.type === 'text'), false);
+    const compacted = readFileSync(file, 'utf8').trim().split('\n').map(line => JSON.parse(line)).filter(entry => entry.type === 'compaction');
+    assert.equal(compacted.length, 1); assert.equal(compacted[0].summary, marker); // Fake Pi alone owns the summary/history.
+    assert.deepEqual(await first.api.request('/sessions/saved/settings'), selected);
+    await first.api.request('/sessions/saved/send', { inputId: 'post-compact-recall', text: 'recall' });
+    await completed(first.stream, 'post-compact-recall');
+    await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'text' && frame.data.text === marker);
     await first.api.request('/sessions/saved/send', { inputId: 'post-reload-wait', text: 'fixture:wait-controls' });
+    await first.api.request('/sessions/saved/compact', {}, 409);
+    assert.equal((await first.api.request('/sessions/saved')).input.status, 'pending');
     assert.equal((await first.api.request('/sessions/saved/cancel', { inputId: 'post-reload-wait' })).status, 'cancelled');
     await first.api.request('/sessions/saved/send', { inputId: 'post-reload-question', text: 'fixture:questions-controls' });
     await first.stream.next(frame => frame.event === 'core' && frame.data.type === 'question' && frame.data.question.requestId === 'controls-question');
@@ -97,6 +110,29 @@ export async function nativeSessionSmoke() {
     assert.deepEqual(await first.api.request('/sessions/saved/reply', { requestId: 'controls-question', method: 'confirm', confirmed: true }), { kind: 'rejected' });
     await first.api.request('/sessions/saved/delete', {}, 409);
     await first.api.request('/sessions/saved/stop', {});
+    await first.api.request('/sessions', { sessionId: 'small-compact' });
+    await first.api.request('/sessions/small-compact/start', {});
+    assert.deepEqual(await first.api.request('/sessions/small-compact/compact', {}), { kind: 'unknown' });
+    assert.equal((await first.api.request('/sessions/small-compact')).status, 'unknown');
+    await first.api.request('/sessions/small-compact/send', { inputId: 'blocked', text: '' }, 409);
+    await first.api.request('/sessions/small-compact/stop', {});
+    await first.api.request('/sessions/small-compact/start', {});
+    await first.api.request('/sessions/small-compact/send', { inputId: 'small', text: 'small context' });
+    await completed(first.stream, 'small');
+    assert.deepEqual(await first.api.request('/sessions/small-compact/compact', { instructions: '' }), { kind: 'unknown' });
+    await first.api.request('/sessions/small-compact/stop', {});
+    await first.api.request('/sessions/small-compact/delete', {});
+    writeFileSync(join(root, 'startup-options.json'), JSON.stringify({ compactRefusal: true }));
+    await first.api.request('/sessions', { sessionId: 'refused-compact' });
+    await first.api.request('/sessions/refused-compact/start', {});
+    writeFileSync(join(root, 'startup-options.json'), '{}');
+    for (const inputId of ['refusal-a', 'refusal-b']) {
+      await first.api.request('/sessions/refused-compact/send', { inputId, text: 'refusal context' });
+      await completed(first.stream, inputId);
+    }
+    assert.deepEqual(await first.api.request('/sessions/refused-compact/compact', {}), { kind: 'unknown' });
+    await first.api.request('/sessions/refused-compact/stop', {});
+    await first.api.request('/sessions/refused-compact/delete', {});
     await first.api.request('/sessions', { sessionId: 'empty' });
     await first.api.request('/sessions/empty/stop', {});
     for (const sessionId of portableIds) {
@@ -162,11 +198,12 @@ export async function nativeSessionSmoke() {
     assert.deepEqual(await third.api.request('/sessions'), []);
     await third.close();
     const health = readdirSync(root).filter(name => name.endsWith('.health'));
-    assert.equal(health.length, 4);
+    assert.equal(health.length, 7);
     for (const name of health) assert.equal(readFileSync(join(root, name), 'utf8'), 'healthy');
     console.log(JSON.stringify({ nativeSessionSmoke: 'passed', platform: process.platform,
       context: 'external marker -> clean stop/shutdown -> new daemon -> exact recall, no marker replay',
       controls: 'catalogue -> effort -> model clamp -> genuine fake reload v1/v2 same PID/native context/settings -> native history reopen readback',
+      compaction: 'idle-only/no hidden cancel -> native fake summary -> continuation/exact reopen; empty/small/refusal honest unknown',
       registry: 'empty record + used IDs + no auto-launch + trusted exact UUID import + Windows-safe case-sensitive IDs', deletion: 'stopped only; unrelated file preserved' }));
   } finally {
     for (const stream of streams) await stream.close();

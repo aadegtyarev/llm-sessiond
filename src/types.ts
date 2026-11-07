@@ -92,6 +92,7 @@ export interface HarnessPort {
   setModel?(sessionId: string, choice: ModelChoice): Promise<HarnessControlResult<SessionSettings>>;
   setThinkingLevel?(sessionId: string, level: string): Promise<HarnessControlResult<SessionSettings>>;
   reload?(sessionId: string): Promise<HarnessControlResult<SessionSettings>>;
+  compact?(sessionId: string, instructions?: string): Promise<HarnessControlResult<void>>;
   // Confirmed acknowledges control delivery, never input settlement.
   cancel?(sessionId: string, inputId: string): Promise<PortOutcome>;
 }
