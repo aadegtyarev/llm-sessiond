@@ -7,7 +7,7 @@ import { createInterface } from 'node:readline';
 import { once } from 'node:events';
 import { apiClient } from './api-client.mjs';
 
-export async function smokeDaemon(cwd) {
+export async function smokeDaemon(cwd, flags = []) {
   const token = randomBytes(32).toString('base64url');
   const child = spawn(process.execPath, [fileURLToPath(new URL('../src/daemon-cli.ts', import.meta.url))], {
     stdio: 'pipe', env: { ...process.env, PI_PACKAGE_DIR: 'fixture-parent-package' },
@@ -20,7 +20,7 @@ export async function smokeDaemon(cwd) {
   const lines = createInterface({ input: child.stdout });
   const ready = once(lines, 'line');
   child.stdin.end(JSON.stringify({ token, port: 0, launch: { executable: process.execPath, cwd,
-    prefixArgs: [fileURLToPath(new URL('./translator-child.ts', import.meta.url))] } }));
+    prefixArgs: [fileURLToPath(new URL('./translator-child.ts', import.meta.url)), ...flags] } }));
   const cleanup = async () => {
     clearTimeout(deadline); lines.close();
     if (child.exitCode === null && child.signalCode === null) child.kill();

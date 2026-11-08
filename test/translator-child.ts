@@ -1,12 +1,21 @@
 // Node-only Pi RPC double. Never loads Pi, providers, auth, or saved histories.
-import { createInterface } from 'node:readline';
 import { dialogs, tools, notifications } from './pi-interaction-records.ts';
 
 const send = (record: object) => process.stdout.write(JSON.stringify(record) + '\n');
-const lines = createInterface({ input: process.stdin });
+const decoder = new TextDecoder('utf-8', { fatal: true });
+let input = '';
+process.stdin.on('data', (bytes: Buffer) => {
+  input += decoder.decode(bytes, { stream: true });
+  let end: number;
+  while ((end = input.indexOf('\n')) >= 0) {
+    const line = input.slice(0, end).replace(/\r$/, ''); input = input.slice(end + 1);
+    handleLine(line);
+  }
+});
+process.stdin.on('end', () => { decoder.decode(); if (input !== '') throw new Error('truncated fake RPC frame'); });
 let startup: Record<string, unknown> | undefined;
 const heldCompactions: (() => void)[] = [];
-lines.on('line', line => {
+function handleLine(line: string) {
   const command = JSON.parse(line);
   if (command.type === 'extension_ui_response') {
     send({ type: 'tool_execution_end', toolCallId: 'reply', toolName: 'fixture',
@@ -29,7 +38,7 @@ lines.on('line', line => {
     return;
   }
   dispatch(command);
-});
+}
 function respond(command: Record<string, unknown>, data: unknown) {
   send({ type: 'response', id: command.id, command: command.type, success: true, data,
     optionalMetadata: { fixture: true } });
