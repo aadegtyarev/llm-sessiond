@@ -13,11 +13,11 @@ node src/api-cli.ts --config FILE [--port PORT] OPERATION [SESSION_ID]
 npm run --silent client -- --config FILE [--port PORT] OPERATION [SESSION_ID]
 ```
 
-`--config` обязателен. Флаги только перед операцией, в любом порядке, каждый не более одного раза; имя и значение — отдельные argv. Unknown/duplicate flags, extra/missing arguments и неизвестные операции дают exit2; help/pretty/URL/host/token flags нет. Без `--silent` banner npm не относится к stdout самого CLI. Существующий `npm start` по-прежнему запускает daemon.
+`--config` обязателен. Флаги только перед операцией, в любом порядке, каждый не более одного раза; имя и непустое значение — отдельные argv; значение не начинается с `--` (для такого имени файла используйте путь с `./`). Unknown/duplicate flags, extra/missing arguments и неизвестные операции дают exit2; help/pretty/URL/host/token flags нет. Без `--silent` banner npm не относится к stdout самого CLI. Существующий `npm start` по-прежнему запускает daemon.
 
-Config — существующий приватный JSON `{token,port?,launch?}` по [API](local-daemon-api.md), не новый формат. UTF8 без BOM, ≤65536 bytes; default port3000. `--port` — цифры, integer1–65535; override применяется к actual bound port. Config port0 без override — exit2, discovery нет. Launch fields валидируются, но не исполняются. Token не argv/env/URL; файл и каталог должны быть приватными, на Windows нужен соответствующий ACL, не только Unix chmod.
+Config — существующий приватный JSON `{token,port?,launch?}` по [API](local-daemon-api.md), не новый формат. UTF8 без BOM, ≤65536 bytes; default port3000. `--port` — ASCII цифры без знака/дроби/exponent, integer1–65535 (leading zeros допустимы); override применяется к actual bound port. Config port0 без override — exit2, discovery нет. Launch fields валидируются, но не исполняются. Token не argv/env/URL; файл и каталог должны быть приватными, на Windows нужен соответствующий ACL, не только Unix chmod.
 
-Session ID проходит существующую API lexical validation: ASCII1–128 `A-Z a-z 0-9 . _ -`, кроме ровно `.`/`..`. ID не превращается в произвольный URL/path.
+Session ID проходит существующую API lexical validation: ASCII1–128 `A-Z a-z 0-9 . _ -`, кроме ровно `.`/`..`. После операции аргумент трактуется только как SESSION_ID, не как flag: допустимый ID `--port` остаётся ID. Флаги разбираются только в префиксе до операции. ID не превращается в произвольный URL/path.
 
 ## Операции
 

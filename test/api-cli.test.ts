@@ -50,6 +50,16 @@ test('api-cli grammar: missing/unknown/duplicate/extra args reject before HTTP w
   assert.equal(f.calls, 0);
 });
 
+test('api-cli grammar: prefix flag order and API-valid leading-dash positional IDs are unambiguous', async t => {
+  const entered = deferred<string>();
+  const f = await fixture(t, (req, res) => {
+    entered.resolve(req.url!); req.resume(); res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}');
+  });
+  const result = await f.launch(['--port', '0' + f.port, '--config', f.config, 'get', '--port']).done;
+  assert.equal(result.code, 0); assert.equal(result.stdout, '{}\n'); assert.equal(result.stderr, '');
+  assert.equal(await entered.promise, '/sessions/--port'); assert.equal(f.calls, 1);
+});
+
 test('api-cli config: private path, strict JSON/UTF8/limits/token/port; no launch execution', async t => {
   const f = await fixture(t);
   for (const bytes of ['{', 'null', '[]', JSON.stringify({ token: 'private-short', port: f.port }),
