@@ -2,7 +2,7 @@
 
 ## Статус
 
-Контракт утверждён; реализация не начата. Разрешена только запись договора, не implementation plan, код или тесты. CLI entrypoint и npm script клиента пока не существуют; текущий `npm start` запускает daemon. Следующие scout/implementation/review требуют отдельного разрешения.
+Контракт утверждён; scout-план и реализация отдельно разрешены. Создан локальный кандидат CLI со всеми10 операциями, Node24 entrypoint и npm script client; текущий `npm start` по-прежнему запускает daemon. Typecheck, full fake suite и три внешних fake smoke проверены локально на Linux. Независимый review, actual remote CI/Windows и приёмка всей фичи ещё предстоят; контракт не COMPLETE и сохраняется. Остальной текст фиксирует исходную согласованную постановку, не новую фазу планирования.
 
 ## Цель и наблюдаемое поведение
 
@@ -47,7 +47,7 @@
 - stderr — только безопасная диагностика: без token/config/private exception/body dumps. Native payload в stdout — явный product output; secret filtering не обещается.
 - Подключение использует существующий приватный config с token/port. `--port` позволяет задать actual bound port, в том числе при daemon config port0. Native launch fields клиент не исполняет. Token не передаётся через argv/env/URL; существующие loopback/auth/privacy/transport ограничения API сохраняются.
 - Exit codes обычных результатов CLI: **0** — получен HTTP200, включая native `success:false`; **1** — API HTTP failure или transport failure; **2** — ошибка CLI arguments/config/JSON. Дополнительные статусы/протокол ошибок не вводятся. Exit0 не означает Native success, run completion или all-cleaned; ACK не completion, reply written не consumption.
-- Нет automatic retry/reconnect/stop или автоматических UI answers. Явный CLI start вызывает HTTP start: Pi запускает daemon, не клиент. Disconnect не гарантирует отсутствия эффекта и не вызывает скрытый stop/shutdown.
+- Нет automatic retry/reconnect/stop или автоматических UI answers. Явный CLI start вызывает HTTP start: запуск Pi выполняет daemon, не клиент. Disconnect не гарантирует отсутствия эффекта и не вызывает скрытый stop/shutdown.
 - Прямой запуск — через Node24. Если будет добавлен optional npm script client, машинный вызов — `npm run --silent client -- ...`; npm banner без `--silent` не является output CLI. Существование будущего entrypoint/script сейчас не утверждается.
 
 ## Приёмка

@@ -5,7 +5,7 @@ Daemon управляет локальными соединениями и св�
 очередью исполнения, моделями, инструментами и настройками. Команды и полные ответы
 проходят через Core без собственной run/history policy.
 [Контракт ядра](docs/contracts/surfaces/session-core.md); Public API: [src/core.ts](src/core.ts).
-Внешнему HTTP-клиенту импорт TypeScript не нужен.
+Внешнему HTTP-клиенту импорт TypeScript не нужен; в checkout есть [командный CLI-клиент](docs/contracts/surfaces/api-cli-client.md).
 
 ## Подготовка и проверки
 
@@ -62,11 +62,27 @@ Native `success:false` остаётся полным HTTP200; ответ ком�
 всего run. UI reply `written` означает только локальную запись, не native consumption.
 Для cleanup используйте explicit stop/shutdown; unknown не all-cleaned.
 
-`npm run test:api-smoke` запускает два внешних Node fake-child сценария HTTP/SSE.
-Полный fake suite и typecheck проверены на Linux; оба внешних fake smoke прошли на Linux
-и в actual Windows CI. Linux/Windows smoke gate и gitleaks прошли в CI.
+`npm run test:api-smoke` запускает два исходных HTTP/SSE Node fake-child сценария и третий CLI smoke.
+Полный fake suite и typecheck проверены на Linux; два исходных smoke прошли также в actual
+Windows CI с обязательным smoke gate/gitleaks. Новый CLI smoke пока проверен локально на Linux;
+его actual Windows CI и независимый review ещё предстоят.
 Реальный Native Pi/provider не запускался; это не full-suite Windows или Native Pi
 сертификация.
+
+## Командный клиент
+
+Для уже запущенного daemon используйте тот же приватный config:
+
+```sh
+node src/api-cli.ts --config /path/to/config.json list
+npm run --silent client -- --config /path/to/config.json list
+```
+
+При config port0 добавьте `--port ACTUAL_PORT` перед операцией. Это только HTTP-клиент,
+не запуск daemon/Pi и не чат. stdout — полный API JSON, events — NDJSON; exit0 включает
+Native success:false и не означает run completion. Command/reply читают JSON stdin до EOF;
+compact принимает ноль bytes или строгий JSON инструкций. [Грамматика, exit/EOF и ограничения](docs/contracts/surfaces/api-cli-client.md);
+[сценарий внешнего клиента](docs/local-daemon-api.md#командный-клиент-из-checkout).
 
 ## Нецели
 

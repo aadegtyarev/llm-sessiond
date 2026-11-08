@@ -30,6 +30,56 @@ node src/daemon-cli.ts < /path/to/config.json
 Дождитесь stdout JSON `listening.host/port`. Это только bind, не подписка или readiness Pi.
 Если выбрали `port:0`, используйте фактический port из listening в клиенте.
 
+## Командный клиент из checkout
+
+[CLI](contracts/surfaces/api-cli-client.md) — готовый reference HTTP/JSON+SSE потребитель,
+не интерактивный чат. Для работающего listener и того же приватного config:
+
+```sh
+node src/api-cli.ts --config /path/to/config.json list
+node src/api-cli.ts --config /path/to/config.json events
+```
+
+Вторая команда остаётся подключённой и пишет NDJSON `{event,data}`. Дождитесь ready,
+затем в другом процессе явно создайте и запустите сессию:
+
+```sh
+node src/api-cli.ts --config /path/to/config.json create demo
+node src/api-cli.ts --config /path/to/config.json start demo
+```
+
+Startup question может прийти до завершения start. Для reply используйте исходные
+requestId/method из question; автоматического ответа нет. Payload берётся из UTF8 JSON
+файла до EOF, например в POSIX shell:
+
+```sh
+node src/api-cli.ts --config /path/to/config.json command demo < request.json
+node src/api-cli.ts --config /path/to/config.json compact demo < compact.json
+node src/api-cli.ts --config /path/to/config.json reply demo < reply.json
+```
+
+В PowerShell передайте JSON через `Get-Content -Raw request.json | node src/api-cli.ts --config /path/to/config.json command demo`.
+Формы command/compact/reply описаны ниже. Command/reply требуют JSON object; compact
+принимает ноль bytes как `{}`, либо `{}`/`{customInstructions:string}`. Whitespace-only
+stdin не заменяет `{}` и даёт exit2. Другие операции stdin не читают.
+
+Все флаги идут перед операцией; config port0 требует `--port ACTUAL_PORT`. Optional npm
+вызов: `npm run --silent client -- --config /path/to/config.json list`. Без `--silent`
+возможный banner npm не является stdout CLI. Token не передавайте через argv/env/URL;
+launch settings клиент не исполняет. Явный start вызывает API; запуск Pi выполняет daemon, а не клиент.
+
+stdout — полный API JSON без CLI envelope; exit0 означает HTTP200, включая Native
+success:false/reply unknown/uncertain shutdown. API/transport failure — exit1,
+CLI args/config/JSON failure — exit2. ACK не completion, written не consumption.
+Нет retry/reconnect/hidden stop; завершение events не останавливает серверную работу.
+После explicit stop/shutdown чистый SSE EOF даёт exit0, socket loss/обрезанный frame — exit1;
+уже напечатанный prefix остаётся, replay нет. [Полная грамматика и ограничения](contracts/surfaces/api-cli-client.md).
+
+Новый [CLI subprocess smoke](../test/api-cli-smoke.mjs) входит в `npm run test:api-smoke`
+третьим сценарием: CLI → настоящий daemon-cli → Node fake child. Локальная CLI валидация —
+Linux fake tests; actual Windows CI/review этого клиента ещё предстоят. Прежняя Native API
+проверка не является real CLI проверкой; новых Pi/model/provider запусков для клиента нет.
+
 ## 3. Подключите внешний клиент
 
 В другом терминале прочитайте тот же приватный config. Пример для заданного port3000
