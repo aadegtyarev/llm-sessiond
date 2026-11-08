@@ -21,6 +21,22 @@ async function fixture(t: TestContext, port: HarnessPort) {
   return { api, config, launch };
 }
 
+test('api-cli command: valid stdin below body limit is not expanded past the API boundary', async t => {
+  const input = '{"type":"future_native","values":[' + Array(4000).fill('1e20').join(',') + ']}';
+  const command = JSON.parse(input);
+  assert.equal(Buffer.byteLength(input), 20035);
+  assert.equal(Buffer.byteLength(JSON.stringify(command)), 88035);
+  const response: NativeResponse = { id: 'boundary-r', type: 'response', command: 'future_native', success: true,
+    data: { accepted: true }, metadata: { optional: ['preserved'] } };
+  const port = new FakePort(); port.commandOperation = async () => response;
+  const { api, launch } = await fixture(t, port); await api.running();
+  const result = await launch(['command', 's'], input).done;
+  assert.equal(result.code, 0); assert.equal(result.stderr, '');
+  assert.equal(result.stdout, JSON.stringify(response) + '\n');
+  assert.deepEqual(port.commands, [{ sessionId: 's', command }]);
+  assert.deepEqual(port.stops, []);
+});
+
 test('api-cli shutdown: HTTP200 uncertainty stays whole JSON and exit0, not all-cleaned', async t => {
   const port = new FakePort(); port.stop = async () => ({ kind: 'unknown' });
   const { api, launch } = await fixture(t, port); await api.running();

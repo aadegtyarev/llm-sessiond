@@ -34,7 +34,7 @@ Session ID проходит существующую API lexical validation: ASC
 | reply | обязателен | POST `/sessions/:sessionId/reply`; stdin QuestionReply JSON |
 | events | нет | GET `/events` |
 
-command/reply/compact читают stdin до EOF, не до первого chunk/строки. UTF8 без BOM, ≤65536 bytes; один JSON object. command/reply требуют payload: пустой stdin — exit2. compact принимает ноль bytes как `{}`; иначе строго `{}` или `{"customInstructions":"..."}`. Whitespace-only, malformed/extra JSON и неверные формы — exit2 до запроса. Синтаксически валидный payload может получить отдельный отказ API или Pi; domain policy клиент не реализует.
+command/reply/compact читают stdin до EOF, не до первого chunk/строки. UTF8 без BOM, ≤65536 bytes; один JSON object. command/reply требуют payload: пустой stdin — exit2. compact принимает ноль bytes как `{}`; иначе строго `{}` или `{"customInstructions":"..."}`. Whitespace-only, malformed/extra JSON и неверные формы — exit2 до запроса. Проверенный непустой stdin передаётся как исходный JSON HTTP body без повторной сериализации. Синтаксически валидный payload может получить отдельный отказ API или Pi; domain policy клиент не реализует.
 
 У остальных операций stdin не читается. command параметры, включая optional поля и выбранный клиентом streamingBehavior, не подменяются; defaults/allowlist/автоматических readbacks нет. Reply shape проверяется по API; written/rejected/unknown остаются локальными результатами, не Native ACK. [QuestionReply и transport limits](local-daemon-api.md) не меняются.
 

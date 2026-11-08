@@ -3,8 +3,7 @@ import type { Writable } from 'node:stream';
 
 /** Internal CLI transport; no process launch, retries, response-wait deadline or event history. */
 export async function callApi(port: number, token: string, method: string, path: string,
-  body: Record<string, unknown> | undefined, events: boolean, output: Writable): Promise<0 | 1> {
-  const payload = body === undefined ? undefined : JSON.stringify(body);
+  payload: string | undefined, events: boolean, output: Writable): Promise<0 | 1> {
   const response = await new Promise<import('node:http').IncomingMessage>((resolve, reject) => {
     const req = request({ hostname: '127.0.0.1', port, method, path, agent: false,
       headers: { Authorization: `Bearer ${token}`, ...(payload === undefined ? {} : {

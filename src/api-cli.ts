@@ -8,7 +8,7 @@ const operations: readonly string[] = ['create', 'list', 'get', 'start', 'stop',
 const needsId = new Set(['create', 'get', 'start', 'stop', 'command', 'compact', 'reply']);
 const decode = (bytes: Uint8Array) => new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes);
 
-async function input(operation: Operation): Promise<Record<string, unknown>> {
+async function input(operation: Operation): Promise<string> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of process.stdin) {
@@ -16,17 +16,18 @@ async function input(operation: Operation): Promise<Record<string, unknown>> {
     if (size > BODY_LIMIT) throw new Error('input limit');
     chunks.push(chunk);
   }
-  if (operation === 'compact' && size === 0) return {};
-  const body = record(JSON.parse(decode(Buffer.concat(chunks))));
+  if (operation === 'compact' && size === 0) return '{}';
+  const payload = decode(Buffer.concat(chunks));
+  const body = record(JSON.parse(payload));
   if (operation === 'command' && (typeof body.type !== 'string' || !body.type)) throw new Error('type');
   if (operation === 'reply') replyBody(body);
   if (operation === 'compact' && (Object.keys(body).some(key => key !== 'customInstructions')
     || ('customInstructions' in body && typeof body.customInstructions !== 'string'))) throw new Error('compact');
-  return body;
+  return payload;
 }
 
 async function main() {
-  let target: { token: string; port: number; method: string; path: string; body?: Record<string, unknown>; events: boolean };
+  let target: { token: string; port: number; method: string; path: string; body?: string; events: boolean };
   try {
     // node src/api-cli.ts --config FILE [--port PORT] OPERATION [SESSION_ID]
     const args = process.argv.slice(2), flags = new Map<string, string>();
@@ -50,8 +51,8 @@ async function main() {
     }
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('port');
     const read = operation === 'list' || operation === 'get' || operation === 'events';
-    let body: Record<string, unknown> | undefined = read ? undefined : {};
-    if (operation === 'create') body = { sessionId: id };
+    let body: string | undefined = read ? undefined : '{}';
+    if (operation === 'create') body = JSON.stringify({ sessionId: id });
     if (operation === 'command' || operation === 'reply' || operation === 'compact') body = await input(operation);
     const path = operation === 'shutdown' ? '/shutdown' : operation === 'events' ? '/events'
       : operation === 'create' || operation === 'list' ? '/sessions'

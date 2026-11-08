@@ -98,6 +98,31 @@ test('api-cli stdin: command/reply require object JSON; compact zero bytes only 
   assert.equal(f.calls, 3);
 });
 
+test('api-cli stdin: validated original JSON is the exact HTTP payload for command, reply and compact', async t => {
+  const received: Array<{ path: string; body: string; length: string | undefined }> = [];
+  const f = await fixture(t, (req, res) => {
+    const chunks: Buffer[] = [];
+    req.on('data', chunk => chunks.push(chunk));
+    req.on('end', () => {
+      received.push({ path: req.url!, body: Buffer.concat(chunks).toString('utf8'), length: req.headers['content-length'] });
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}');
+    });
+  });
+  for (const [operation, input] of [
+    ['command', '{"type":"future_native","values":[' + Array(4000).fill('1e20').join(',') + ']}'],
+    ['command', ' {"type":"future_native","values":[1e20,-0,1e400],"escaped":"\\u0061"}\n'],
+    ['reply', ' {"requestId":"q","method":"input","value":"\\u0061🙂"}\n'],
+    ['compact', ' {"customInstructions":"\\u0061🙂"}\n'],
+    ['compact', ''],
+  ]) {
+    const result = await f.run([operation, 's'], input);
+    assert.equal(result.code, 0); assert.equal(result.stdout, '{}\n'); assert.equal(result.stderr, '');
+    const body = input || '{}';
+    assert.deepEqual(received.at(-1), { path: `/sessions/s/${operation}`, body, length: String(Buffer.byteLength(body)) });
+  }
+  assert.equal(f.calls, 5);
+});
+
 for (const status of [200, 401, 409, 500]) {
   test(`api-cli HTTP${status}: whole JSON/errors and exit code, no output envelope`, async t => {
     const value = status === 200 ? { type: 'response', id: 'native-r', command: 'future_native', success: false,
