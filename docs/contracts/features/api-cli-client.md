@@ -2,7 +2,7 @@
 
 ## Статус
 
-Контракт утверждён; scout-план и реализация отдельно разрешены. Создан локальный кандидат CLI со всеми10 операциями, Node24 entrypoint и npm script client; текущий `npm start` по-прежнему запускает daemon. Typecheck, full fake suite и три внешних fake smoke проверены локально на Linux. Независимый review, actual remote CI/Windows и приёмка всей фичи ещё предстоят; контракт не COMPLETE и сохраняется. Остальной текст фиксирует исходную согласованную постановку, не новую фазу планирования.
+COMPLETE — реализация всех10 операций принята parent для финальной проверки lifecycle; Node24 entrypoint и npm script client реализованы, `npm start` по-прежнему запускает daemon. Typecheck и full fake suite370/370 прошли на Linux. Все три внешних fake smoke прошли на Linux и в actual Windows CI; exact9ee12ae CI run42509010005 завершён SUCCESS, включая both-platform guard и gitleaks. Полный независимый review b93ceb2 — ACCEPT с одним non-blocking P2 JSON body; узкий fix9ee12ae проверен parent, включая обе regression и full fake suite, а не независимым review нового HEAD. Новых Native/model/provider запусков нет. Durable CLI docs обновлены; далее проверяются их committed bytes перед удалением временного договора. Финальные docs-head CI и protected delivery ещё pending: main merge не выполнен. Остальной текст сохраняет исходную согласованную постановку без изменения scope/interfaces/criteria.
 
 ## Цель и наблюдаемое поведение
 

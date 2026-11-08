@@ -75,9 +75,9 @@ CLI args/config/JSON failure — exit2. ACK не completion, written не consum
 После explicit stop/shutdown чистый SSE EOF даёт exit0, socket loss/обрезанный frame — exit1;
 уже напечатанный prefix остаётся, replay нет. [Полная грамматика и ограничения](contracts/surfaces/api-cli-client.md).
 
-Новый [CLI subprocess smoke](../test/api-cli-smoke.mjs) входит в `npm run test:api-smoke`
-третьим сценарием: CLI → настоящий daemon-cli → Node fake child. Локальная CLI валидация —
-Linux fake tests; actual Windows CI/review этого клиента ещё предстоят. Прежняя Native API
+[CLI subprocess smoke](../test/api-cli-smoke.mjs) входит в `npm run test:api-smoke`
+третьим сценарием: CLI → настоящий daemon-cli → Node fake child. Все три smoke прошли
+на Linux и в actual Windows CI; review и проверка клиента пройдены. Прежняя Native API
 проверка не является real CLI проверкой; новых Pi/model/provider запусков для клиента нет.
 
 ## 3. Подключите внешний клиент
@@ -174,7 +174,7 @@ options и дальнейшее исполнение. Wrapper проверяет
 Читайте сводку: unknown не all-cleaned и не гарантирует выход процесса.
 После завершения удалите owned config. Разрыв SSE сам по себе сессию не останавливает;
 replay нет. Display text не secret-filtered, Native tools сохраняют права child.
-Полный fake Node suite и typecheck проверены на Linux. Оба внешних fake smoke прошли
-на Linux и в actual Windows CI; обязательный smoke gate и gitleaks прошли в CI.
-Это не full-suite Windows certification; реальный Native Pi/provider не запускался.
+Полный fake Node suite (370 тестов) и typecheck проверены на Linux. Все три внешних fake smoke
+прошли на Linux и в actual Windows CI; обязательный smoke gate и gitleaks прошли в CI.
+Это не full-suite Windows certification; проверки CLI не запускали реальный Native Pi/provider.
 Границы cleanup определяет [нормативный API](contracts/surfaces/local-daemon-api.md).
