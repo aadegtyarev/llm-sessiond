@@ -112,7 +112,7 @@ for (const status of [200, 401, 409, 500]) {
         res.end();
       });
     });
-    const body = { type: 'future_native', arbitrary: { nested: ['text'] } };
+    const body = { type: 'future_native', streamingBehavior: 'steer', arbitrary: { nested: ['text'] } };
     const result = await f.run(['command', 's'], JSON.stringify(body));
     assert.equal(result.code, status === 200 ? 0 : 1); assert.equal(result.stdout, JSON.stringify(value) + '\n');
     assert.equal(result.stderr, '');
