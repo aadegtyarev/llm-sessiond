@@ -1,11 +1,11 @@
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-export function cliProcess(args: string[], input: string | Uint8Array = '') {
+export function cliProcess(args: string[], input: string | Uint8Array = '', timeoutMs = 10_000) {
   const child = spawn(process.execPath, [fileURLToPath(new URL('../src/api-cli.ts', import.meta.url)), ...args], {
     stdio: 'pipe', shell: false,
   });
-  const deadline = setTimeout(() => child.kill(), 10_000);
+  const deadline = setTimeout(() => child.kill(), timeoutMs);
   let stdout = '', stderr = '';
   const changed = new Set<() => void>();
   child.stdout.setEncoding('utf8'); child.stderr.setEncoding('utf8');
