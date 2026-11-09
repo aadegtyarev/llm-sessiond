@@ -12,7 +12,7 @@
   "scripts": {
     "start": "node src/daemon-cli.ts",
     "client": "node src/api-cli.ts",
-    "test:api-smoke": "node test/api-external-smoke.mjs && node test/api-cli-smoke.mjs",
+    "test:api-smoke": "node test/api-external-smoke.mjs && node test/api-cli-smoke.mjs && node test/module-external-smoke.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --experimental-strip-types --test test/*.test.ts"
   }
