@@ -29,16 +29,17 @@ async function input(operation: Operation): Promise<string> {
 async function main() {
   let target: { token: string; port: number; method: string; path: string; body?: string; events: boolean };
   try {
-    // node src/api-cli.ts --config FILE [--port PORT] OPERATION [SESSION_ID]
+    // Prefix flags only; --harness ID is specific to create.
     const args = process.argv.slice(2), flags = new Map<string, string>();
     while (args[0]?.startsWith('--')) {
       const name = args.shift()!;
       const value = args.shift();
-      if (!['--config', '--port'].includes(name) || flags.has(name) || !value || value.startsWith('--')) throw new Error('arguments');
+      if (!['--config', '--port', '--harness'].includes(name) || flags.has(name) || !value || value.startsWith('--')) throw new Error('arguments');
       flags.set(name, value);
     }
     const operation = args.shift() as Operation;
     if (!flags.has('--config') || !operations.includes(operation) || args.length !== (needsId.has(operation) ? 1 : 0)) throw new Error('arguments');
+    if (flags.has('--harness') && operation !== 'create') throw new Error('arguments');
     const id = needsId.has(operation) ? sessionId(args[0]) : undefined;
     const bytes = await readFile(flags.get('--config')!);
     if (bytes.length > BODY_LIMIT) throw new Error('config limit');
@@ -52,7 +53,8 @@ async function main() {
     if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('port');
     const read = operation === 'list' || operation === 'get' || operation === 'events';
     let body: string | undefined = read ? undefined : '{}';
-    if (operation === 'create') body = JSON.stringify({ sessionId: id });
+    if (operation === 'create') body = JSON.stringify({ sessionId: id,
+      ...(flags.has('--harness') ? { harness: flags.get('--harness') } : {}) });
     if (operation === 'command' || operation === 'reply' || operation === 'compact') body = await input(operation);
     const path = operation === 'shutdown' ? '/shutdown' : operation === 'events' ? '/events'
       : operation === 'create' || operation === 'list' ? '/sessions'

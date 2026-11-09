@@ -1,6 +1,6 @@
 import { listenDaemon } from './daemon.ts';
 import { daemonConfig } from './daemon-config.ts';
-import { createPiHarness } from './pi-harness.ts';
+import { daemonHarnesses } from './daemon-harnesses.ts';
 
 async function main() {
   if (process.argv.length !== 2) throw new Error('arguments');
@@ -12,8 +12,9 @@ async function main() {
     chunks.push(chunk);
   }
   const config = daemonConfig(JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(Buffer.concat(chunks))));
-  // The credential arrives only on stdin, never via argv/env inherited by Native Pi.
-  const daemon = await listenDaemon({ ...config, harness: createPiHarness(config.launch) });
+  // Credentials stay at the server boundary; modules receive only trusted launch data.
+  const harness = daemonHarnesses({ launch: config.launch, harnesses: config.harnesses });
+  const daemon = await listenDaemon({ token: config.token, port: config.port, harness });
   const stop = () => { void daemon.close().then(result => {
     process.stdout.write(`${JSON.stringify({ shutdown: result })}\n`);
   }).catch(() => { process.exitCode = 1; }); };
