@@ -33,11 +33,17 @@ export function createClaudeWire(
   child.stdout.on('data', (chunk: Buffer) => {
     if (broken) return;
     try {
-      buffer += decoder.decode(chunk, { stream: true });
-      let end: number;
-      while (!broken && (end = buffer.indexOf('\n')) >= 0) {
-        const line = buffer.slice(0, end).replace(/\r$/, '');
-        buffer = buffer.slice(end + 1);
+      let offset = 0;
+      while (!broken && offset < chunk.length) {
+        // Decode through one byte-LF at a time: a corrupt later frame must not
+        // erase a complete native answer/event preceding it in this same chunk.
+        const newline = chunk.indexOf(0x0a, offset);
+        const end = newline < 0 ? chunk.length : newline + 1;
+        buffer += decoder.decode(chunk.subarray(offset, end), { stream: true });
+        offset = end;
+        if (newline < 0) break; // Still decode the suffix now, so invalid UTF8 fails promptly.
+        const line = buffer.slice(0, -1).replace(/\r$/, '');
+        buffer = '';
         const record = claudeObject(JSON.parse(line));
         if (!record || typeof record.type !== 'string') { fail(); break; }
         if (record.type === 'control_response') {
