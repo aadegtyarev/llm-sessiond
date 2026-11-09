@@ -4,19 +4,19 @@ import type { ChildProcessWithoutNullStreams } from 'node:child_process';
 import { test } from 'node:test';
 import { trackClaudeExit } from '../src/claude-process.ts';
 
-for (const observation of ['exit', 'close', 'none', 'throw'] as const) {
+for (const observation of ['exit', 'close', 'none', 'throw', 'end-throw'] as const) {
   test(`claude process: owned cleanup needs observed fact (${observation})`, async t => {
     t.mock.timers.enable({ apis: ['setTimeout'] });
     let ends = 0, kills = 0;
     const child = Object.assign(new EventEmitter(), {
-      stdin: { end() { ends++; } }, kill() {
+      stdin: { end() { ends++; if (observation === 'end-throw') throw new Error('private'); } }, kill() {
         kills++; if (observation === 'throw') throw new Error('private'); return true;
       },
     });
     const exit = trackClaudeExit(child as unknown as ChildProcessWithoutNullStreams);
     const stop = exit.stop(1000);
     child.emit('end');
-    if (observation === 'none') t.mock.timers.tick(1000);
+    if (observation === 'none' || observation === 'end-throw') t.mock.timers.tick(1000);
     if (observation === 'exit' || observation === 'close') child.emit(observation);
     assert.deepEqual(await stop, { kind: observation === 'exit' || observation === 'close' ? 'confirmed' : 'unknown' });
     assert.equal(ends, 1); assert.equal(kills, 1);

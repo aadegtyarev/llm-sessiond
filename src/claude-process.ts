@@ -29,10 +29,9 @@ export function trackClaudeExit(child: ChildProcessWithoutNullStreams) {
         };
         const timer = setTimeout(finish, deadlineMs);
         waiters.add(finish);
-        try {
-          child.stdin.end();
-          child.kill('SIGTERM');
-        } catch { finish(); }
+        // A failed stdin close must not skip termination of our own child.
+        try { child.stdin.end(); } catch { /* Exit observation remains authoritative. */ }
+        try { child.kill('SIGTERM'); } catch { finish(); }
         if (exited) finish();
       });
     },

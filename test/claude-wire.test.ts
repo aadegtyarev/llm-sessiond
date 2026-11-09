@@ -34,6 +34,7 @@ test('claude wire: pending native control does not queue interrupt, users or exp
   for (let index = 2; index < f.frames.length; index++) f.release(index);
   assert.deepEqual(await Promise.all(writes), records.map(() => ({ kind: 'written' })));
   assert.deepEqual(f.frames.slice(2), records);
+  assert.deepEqual(f.events, []); // All writes finished before any native result/ACK.
   assert.equal(done, false);
   const answer = f.respond(0); assert.deepEqual(await long, answer);
 });
@@ -127,4 +128,41 @@ test('claude wire: pending registered before synchronous native answer, even if 
   const answer = { type: 'control_response', response: { request_id: 'sync', subtype: 'success', future: [1] } };
   f.stdin.write = () => { f.send(answer); throw new Error('late private write failure'); };
   assert.deepEqual(await f.wire.command(control('sync')), answer);
+});
+
+test('claude wire: one-way without backpressure still waits callback, and written survives later loss', { timeout: 2000 }, async t => {
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  f.stdin.write = (line, callback) => {
+    f.frames.push(JSON.parse(line)); f.callbacks.push(callback); return true;
+  };
+  let done = false;
+  const result = f.wire.command({ type: 'user' }); void result.then(() => { done = true; });
+  await Promise.resolve(); assert.equal(done, false);
+  f.callbacks[0]();
+  assert.deepEqual(await result, { kind: 'written' });
+  f.child.emit('exit');
+  assert.deepEqual(await result, { kind: 'written' });
+});
+
+test('claude wire: synchronous local callback cannot bypass false write return/drain', { timeout: 2000 }, async t => {
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  f.stdin.write = (_line, callback) => { callback(); return false; };
+  let done = false;
+  const result = f.wire.command({ type: 'user' }); void result.then(() => { done = true; });
+  await Promise.resolve(); assert.equal(done, false);
+  f.stdin.emit('drain'); assert.deepEqual(await result, { kind: 'written' });
+});
+
+test('claude wire: unrelated native reply does not claim pending request; many pending share drain listener', { timeout: 2000 }, async t => {
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  let done = false;
+  const results = Array.from({ length: 24 }, (_, i) => f.wire.command(control(`native-${i}`)));
+  void results[0].then(() => { done = true; });
+  f.send({ type: 'control_response', response: { subtype: 'success', request_id: 'unrelated', response: {} } });
+  await Promise.resolve(); assert.equal(done, false);
+  assert.equal(f.stdin.listenerCount('drain'), 1);
+  const answers = [];
+  for (let i = 23; i >= 0; i--) answers.unshift(f.respond(i));
+  assert.deepEqual(await Promise.all(results), answers);
+  assert.deepEqual(f.events, []); assert.equal(f.losses, 0);
 });

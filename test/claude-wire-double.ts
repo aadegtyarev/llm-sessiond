@@ -8,7 +8,7 @@ export function claudeWireDouble() {
   const frames: Record<string, unknown>[] = [];
   const callbacks: ((error?: Error | null) => void)[] = [];
   const stdin = Object.assign(new EventEmitter(), {
-    write(line: string, callback: (error?: Error | null) => void) {
+    write(line: string, callback: (error?: Error | null) => void): boolean {
       frames.push(JSON.parse(line)); callbacks.push(callback); return false;
     },
     end() {},
