@@ -1,7 +1,7 @@
 # Подключаемые harness-модули: Claude Code
 
 Статус: **APPROVED** — согласованный контракт изменения, не реализованная поверхность.
-Запись контракта предшествует source-grounded плану и разрешению parent на реализацию.
+Source-grounded план принят, parent gate на реализацию пройден; внутренние шаги в работе.
 
 ## Цель и наблюдаемое поведение
 
@@ -73,7 +73,7 @@ Durable `docs/contracts/surfaces/claude-code-harness.md` появится тол
   `user`, явный `control_response` и прочие one-way записи возвращают лишь local `written`
   после callback + drain, либо честный rejected/unknown: не model acceptance/completion.
   Штатное отсутствие ACK не transport loss. Нет prompt→result resolver или своей очереди.
-- Полные native `result`, `control_request`, `control_cancel` доступны как новый
+- Полные native `result`, `control_request`, `control_cancel_request` доступны как новый
   session-scoped native-record event в существующем SSE `core` frame. Native поля,
   включая errors/usage/metadata, сохраняются. `result` завершает native turn, но не
   доказывает завершения всех фоновых задач. Корреляция result с отдельным user не выдумывается.
@@ -155,8 +155,8 @@ Claude external fake smoke), проверки ссылок/docs и CI Linux/Wind
 отдельно одобренных модели и бюджета. Native Pi бюджет исчерпан; реальные native/model
 запуски не разрешены. Не выполнять `claude -p`, model/auth probes или SDK install.
 
-Текущий шаг — только запись и проверка этого контракта, без source/tests/surface edits,
-реализации, PR или merge. Следом — source-grounded план и parent gate. Дальнейшая цельная
-работа доводится до verified code + CI + PR/merge после review по обычному workflow,
+Контракт записан, source-grounded план и parent gate одобрены; реализация внутренних
+компонентов идёт последовательно, фича ещё не завершена. Цельная работа доводится
+до verified code + CI + PR/merge после review по обычному workflow,
 без разрешения rollout. После полной приёмки durable surfaces обновляются, временный
 контракт завершается/удаляется по метаконтракту; сейчас фича не объявляется готовой.

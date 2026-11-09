@@ -4,6 +4,7 @@ export type PortOutcome = { kind: 'confirmed' } | { kind: 'rejected' } | { kind:
 export interface SessionView {
   readonly sessionId: string;
   readonly status: SessionStatus;
+  readonly harness?: string;
 }
 
 // Display payloads are snapshots, not private RPC records or secret-filtered text.
@@ -34,12 +35,19 @@ export type InteractionEvent =
   | { readonly type: 'notification'; readonly method: 'setStatus'; readonly statusKey: string; readonly statusText?: string }
   | { readonly type: 'notification'; readonly method: 'notify'; readonly message: string; readonly level: 'info' | 'warning' | 'error' };
 
-export type HarnessEvent = InteractionEvent | { type: 'text'; text: string };
+// Native records need no shared protocol discriminator or mandatory backend fields.
+export interface NativeRecord {
+  readonly [key: string]: unknown;
+}
+export type CommandResult = NativeRecord | { readonly kind: 'written' };
+export type NativeRecordEvent = { readonly type: 'native-record'; readonly record: NativeRecord };
+export type HarnessEvent = InteractionEvent | NativeRecordEvent | { type: 'text'; text: string };
 
 export interface NativeCommand {
   readonly type: string;
   readonly [key: string]: unknown;
 }
+// Legacy Pi response export; this is not the shared HarnessPort return constraint.
 export interface NativeResponse {
   readonly type: 'response';
   readonly id: string;
@@ -48,17 +56,21 @@ export interface NativeResponse {
   readonly [key: string]: unknown;
 }
 
-export interface HarnessPort {
+export interface HarnessPort<Result extends CommandResult = CommandResult> {
   start(sessionId: string, emit: (event: HarnessEvent) => void): Promise<PortOutcome>;
-  // null means response loss, not Native refusal. Unsupported compact may throw
-  // CoreError('harness-rejected'); an actual Native failure stays a full response.
-  command(sessionId: string, command: NativeCommand): Promise<NativeResponse | null>;
+  // null means expected-response loss, not Native refusal. A one-way write returns
+  // only local written; unsupported operations may throw CoreError('harness-rejected').
+  command(sessionId: string, command: NativeCommand): Promise<Result | null>;
   stop(sessionId: string): Promise<PortOutcome>;
   reply?(sessionId: string, reply: QuestionReply): Promise<ReplyOutcome>;
 }
 
+export interface HarnessRegistry<Result extends CommandResult = CommandResult> {
+  resolve(harness?: string): HarnessPort<Result> | undefined;
+}
+
 export type CoreEvent =
-  | (InteractionEvent & { readonly sessionId: string })
+  | ((InteractionEvent | NativeRecordEvent) & { readonly sessionId: string })
   | { type: 'text'; sessionId: string; text: string }
   | { type: 'session'; session: SessionView };
 
@@ -80,8 +92,10 @@ export interface ShutdownResult {
   readonly failedSessionIds: readonly string[];
 }
 
-export interface SessionRecord {
+export interface SessionRecord<Result extends CommandResult = CommandResult> {
   readonly id: string;
+  readonly port: HarnessPort<Result>;
+  readonly harness?: string;
   status: SessionStatus;
   generation: number;
   stopRequested: boolean;

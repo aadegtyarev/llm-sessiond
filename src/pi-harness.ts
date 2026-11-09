@@ -5,7 +5,7 @@ import { createPiQuestions } from './pi-questions.ts';
 export type { PiLaunch } from './pi-process.ts';
 
 /** Trusted native Pi 1.5 launch; text is RPC data, never shell arguments. */
-export function createPiHarness(config: PiLaunch = {}): HarnessPort {
+export function createPiHarness(config: PiLaunch = {}): HarnessPort<NativeResponse> {
   const sessions = new Map<string, ReturnType<typeof session>>();
   const stopDeadline = config.stopDeadlineMs ?? 5_000;
   if (!Number.isFinite(stopDeadline) || stopDeadline <= 0) throw new RangeError('invalid deadline');

@@ -1,13 +1,14 @@
 import type { CoreEvent, HarnessEvent, SessionRecord, SessionStatus, SessionView } from './types.ts';
 
-export function sessionView(session: { id: string; status: SessionStatus }): SessionView {
+export function sessionView(session: { id: string; status: SessionStatus; harness?: string }): SessionView {
   return Object.freeze({
     sessionId: session.id,
     status: session.status,
+    ...(session.harness === undefined ? {} : { harness: session.harness }),
   });
 }
 
-/** Detach consumer payloads before publication; freeze nested display data too. */
+/** Detach consumer payloads before publication; freeze nested native/display data too. */
 export function snapshot<T>(value: T): T {
   const copy = structuredClone(value);
   const seen = new WeakSet<object>();
