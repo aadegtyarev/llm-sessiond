@@ -1,7 +1,9 @@
 # Подключаемые harness-модули: Claude Code
 
-Статус: **APPROVED** — согласованный контракт изменения, не реализованная поверхность.
-Source-grounded план принят, parent gate на реализацию пройден; внутренние шаги в работе.
+Статус: **COMPLETE** — реализация принята, поведение перенесено в durable surfaces,
+локальные документационные проверки пройдены. Контракт сохранён для финальной проверки
+закоммиченного docs-кандидата родительской сессией; затем она выполняет cleanup по
+метаконтракту. Это не утверждение merge, deployment или rollout.
 
 ## Цель и наблюдаемое поведение
 
@@ -34,10 +36,10 @@ lifecycle, маршрутизацией и своими процессами. П
 - [Pi text harness](../surfaces/pi-text-harness.md).
 - [Локальный daemon API](../surfaces/local-daemon-api.md).
 - [Командный API CLI клиент](../surfaces/api-cli-client.md).
+- [Claude Code harness](../surfaces/claude-code-harness.md) — новая durable native boundary.
 
-Также затронуты [руководство API](../../local-daemon-api.md) и [README](../../../README.md).
-Durable `docs/contracts/surfaces/claude-code-harness.md` появится только с подтверждённой
-реализацией, не как дубликат будущего поведения сейчас. Жизненный цикл —
+Также обновлены [руководство API](../../local-daemon-api.md) и [README](../../../README.md).
+Текущее поведение описано в этих поверхностях, не в отдельной будущей платформе. Жизненный цикл —
 [метаконтракт](../meta-contract.md), работа — [контракт разработки](../development.md).
 
 ## Интерфейсы и ограничения
@@ -155,8 +157,21 @@ Claude external fake smoke), проверки ссылок/docs и CI Linux/Wind
 отдельно одобренных модели и бюджета. Native Pi бюджет исчерпан; реальные native/model
 запуски не разрешены. Не выполнять `claude -p`, model/auth probes или SDK install.
 
-Контракт записан, source-grounded план и parent gate одобрены; реализация внутренних
-компонентов идёт последовательно, фича ещё не завершена. Цельная работа доводится
-до verified code + CI + PR/merge после review по обычному workflow,
-без разрешения rollout. После полной приёмки durable surfaces обновляются, временный
-контракт завершается/удаляется по метаконтракту; сейчас фича не объявляется готовой.
+Реализация принята независимым source review после исправления UTF8 prefix framing.
+Source candidate `1bc46469f917afc081932dd8b685cf7a347ff6ed`: typecheck, 530/530 fake tests
+и четыре external Node fake smoke прошли на Linux. Required
+[CI](https://github.com/aadegtyarev/llm-sessiond/actions/runs/42665266675) на том же source
+HEAD завершён SUCCESS: Linux/Windows external smoke, Linux checks и gitleaks.
+Windows CI проверяет именно четыре external Node fake smoke, не полный suite/native CLI.
+
+Durable transfer охватывает Core, Pi, Claude, daemon API, API CLI, README и operator guide;
+source/test/package/CI при этом не изменены. После добавления auto-discovered Claude
+surface guard локально пройдены docs checker, surface-docs 14/14, README FakePort example,
+typecheck, полный fake suite 531/531 и четыре Linux external Node fake smoke.
+Native CLI/provider/auth/model/context и Native Windows в этой фиче не запускались
+и не сертифицированы; metadata/help и official wire-source research не real integration.
+
+Следующий lifecycle gate принадлежит родительской сессии: независимая финальная docs
+приёмка и проверка committed candidate, затем удаление этого временного контракта,
+финальный required CI и обычный PR/merge workflow. В этом проходе контракт остаётся
+присутствующим и закоммиченным. Service/release/deploy/restart не разрешены.
