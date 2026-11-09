@@ -8,6 +8,7 @@ function eventOf(type: CoreEvent['type'], id: string): CoreEvent {
   if (type === 'tool') return { type, sessionId: id, phase: 'start', toolCallId: id, toolName: 'fixture', args: {} };
   if (type === 'question') return { type, sessionId: id, question: { requestId: id, method: 'input', title: id } };
   if (type === 'notification') return { type, sessionId: id, method: 'notify', message: id, level: 'info' };
+  if (type === 'native-record') return { type, sessionId: id, record: { extra: { id } } };
   return { type, sessionId: id, text: id };
 }
 
@@ -15,8 +16,8 @@ function idOf(event: CoreEvent): string {
   return event.type === 'session' ? event.session.sessionId : event.sessionId;
 }
 
-for (const outerType of ['session', 'text', 'tool', 'question', 'notification'] as const) {
-  for (const nestedType of ['session', 'text', 'tool', 'question', 'notification'] as const) {
+for (const outerType of ['session', 'text', 'tool', 'question', 'notification', 'native-record'] as const) {
+  for (const nestedType of ['session', 'text', 'tool', 'question', 'notification', 'native-record'] as const) {
     test(`events: FIFO ${outerType} → ${nestedType}, with publish-time recipients`, () => {
       const publisher = createEventPublisher();
       const seen: string[] = [];

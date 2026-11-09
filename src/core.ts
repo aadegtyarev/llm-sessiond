@@ -1,24 +1,29 @@
-import { CoreError, type CoreEvent, type HarnessPort, type NativeCommand, type NativeResponse, type QuestionReply, type ReplyOutcome, type SessionRecord, type SessionView, type ShutdownResult } from './types.ts';
+import { CoreError, type CommandResult, type CoreEvent, type HarnessPort, type HarnessRegistry, type NativeCommand, type QuestionReply, type ReplyOutcome, type SessionRecord, type SessionView, type ShutdownResult } from './types.ts';
 import { createEventPublisher, sessionView, snapshot } from './events.ts';
 import { createSessionRecord, startHarnessSession, stopAllHarnessSessions, stopHarnessSession } from './harness-session.ts';
 export { CoreError } from './types.ts';
-export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, NativeCommand, NativeResponse, PortOutcome, SessionStatus, SessionView, ShutdownResult, DisplayValue, InteractionEvent, NativeQuestion, QuestionMethod, QuestionReply, ReplyOutcome } from './types.ts';
+export type { CoreErrorCode, CoreEvent, HarnessEvent, HarnessPort, HarnessRegistry, CommandResult, NativeRecord, NativeRecordEvent, NativeCommand, NativeResponse, PortOutcome, SessionStatus, SessionView, ShutdownResult, DisplayValue, InteractionEvent, NativeQuestion, QuestionMethod, QuestionReply, ReplyOutcome } from './types.ts';
+export { createHarnessRegistry } from './harness-registry.ts';
 
-export class SessionCore {
-  private readonly sessions = new Map<string, SessionRecord>();
+export class SessionCore<Result extends CommandResult = CommandResult> {
+  private readonly sessions = new Map<string, SessionRecord<Result>>();
   private readonly events = createEventPublisher();
   private closed = false;
   private shutdownTask: Promise<ShutdownResult> | null = null;
-  private readonly port: HarnessPort;
+  private readonly harnesses: HarnessRegistry<Result>;
 
-  constructor(port: HarnessPort) {
-    this.port = port;
+  constructor(source: HarnessPort<Result> | HarnessRegistry<Result>) {
+    this.harnesses = 'resolve' in source ? source : {
+      resolve: harness => harness === undefined ? source : undefined,
+    };
   }
 
-  create(sessionId: string): SessionView {
+  create(sessionId: string, harness?: string): SessionView {
     this.assertOpen();
     if (this.sessions.has(sessionId)) throw new CoreError('duplicate-session');
-    const record = createSessionRecord(sessionId);
+    const port = this.harnesses.resolve(harness);
+    if (!port) throw new CoreError('harness-rejected');
+    const record = createSessionRecord(sessionId, port, harness);
     this.sessions.set(sessionId, record);
     this.events.publish({ type: 'session', session: sessionView(record) });
     return sessionView(record);
@@ -43,19 +48,19 @@ export class SessionCore {
     this.assertOpen();
     const session = this.requireSession(sessionId);
     if (session.status !== 'created' || session.stopInFlight) throw new CoreError('invalid-state');
-    const outcome = await startHarnessSession(this.port, session, this.events.publish);
+    const outcome = await startHarnessSession(session, this.events.publish);
     if (!outcome) return sessionView(session);
     if (outcome.kind !== 'confirmed') throw new CoreError(outcome.kind === 'rejected' ? 'harness-rejected' : 'harness-unknown');
     return sessionView(session);
   }
 
-  async command(sessionId: string, command: NativeCommand): Promise<NativeResponse> {
+  async command(sessionId: string, command: NativeCommand): Promise<Result> {
     this.assertOpen();
     const session = this.requireSession(sessionId);
     if (session.status !== 'running' || session.stopRequested) throw new CoreError('invalid-state');
     // Only the transport may report loss. Native refusals are ordinary responses.
-    let response: NativeResponse | null;
-    try { response = await this.port.command(sessionId, snapshot(command)); }
+    let response: Result | null;
+    try { response = await session.port.command(sessionId, snapshot(command)); }
     catch (error) {
       if (error instanceof CoreError && error.code === 'harness-rejected') throw error;
       throw new CoreError('harness-unknown');
@@ -73,7 +78,7 @@ export class SessionCore {
     }
     const generation = session.generation;
     let outcome: ReplyOutcome;
-    try { outcome = await this.port.reply?.(sessionId, snapshot(reply)) ?? { kind: 'rejected' }; }
+    try { outcome = await session.port.reply?.(sessionId, snapshot(reply)) ?? { kind: 'rejected' }; }
     catch { outcome = { kind: 'unknown' }; }
     if (session.generation !== generation || session.stopRequested) return { kind: 'unknown' };
     return Object.freeze({ kind: outcome.kind });
@@ -82,7 +87,7 @@ export class SessionCore {
   async stop(sessionId: string): Promise<SessionView> {
     this.assertOpen();
     const session = this.requireSession(sessionId);
-    const outcome = await stopHarnessSession(this.port, session, this.events.publish);
+    const outcome = await stopHarnessSession(session, this.events.publish);
     if (outcome === 'rejected') throw new CoreError('harness-rejected');
     if (outcome === 'unknown') throw new CoreError('harness-unknown');
     return sessionView(session);
@@ -92,7 +97,7 @@ export class SessionCore {
     if (this.shutdownTask) return this.shutdownTask;
     this.closed = true;
     this.shutdownTask = Promise.resolve().then(() =>
-      stopAllHarnessSessions(this.port, this.sessions.values(), this.events.publish));
+      stopAllHarnessSessions(this.sessions.values(), this.events.publish));
     return this.shutdownTask;
   }
 
@@ -100,7 +105,7 @@ export class SessionCore {
     if (this.closed) throw new CoreError('closed');
   }
 
-  private requireSession(sessionId: string): SessionRecord {
+  private requireSession(sessionId: string): SessionRecord<Result> {
     const session = this.sessions.get(sessionId);
     if (!session) throw new CoreError('session-not-found');
     return session;

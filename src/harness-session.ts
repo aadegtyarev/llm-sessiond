@@ -1,21 +1,22 @@
-import type { CoreEvent, HarnessPort, PortOutcome, SessionRecord, ShutdownResult } from './types.ts';
+import type { CommandResult, CoreEvent, HarnessPort, PortOutcome, SessionRecord, ShutdownResult } from './types.ts';
 import { acceptHarnessEvent, sessionView } from './events.ts';
 
-export function createSessionRecord(id: string): SessionRecord {
+export function createSessionRecord<Result extends CommandResult>(
+  id: string, port: HarnessPort<Result>, harness?: string,
+): SessionRecord<Result> {
   return {
-    id, status: 'created', generation: 0,
+    id, port, harness, status: 'created', generation: 0,
     stopRequested: false, stopInFlight: false, startOutcomeWhileStopping: null,
   };
 }
 
 export async function startHarnessSession(
-  port: HarnessPort,
   session: SessionRecord,
   notify: (event: CoreEvent) => void,
 ): Promise<PortOutcome | null> {
   session.status = 'starting';
   const generation = session.generation;
-  const startTask = callPort(() => port.start(session.id, (event) => acceptHarnessEvent(session, generation, event, notify)));
+  const startTask = callPort(() => session.port.start(session.id, (event) => acceptHarnessEvent(session, generation, event, notify)));
   notify({ type: 'session', session: sessionView(session) });
   const outcome = await startTask;
   if (session.generation !== generation || session.status !== 'starting') return null;
@@ -29,7 +30,6 @@ export async function startHarnessSession(
 }
 
 export async function stopHarnessSession(
-  port: HarnessPort,
   session: SessionRecord,
   notify: (event: CoreEvent) => void,
 ): Promise<PortOutcome['kind']> {
@@ -45,7 +45,7 @@ export async function stopHarnessSession(
   const stopPreviouslyRequested = session.stopRequested;
   session.stopRequested = true;
   session.stopInFlight = true;
-  const outcome = await callPort(() => port.stop(session.id));
+  const outcome = await callPort(() => session.port.stop(session.id));
   session.stopInFlight = false;
   if (outcome.kind === 'rejected') {
     // A rejected cleanup cannot undo uncertainty from an earlier stop.
@@ -66,7 +66,6 @@ export async function stopHarnessSession(
 }
 
 export async function stopAllHarnessSessions(
-  port: HarnessPort,
   sessions: Iterable<SessionRecord>,
   notify: (event: CoreEvent) => void,
 ): Promise<ShutdownResult> {
@@ -76,7 +75,7 @@ export async function stopAllHarnessSessions(
   for (const session of sessions) {
     if (session.status === 'stopped') continue;
     let outcome: PortOutcome['kind'];
-    try { outcome = await stopHarnessSession(port, session, notify); }
+    try { outcome = await stopHarnessSession(session, notify); }
     catch { outcome = 'unknown'; }
     if (outcome === 'confirmed') stoppedSessionIds.push(session.id);
     else if (outcome === 'unknown') uncertainSessionIds.push(session.id);

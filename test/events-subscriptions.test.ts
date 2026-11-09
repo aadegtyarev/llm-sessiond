@@ -8,10 +8,11 @@ function eventOf(type: CoreEvent['type']): CoreEvent {
   if (type === 'tool') return { type, sessionId: 's', phase: 'start', toolCallId: 't', toolName: 'fixture', args: {} };
   if (type === 'question') return { type, sessionId: 's', question: { requestId: 'q', method: 'input', title: 'title' } };
   if (type === 'notification') return { type, sessionId: 's', method: 'notify', message: 'hello', level: 'info' };
+  if (type === 'native-record') return { type, sessionId: 's', record: { extra: ['hello'] } };
   return { type, sessionId: 's', text: 'hello' };
 }
 
-for (const type of ['session', 'text', 'tool', 'question', 'notification'] as const) {
+for (const type of ['session', 'text', 'tool', 'question', 'notification', 'native-record'] as const) {
   for (const asynchronous of [false, true]) {
     test(`events: ${type} fixes recipients across subscription mutation (${asynchronous ? 'async' : 'sync'})`, () => {
       const publisher = createEventPublisher();

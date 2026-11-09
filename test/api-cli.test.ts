@@ -187,6 +187,45 @@ for (const ending of ['clean', 'loss', 'incomplete', 'utf8']) {
   });
 }
 
+test('api-cli --harness: invalid prefix forms and non-create usage reject before HTTP', async t => {
+  const f = await fixture(t);
+  for (const args of [['--harness'], ['--harness', '', 'create', 's'], ['--harness', '--port', '1', 'create', 's'],
+    ['--harness', 'pi', '--harness', 'claude-code', 'create', 's'], ['--harness=pi', 'create', 's'],
+    ['create', 's', '--harness', 'pi'], ['create', '--harness', 'pi'], ['--unknown', 'pi', 'create', 's']]) {
+    const result = await f.run(args);
+    assert.deepEqual({ code: result.code, stdout: result.stdout, stderr: result.stderr },
+      { code: 2, stdout: '', stderr: 'invalid CLI input\n' });
+  }
+  for (const operation of ['list', 'get', 'start', 'stop', 'shutdown', 'command', 'compact', 'reply', 'events']) {
+    const args = ['--harness', 'pi', operation, ...(['list', 'shutdown', 'events'].includes(operation) ? [] : ['s'])];
+    assert.equal((await f.run(args)).code, 2);
+  }
+  assert.equal(f.calls, 0);
+});
+
+test('api-cli --harness: any prefix order, opaque selector and positional flag-like ID preserve create JSON', async t => {
+  const received: unknown[] = [];
+  const f = await fixture(t, (req, res) => {
+    let body = ''; req.setEncoding('utf8'); req.on('data', text => { body += text; });
+    req.on('end', () => {
+      received.push({ path: req.url, body: JSON.parse(body) });
+      res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}');
+    });
+  });
+  // The pure client config accepts future IDs without loading or validating a backend.
+  writeFileSync(f.config, JSON.stringify({ token: f.token, port: f.port,
+    harnesses: { 'unknown / id': { executable: 'never-execute' } } }));
+  const pairs = [['--config', f.config], ['--port', String(f.port)], ['--harness', ' opaque / id 🙂 ']];
+  for (const order of [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]]) {
+    const result = await f.launch([...order.flatMap(i => pairs[i]), 'create', '--harness']).done;
+    assert.equal(result.code, 0); assert.equal(result.stderr, '');
+    assert.deepEqual(received.at(-1), { path: '/sessions', body: { sessionId: '--harness', harness: ' opaque / id 🙂 ' } });
+  }
+  assert.equal((await f.run(['create', 'legacy'])).code, 0);
+  assert.deepEqual(received.at(-1), { path: '/sessions', body: { sessionId: 'legacy' } });
+  assert.equal(f.calls, 7);
+});
+
 test('api-cli refused connection: no local process spawn or retry', async t => {
   const f = await fixture(t);
   await new Promise<void>(resolve => f.server.close(() => resolve()));

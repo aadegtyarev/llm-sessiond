@@ -3,8 +3,11 @@
 ## Граница и владение
 
 `createPiHarness(PiLaunch)` из [pi-harness.ts](../../../src/pi-harness.ts) реализует
-`HarnessPort` для штатного Native Pi 1.5 subprocess RPC.
-Потребитель — [SessionCore](session-core.md), который владеет локальным lifecycle/access.
+`HarnessPort<NativeResponse>` для штатного Native Pi 1.5 subprocess RPC.
+`NativeResponse` — совместимый Pi-specific type export, не обязательный envelope общего
+port. Потребитель — [SessionCore](session-core.md), который владеет локальным lifecycle/access.
+[Trusted composition](../../../src/daemon-harnesses.ts) регистрирует модуль `pi` как default;
+выбор другого модуля не меняет Pi runtime guarantees.
 Adapter владеет одним своим child и RPC channel на локальную сессию, framing, backpressure
 и request-id correlation. Pi владеет native session/history/transitions/persistence,
 execution queue, settings, acceptance/refusal, agent/model/tool loop и native resources.
@@ -135,7 +138,8 @@ private bridge, собственного UI renderer/history store/registry ил
 команды, independent connections, UTF8/backpressure, no-ACK replies, tool payloads,
 реальные fake-channel loss/stop/shutdown races и privacy. Старые history/run/controls/
 private-reload proofs удалены, не оставлены параллельным legacy путём.
-Полный fake suite и typecheck проверены на Linux; оба внешних fake smoke прошли на Linux
-и в actual Windows CI. Обязательный smoke gate и gitleaks прошли в CI.
-Это не full-suite Windows certification; реальный Native Pi/provider не запускался.
+Полный fake suite и typecheck проверены на Linux; четыре внешних Node fake smoke
+(включая mixed Pi/Claude) прошли на Linux и в Windows CI. Обязательный smoke gate
+и gitleaks прошли в CI. Это не full-suite Windows или Native Windows certification;
+реальные Native CLI/provider/auth/model/context проверки в этой фиче не выполнялись.
 Правила lifecycle — [метаконтракт](../meta-contract.md).
