@@ -23,6 +23,14 @@ test('daemon-config: absent harnesses preserves exact legacy result; opaque keys
   assert.equal(Object.hasOwn(daemonConfig({ token }), 'harnesses'), false);
 });
 
+for (const [name, launch] of [['null', null], ['undefined', undefined]] as const) {
+  test(`daemon-config: legacy launch ${name} preserves exact nullish default`, () => {
+    assert.deepEqual(daemonConfig({ token, launch }), { token, port: 3000, launch: {} });
+    const harnesses = { pi: {}, 'claude-code': { executable: process.execPath } };
+    assert.deepEqual(daemonConfig({ token, launch, harnesses }), { token, port: 3000, launch: {}, harnesses });
+  });
+}
+
 for (const value of [null, [], '', 1, true]) {
   test(`daemon-config: rejects invalid harness map ${JSON.stringify(value)}`, () => {
     assert.throws(() => daemonConfig({ token, harnesses: value }));
@@ -30,9 +38,10 @@ for (const value of [null, [], '', 1, true]) {
 }
 for (const [index, options] of [null, [], '', 1, true, { executable: '' }, { executable: 1 }, { cwd: '' }, { cwd: false },
   { prefixArgs: 'x' }, { prefixArgs: [1] }, { stopDeadlineMs: 0 }, { stopDeadlineMs: -1 },
-  { stopDeadlineMs: Infinity }, { stopDeadlineMs: NaN }, { stopDeadlineMs: '1' }, { token }, { model: 'no' }].entries()) {
-  test(`daemon-config: same strict launch validation for legacy and each module, invalid case ${index}`,  () => {
-    assert.throws(() => daemonConfig({ token, launch: options }));
+  { stopDeadlineMs: Infinity }, { stopDeadlineMs: NaN }, { stopDeadlineMs: '1' }, { token }, { model: 'no' }, false, 0].entries()) {
+  test(`daemon-config: strict module launch validation and non-null legacy rejection, invalid case ${index}`, () => {
+    // Nullish defaults belong only to legacy root launch, not module entries.
+    if (options !== null) assert.throws(() => daemonConfig({ token, launch: options }));
     for (const id of ['pi', 'claude-code', 'future']) {
       assert.throws(() => daemonConfig({ token, harnesses: { [id]: options } }));
     }

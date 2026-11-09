@@ -21,7 +21,7 @@ export function daemonConfig(value: unknown): DaemonConfig {
   const port = config.port ?? 3000;
   if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{32,256}$/.test(token)
     || !Number.isInteger(port) || Number(port) < 0 || Number(port) > 65535) throw new Error('config');
-  const launch = launchOptions(Object.hasOwn(config, 'launch') ? config.launch : {});
+  const launch = launchOptions(config.launch ?? {});
   const result: DaemonConfig = { token, port: Number(port), launch };
   if (Object.hasOwn(config, 'harnesses')) {
     result.harnesses = Object.fromEntries(Object.entries(record(config.harnesses))
