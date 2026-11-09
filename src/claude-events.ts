@@ -4,8 +4,9 @@ import { claudeObject } from './claude-wire.ts';
 // Ephemeral display association only: no turn completion or user/result resolver.
 export function createClaudeEvents(emit: (event: HarnessEvent) => void) {
   const tools = new Map<string, { name: string; args: DisplayValue }>();
-  const blocks = new Map<number, { id: string; json: string }>();
-  function clear() { tools.clear(); blocks.clear(); }
+  // Block indexes are local to a native parent stream, not the whole channel.
+  const assemblies = new Map<string | null, Map<number, { id: string; json: string }>>();
+  function clear() { tools.clear(); assemblies.clear(); }
   function toolUse(value: unknown) {
     const block = claudeObject(value);
     if (block?.type !== 'tool_use' || typeof block.id !== 'string'
@@ -42,21 +43,30 @@ export function createClaudeEvents(emit: (event: HarnessEvent) => void) {
     }
     if (record.type !== 'stream_event') return;
     const stream = claudeObject(record.event);
-    if (stream?.type === 'message_start') blocks.clear();
     const delta = claudeObject(stream?.delta);
     if (stream?.type === 'content_block_delta' && delta?.type === 'text_delta'
       && typeof delta.text === 'string') emit({ type: 'text', text: delta.text });
+    const parent = record.parent_tool_use_id ?? null;
+    if (parent !== null && typeof parent !== 'string') return;
+    if (stream?.type === 'message_start' || stream?.type === 'message_stop') {
+      assemblies.delete(parent);
+      return; // Message assembly ends, not native tool execution.
+    }
     if (typeof stream?.index !== 'number') return;
+    let blocks = assemblies.get(parent);
     if (stream.type === 'content_block_start') {
+      blocks?.delete(stream.index);
       const block = claudeObject(stream.content_block);
-      if (block?.type === 'tool_use' && typeof block.id === 'string') {
+      if (block?.type === 'tool_use' && typeof block.id === 'string'
+        && typeof block.name === 'string' && claudeObject(block.input)) {
         toolUse(block);
-        if (tools.has(block.id)) blocks.set(stream.index, { id: block.id, json: '' });
+        if (!blocks) { blocks = new Map(); assemblies.set(parent, blocks); }
+        blocks.set(stream.index, { id: block.id, json: '' });
       }
     }
     if (stream.type === 'content_block_delta' && delta?.type === 'input_json_delta'
       && typeof delta.partial_json === 'string') {
-      const block = blocks.get(stream.index);
+      const block = blocks?.get(stream.index);
       const tool = block && tools.get(block.id);
       if (!block || !tool) return;
       block.json += delta.partial_json;
@@ -68,7 +78,8 @@ export function createClaudeEvents(emit: (event: HarnessEvent) => void) {
         args: tool.args, partialResult: block.json });
     }
     // A content block ending is not the execution ending. Only tool_result is.
-    if (stream.type === 'content_block_stop') blocks.delete(stream.index);
+    if (stream.type === 'content_block_stop') blocks?.delete(stream.index);
+    if (blocks?.size === 0) assemblies.delete(parent);
   }
   return { event, clear };
 }

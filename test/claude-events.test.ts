@@ -79,6 +79,87 @@ test('claude events: final tool_use works without partials; parallel IDs, messag
   assert.equal(f.events.filter(event => event.type === 'tool' && event.phase === 'end').length, 1);
 });
 
+const scopedStream = (parent: unknown, event: Record<string, unknown>) => ({
+  type: 'stream_event', event,
+  ...(parent === undefined ? {} : { parent_tool_use_id: parent }),
+});
+const toolBlockStart = (id: string) => ({ type: 'content_block_start', index: 0,
+  content_block: { type: 'tool_use', id, name: 'Read', input: {} } });
+const argsDelta = (partial_json: string) => ({ type: 'content_block_delta', index: 0,
+  delta: { type: 'input_json_delta', partial_json } });
+
+for (const parentA of ['parent-A', null, undefined]) {
+  test(`claude events: interleaved native parent streams independently assemble index0 (${String(parentA)})`, () => {
+    const f = display();
+    f.event(scopedStream(parentA, { type: 'message_start', message: { id: 'message-A' } }));
+    f.event(scopedStream(parentA, toolBlockStart('tool-A')));
+    f.event(scopedStream(parentA, argsDelta('{"source":')));
+    f.event(scopedStream('parent-B', { type: 'message_start', message: { id: 'message-B' } }));
+    f.event(scopedStream('parent-B', toolBlockStart('tool-B')));
+    f.event(scopedStream('parent-B', argsDelta('{"source":')));
+    f.event(scopedStream(parentA, argsDelta('"A"}')));
+    f.event(scopedStream('parent-B', argsDelta('"B"}')));
+    assert.deepEqual(f.events.filter(e => e.type === 'tool' && e.phase === 'update'), [
+      { type: 'tool', phase: 'update', toolCallId: 'tool-A', toolName: 'Read', args: {}, partialResult: '{"source":' },
+      { type: 'tool', phase: 'update', toolCallId: 'tool-B', toolName: 'Read', args: {}, partialResult: '{"source":' },
+      { type: 'tool', phase: 'update', toolCallId: 'tool-A', toolName: 'Read', args: { source: 'A' }, partialResult: '{"source":"A"}' },
+      { type: 'tool', phase: 'update', toolCallId: 'tool-B', toolName: 'Read', args: { source: 'B' }, partialResult: '{"source":"B"}' },
+    ]);
+  });
+}
+
+for (const ending of ['content_block_stop', 'message_stop', 'message_start'] as const) {
+  test(`claude events: ${ending} cleans only its native assembly, never ends tool execution`, () => {
+    const f = display();
+    f.event(scopedStream('parent-A', toolBlockStart('tool-A')));
+    f.event(scopedStream('parent-A', argsDelta('{"source":')));
+    f.event(scopedStream('parent-B', toolBlockStart('tool-B')));
+    f.event(scopedStream('parent-B', argsDelta('{"source":')));
+    f.event(scopedStream('parent-A', { type: ending, index: 0, message: { id: 'new-message-A' } }));
+    const beforeLateDelta = f.events.length;
+    f.event(scopedStream('parent-A', argsDelta('"stale-A"}')));
+    assert.equal(f.events.length, beforeLateDelta);
+    f.event(scopedStream('parent-B', argsDelta('"B"}')));
+    assert.deepEqual(f.events.at(-1), { type: 'tool', phase: 'update', toolCallId: 'tool-B',
+      toolName: 'Read', args: { source: 'B' }, partialResult: '{"source":"B"}' });
+    f.event({ type: 'result', subtype: 'success', is_error: false });
+    assert.equal(f.events.some(e => e.type === 'tool' && e.phase === 'end'), false);
+    for (const tool_use_id of ['tool-A', 'tool-B']) {
+      f.event({ type: 'user', message: { content: [{ type: 'tool_result', tool_use_id, content: 'actual result' }] } });
+    }
+    assert.deepEqual(f.events.filter(e => e.type === 'tool' && e.phase === 'end'),
+      ['tool-A', 'tool-B'].map(toolCallId => ({ type: 'tool', phase: 'end', toolCallId,
+        toolName: 'Read', result: 'actual result', isError: false })));
+  });
+}
+
+test('claude events: null and omitted parent denote root, clear removes every parent assembly', () => {
+  const f = display();
+  f.event(scopedStream(null, toolBlockStart('root-tool')));
+  f.event(scopedStream(undefined, argsDelta('{"root":true}')));
+  assert.deepEqual(f.events.at(-1), { type: 'tool', phase: 'update', toolCallId: 'root-tool',
+    toolName: 'Read', args: { root: true }, partialResult: '{"root":true}' });
+  f.event(scopedStream('parent-A', toolBlockStart('tool-A')));
+  f.clear();
+  const before = f.events.length;
+  for (const parent of [null, undefined, 'parent-A']) f.event(scopedStream(parent, argsDelta('{}')));
+  assert.equal(f.events.length, before);
+});
+
+for (const parent of [3, {}, false]) {
+  test(`claude events: invalid parent attribution cannot consume root arguments (${JSON.stringify(parent)})`, () => {
+    const f = display();
+    f.event(scopedStream(null, toolBlockStart('root-tool')));
+    const before = f.events.length;
+    f.event(scopedStream(parent, argsDelta('{"wrong":true}')));
+    assert.equal(f.events.length, before);
+    f.event(scopedStream(parent, { type: 'message_start' }));
+    f.event(scopedStream(null, argsDelta('{"root":true}')));
+    assert.deepEqual(f.events.at(-1), { type: 'tool', phase: 'update', toolCallId: 'root-tool',
+      toolName: 'Read', args: { root: true }, partialResult: '{"root":true}' });
+  });
+}
+
 for (const block of [
   { type: 'tool_use', id: 3, name: 'Read', input: {} },
   { type: 'tool_use', id: 'id', name: 3, input: {} },
