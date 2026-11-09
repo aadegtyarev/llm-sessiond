@@ -1,0 +1,130 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import { claudeWireDouble } from './claude-wire-double.ts';
+
+const control = (request_id?: string) => ({ type: 'control_request',
+  ...(request_id === undefined ? {} : { request_id }), request: { subtype: 'future_native', value: false } });
+
+test('claude wire: reverse full native replies need neither callback nor drain', { timeout: 2000 }, async t => {
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  const a = f.wire.command(control('original-a'));
+  const b = f.wire.command(control('original-b'));
+  const answerB = f.respond(1, { subtype: 'error', error: 'native refusal', usage: { all: 8 }, future: [1] });
+  assert.deepEqual(await b, answerB);
+  const answerA = f.respond(0, { response: { models: ['native'], unknown: true } });
+  assert.deepEqual(await a, answerA);
+  assert.equal(f.losses, 0);
+});
+
+test('claude wire: pending native control does not queue interrupt, users or explicit permission answer', { timeout: 2000 }, async t => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  let done = false;
+  const long = f.wire.command(control()); void long.then(() => { done = true; });
+  t.mock.timers.tick(600_000); await Promise.resolve();
+  assert.equal(done, false); assert.equal(f.wire.broken, false);
+  const interrupt = f.wire.command({ ...control('interrupt'), request: { subtype: 'interrupt' } });
+  const interruptAnswer = f.respond(1);
+  assert.deepEqual(await interrupt, interruptAnswer);
+  const permission = { type: 'control_response', response: { subtype: 'success',
+    request_id: 'native-permission', response: { behavior: 'allow', updatedInput: { x: [1] } } } };
+  const records = [{ type: 'user', message: { role: 'user', content: 'a' } },
+    { type: 'user', message: { role: 'user', content: 'b' } }, permission, { type: 'future_oneway', v: 3 }];
+  const writes = records.map(record => f.wire.command(record));
+  for (let index = 2; index < f.frames.length; index++) f.release(index);
+  assert.deepEqual(await Promise.all(writes), records.map(() => ({ kind: 'written' })));
+  assert.deepEqual(f.frames.slice(2), records);
+  assert.equal(done, false);
+  const answer = f.respond(0); assert.deepEqual(await long, answer);
+});
+
+for (const order of ['callback-first', 'drain-first'] as const) {
+  test(`claude wire: one-way written requires callback AND drain (${order})`, { timeout: 2000 }, async t => {
+    const f = claudeWireDouble(); t.after(f.cleanup);
+    let done = false;
+    const write = f.wire.command({ type: 'user' }); void write.then(() => { done = true; });
+    if (order === 'callback-first') f.callbacks[0](); else f.stdin.emit('drain');
+    await Promise.resolve(); assert.equal(done, false);
+    if (order === 'callback-first') f.stdin.emit('drain'); else f.callbacks[0]();
+    assert.deepEqual(await write, { kind: 'written' });
+  });
+}
+
+test('claude wire: correlation admission is before write; only INFLIGHT IDs reserved', { timeout: 2000 }, async t => {
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  const first = f.wire.command(control('same'));
+  await assert.rejects(f.wire.command(control('same')), { code: 'harness-rejected' });
+  for (const invalid of [null, 3, {}, false]) {
+    await assert.rejects(f.wire.command({ ...control(), request_id: invalid }), { code: 'harness-rejected' });
+  }
+  await assert.rejects(f.wire.command({ type: 'control_request', request: [] }), { code: 'harness-rejected' });
+  await assert.rejects(f.wire.command({ type: 'compact' }), { code: 'harness-rejected' });
+  const cyclic: Record<string, unknown> = {}; cyclic.self = cyclic;
+  await assert.rejects(f.wire.command({ type: 'user', cyclic }), { code: 'harness-rejected' });
+  assert.equal(f.frames.length, 1);
+  f.respond(0); await first;
+  const reused = f.wire.command(control('same')); f.respond(1); await reused;
+  const generated = f.wire.command(control());
+  assert.equal(typeof f.frames[2].request_id, 'string');
+  assert.notEqual(f.frames[2].request_id, 'same'); f.respond(2); await generated;
+});
+
+for (const loss of ['write-error', 'write-throw', 'exit', 'close', 'eof', 'stdin-error', 'stdout-error', 'stderr-error', 'child-error', 'stop'] as const) {
+  for (const received of [false, true]) {
+    test(`claude wire: ${loss}, response already received=${received}`, { timeout: 2000 }, async t => {
+      const f = claudeWireDouble(); t.after(f.cleanup);
+      const pending = f.wire.command(control());
+      const answer = received ? f.respond() : null;
+      const oneWay = f.wire.command({ type: 'user' });
+      const rejected = assert.rejects(oneWay, { code: 'harness-unknown' });
+      if (loss === 'write-error') f.callbacks[0](new Error('private'));
+      else if (loss === 'write-throw') {
+        f.stdin.write = () => { throw new Error('private'); };
+        assert.equal(await f.wire.command(control()), null);
+      } else if (loss === 'exit' || loss === 'close') f.child.emit(loss);
+      else if (loss === 'eof') f.stdout.end('{truncated');
+      else if (loss === 'stdin-error') f.stdin.emit('error', new Error('private'));
+      else if (loss === 'stdout-error') f.stdout.emit('error', new Error('private'));
+      else if (loss === 'stderr-error') f.stderr.emit('error', new Error('private'));
+      else if (loss === 'child-error') f.child.emit('error', new Error('private'));
+      else f.wire.fail();
+      assert.deepEqual(await pending, answer); await rejected;
+      assert.equal(f.losses, 1);
+      assert.equal(await f.wire.command(control()), null);
+    });
+  }
+}
+
+for (const malformed of [
+  'not json\n', '[]\n', 'null\n', '{}\n', '{"type":1}\n',
+  JSON.stringify({ type: 'control_response', request_id: 'outer-not-nested' }) + '\n',
+  JSON.stringify({ type: 'control_response', response: { subtype: 'success', request_id: 3 } }) + '\n',
+  JSON.stringify({ type: 'control_response', response: { subtype: 'unknown', request_id: 'r' } }) + '\n',
+  JSON.stringify({ type: 'control_request', request_id: 2, request: { subtype: 'can_use_tool' } }) + '\n',
+  JSON.stringify({ type: 'control_cancel_request', request_id: null }) + '\n',
+  Buffer.from([0xff]), Buffer.from([0xe2, 0x82]), '{"type":"result"}', '\ufeff{}\n',
+]) {
+  test(`claude wire: malformed/UTF8/truncated EOF ${JSON.stringify(malformed)}`, { timeout: 2000 }, async t => {
+    const f = claudeWireDouble(); t.after(f.cleanup);
+    const pending = f.wire.command(control());
+    f.stdout.end(malformed);
+    assert.equal(await pending, null); assert.equal(f.losses, 1);
+  });
+}
+
+test('claude wire: continuous LF/CRLF fatal streaming decoder preserves split Unicode and native records', t => {
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  const record = { type: 'result', session_id: 'not-local', result: '🙂 Привет\u2028\u2029', usage: { all: 1 } };
+  for (const ending of ['\n', '\r\n']) {
+    for (const byte of Buffer.from(JSON.stringify(record) + ending)) f.stdout.write(Buffer.from([byte]));
+  }
+  assert.deepEqual(f.events, [record, record]);
+  f.stderr.write('private diagnostics'); assert.equal(f.losses, 0);
+});
+
+test('claude wire: pending registered before synchronous native answer, even if local write throws afterward', { timeout: 2000 }, async t => {
+  const f = claudeWireDouble(); t.after(f.cleanup);
+  const answer = { type: 'control_response', response: { request_id: 'sync', subtype: 'success', future: [1] } };
+  f.stdin.write = () => { f.send(answer); throw new Error('late private write failure'); };
+  assert.deepEqual(await f.wire.command(control('sync')), answer);
+});
