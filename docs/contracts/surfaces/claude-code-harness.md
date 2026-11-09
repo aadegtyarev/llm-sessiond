@@ -51,7 +51,8 @@ response/error, metadata, usage и неизвестными optional полям�
 HTTP200/CLI exit0; Pi `id/command/success` не добавляются.
 
 `written` не native ACK, acceptance, receipt или turn completion. Нет user→result FIFO
-resolver: несколько user writes завершаются локально до любого result. Native result
+resolver: несколько user writes могут завершаться без ожидания result. Относительный
+порядок result и written не гарантируется. Native result
 приходит асинхронным событием и завершает native turn, не все background tasks.
 Pending control не блокирует interrupt или explicit permission answer. Нет обычного
 command deadline, retry/reset/abort по ожиданию, settings mirror, readbacks, summary
