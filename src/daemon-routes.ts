@@ -1,5 +1,5 @@
 import type { SessionCore } from './core.ts';
-import { ApiError, fields, replyBody, sessionId } from './daemon-schema.ts';
+import { ApiError, commandBody, compactBody, fields, replyBody, sessionId } from './daemon-schema.ts';
 
 export function route(core: SessionCore, method: string, path: string, body: Record<string, unknown>) {
   if (path === '/sessions') {
@@ -20,14 +20,10 @@ export function route(core: SessionCore, method: string, path: string, body: Rec
   if (!operation) throw new ApiError(405, 'method');
   if (method !== 'POST') throw new ApiError(405, 'method');
   if (operation === 'command') {
-    if (typeof body.type !== 'string' || !body.type) throw new ApiError(400, 'schema');
-    return core.command(id, { ...body, type: body.type });
+    const command = commandBody(body);
+    return core.command(id, { ...command, type: command.type });
   }
-  if (operation === 'compact') {
-    if (Object.keys(body).some(key => key !== 'customInstructions')
-      || ('customInstructions' in body && typeof body.customInstructions !== 'string')) throw new ApiError(400, 'schema');
-    return core.command(id, { ...body, type: 'compact' });
-  }
+  if (operation === 'compact') return core.command(id, { ...compactBody(body), type: 'compact' });
   if (operation === 'reply') return core.reply(id, replyBody(body));
   fields(body, []);
   return operation === 'start' ? core.start(id) : core.stop(id);

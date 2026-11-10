@@ -98,6 +98,39 @@ test('api-cli stdin: command/reply require object JSON; compact zero bytes only 
   assert.equal(f.calls, 3);
 });
 
+for (const operation of ['command', 'compact'] as const) {
+  test(`api-cli ${operation}: shape parity, invalid input has no HTTP effect`, async t => {
+    const received: unknown[] = [];
+    const f = await fixture(t, (req, res) => {
+      let body = ''; req.setEncoding('utf8'); req.on('data', chunk => { body += chunk; });
+      req.on('end', () => {
+        received.push(JSON.parse(body));
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}');
+      });
+    });
+    const invalid = operation === 'command'
+      ? [{}, ...['', null, 0, false, [], {}].map(type => ({ type }))]
+      : [...[null, 0, false, [], {}].map(customInstructions => ({ customInstructions })),
+        { type: 'compact' }, { extra: true }, { customInstructions: '', extra: true }];
+    for (const body of invalid) {
+      const result = await f.run([operation, 's'], JSON.stringify(body));
+      assert.deepEqual({ code: result.code, stdout: result.stdout, stderr: result.stderr },
+        { code: 2, stdout: '', stderr: 'invalid CLI input\n' });
+    }
+    assert.equal(f.calls, 0);
+    const valid = operation === 'command'
+      ? [{ type: ' \t\n' }, { type: 'future_native', arbitrary: { nested: [1, null, '🙂'] } },
+        { type: 'control_response', response: { request_id: 'q', response: { behavior: 'deny' } }, extra: true }]
+      : [{}, { customInstructions: '' }, { customInstructions: 'preserve 🙂' }];
+    for (const body of valid) {
+      const result = await f.run([operation, 's'], JSON.stringify(body));
+      assert.equal(result.code, 0); assert.equal(result.stderr, '');
+      assert.deepEqual(received.at(-1), body);
+    }
+    assert.equal(f.calls, valid.length);
+  });
+}
+
 test('api-cli stdin: validated original JSON is the exact HTTP payload for command, reply and compact', async t => {
   const received: Array<{ path: string; body: string; length: string | undefined }> = [];
   const f = await fixture(t, (req, res) => {
@@ -122,6 +155,33 @@ test('api-cli stdin: validated original JSON is the exact HTTP payload for comma
   }
   assert.equal(f.calls, 5);
 });
+
+for (const operation of ['command', 'compact'] as const) {
+  test(`api-cli ${operation}: original UTF8 payload at byte limit is forwarded, one more byte has no HTTP effect`, async t => {
+    const received: string[] = [];
+    const f = await fixture(t, (req, res) => {
+      const chunks: Buffer[] = []; req.on('data', chunk => chunks.push(chunk));
+      req.on('end', () => {
+        const body = Buffer.concat(chunks);
+        assert.equal(req.headers['content-length'], String(body.length));
+        received.push(body.toString('utf8'));
+        res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{}');
+      });
+    });
+    const json = operation === 'command' ? ' {"type":"future_native","value":1e20,"text":"🙂"}\n'
+      : ' {"customInstructions":"🙂"}\n';
+    const input = json + ' '.repeat(65_536 - Buffer.byteLength(json));
+    assert.equal(Buffer.byteLength(input), 65_536);
+    assert.ok(input.length < Buffer.byteLength(input));
+    const accepted = await f.run([operation, 's'], input);
+    assert.equal(accepted.code, 0); assert.equal(accepted.stderr, '');
+    assert.deepEqual(received, [input]);
+    const rejected = await f.run([operation, 's'], input + ' ');
+    assert.deepEqual({ code: rejected.code, stdout: rejected.stdout, stderr: rejected.stderr },
+      { code: 2, stdout: '', stderr: 'invalid CLI input\n' });
+    assert.equal(f.calls, 1);
+  });
+}
 
 for (const status of [200, 401, 409, 500]) {
   test(`api-cli HTTP${status}: whole JSON/errors and exit code, no output envelope`, async t => {
