@@ -14,13 +14,11 @@ export async function listenDaemon({ token, port, harness }: DaemonOptions) {
   const server = createServer({ maxHeaderSize: 8192, requestTimeout: 15_000, headersTimeout: 10_000 });
   const core = new SessionCore(harness);
   const streams = new Set<() => void>();
-  let closing = false;
   let shutdownTask: ReturnType<SessionCore['shutdown']> | undefined;
   server.on('clientError', (_error, socket) => {
     socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
   });
   function shutdown() {
-    closing = true;
     return shutdownTask ??= core.shutdown();
   }
   function finish() {
@@ -32,14 +30,14 @@ export async function listenDaemon({ token, port, harness }: DaemonOptions) {
     response.on('error', () => response.destroy());
     void (async () => {
       authenticate(request, token);
-      if (closing) throw new ApiError(503, 'closed');
+      if (shutdownTask) throw new ApiError(503, 'closed');
       const path = request.url ?? '';
       if (!path.startsWith('/') || /[?#%]/.test(path) || request.headers.origin) {
         throw new ApiError(400, 'transport');
       }
       if (request.method !== 'GET' && request.method !== 'POST') throw new ApiError(405, 'method');
       const body = await requestBody(request);
-      if (closing) throw new ApiError(503, 'closed');
+      if (shutdownTask) throw new ApiError(503, 'closed');
       if (path === '/events') {
         if (request.method !== 'GET') throw new ApiError(405, 'method');
         if (streams.size >= STREAM_CLIENTS) throw new ApiError(503, 'stream-limit');

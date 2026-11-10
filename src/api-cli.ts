@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { daemonConfig } from './daemon-config.ts';
-import { BODY_LIMIT, record, replyBody, sessionId } from './daemon-schema.ts';
+import { BODY_LIMIT, commandBody, compactBody, record, replyBody, sessionId } from './daemon-schema.ts';
 import { callApi } from './api-client.ts';
 
 type Operation = 'create' | 'list' | 'get' | 'start' | 'stop' | 'shutdown' | 'command' | 'compact' | 'reply' | 'events';
@@ -19,10 +19,9 @@ async function input(operation: Operation): Promise<string> {
   if (operation === 'compact' && size === 0) return '{}';
   const payload = decode(Buffer.concat(chunks));
   const body = record(JSON.parse(payload));
-  if (operation === 'command' && (typeof body.type !== 'string' || !body.type)) throw new Error('type');
+  if (operation === 'command') commandBody(body);
   if (operation === 'reply') replyBody(body);
-  if (operation === 'compact' && (Object.keys(body).some(key => key !== 'customInstructions')
-    || ('customInstructions' in body && typeof body.customInstructions !== 'string'))) throw new Error('compact');
+  if (operation === 'compact') compactBody(body);
   return payload;
 }
 

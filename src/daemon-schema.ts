@@ -1,4 +1,4 @@
-import type { QuestionReply } from './types.ts';
+import type { NativeCommand, QuestionReply } from './types.ts';
 
 export const BODY_LIMIT = 65_536;
 export const ID = /^[A-Za-z0-9._-]{1,128}$/;
@@ -23,6 +23,17 @@ export function sessionId(value: unknown): string {
   // Session IDs must survive standard URL dot-segment normalization unchanged.
   if (id === '.' || id === '..') throw new ApiError(400, 'schema');
   return id;
+}
+
+export function commandBody(value: Record<string, unknown>): NativeCommand {
+  if (typeof value.type !== 'string' || !value.type) throw new ApiError(400, 'schema');
+  return value as NativeCommand;
+}
+
+export function compactBody(value: Record<string, unknown>): Record<string, unknown> & { customInstructions?: string } {
+  if (Object.keys(value).some(key => key !== 'customInstructions')
+    || ('customInstructions' in value && typeof value.customInstructions !== 'string')) throw new ApiError(400, 'schema');
+  return value as Record<string, unknown> & { customInstructions?: string };
 }
 
 export function replyBody(value: Record<string, unknown>): QuestionReply {

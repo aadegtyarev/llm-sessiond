@@ -8,7 +8,6 @@ export { createHarnessRegistry } from './harness-registry.ts';
 export class SessionCore<Result extends CommandResult = CommandResult> {
   private readonly sessions = new Map<string, SessionRecord<Result>>();
   private readonly events = createEventPublisher();
-  private closed = false;
   private shutdownTask: Promise<ShutdownResult> | null = null;
   private readonly harnesses: HarnessRegistry<Result>;
 
@@ -95,14 +94,13 @@ export class SessionCore<Result extends CommandResult = CommandResult> {
 
   shutdown(): Promise<ShutdownResult> {
     if (this.shutdownTask) return this.shutdownTask;
-    this.closed = true;
     this.shutdownTask = Promise.resolve().then(() =>
       stopAllHarnessSessions(this.sessions.values(), this.events.publish));
     return this.shutdownTask;
   }
 
   private assertOpen(): void {
-    if (this.closed) throw new CoreError('closed');
+    if (this.shutdownTask) throw new CoreError('closed');
   }
 
   private requireSession(sessionId: string): SessionRecord<Result> {

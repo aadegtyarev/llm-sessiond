@@ -36,6 +36,31 @@ for (const path of ['command', 'compact']) {
   });
 }
 
+for (const operation of ['command', 'compact'] as const) {
+  test(`api ${operation}: shape parity, validation precedes Core lookup and port effects`, async t => {
+    const port = new FakePort(); const api = await apiFixture(t, port); await api.running();
+    const invalid = operation === 'command'
+      ? [{}, ...['', null, 0, false, [], {}].map(type => ({ type }))]
+      : [...[null, 0, false, [], {}].map(customInstructions => ({ customInstructions })),
+        { type: 'compact' }, { extra: true }, { customInstructions: '', extra: true }];
+    for (const body of invalid) {
+      for (const id of ['s', 'missing']) {
+        assert.deepEqual(await api.request(`/sessions/${id}/${operation}`, body, 400), { error: { code: 'schema' } });
+      }
+    }
+    assert.equal(port.commands.length, 0);
+    const valid = operation === 'command'
+      ? [{ type: ' \t\n' }, { type: 'future_native', arbitrary: { nested: [1, null, '🙂'] } },
+        { type: 'control_response', response: { request_id: 'q', response: { behavior: 'deny' } }, extra: true }]
+      : [{}, { customInstructions: '' }, { customInstructions: 'preserve 🙂' }];
+    for (const body of valid) {
+      await api.request(`/sessions/s/${operation}`, body);
+      assert.deepEqual(port.commands.at(-1), { sessionId: 's', command: operation === 'compact' ? { ...body, type: 'compact' } : body });
+    }
+    assert.equal(port.commands.length, valid.length);
+  });
+}
+
 test('api command: no allowlist, file/domain guards, defaults or automatic proof requests', async t => {
   const port = new FakePort(); const api = await apiFixture(t, port); await api.running();
   for (const command of [{ type: 'prompt', message: 'no streaming default' },
