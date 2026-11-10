@@ -1,66 +1,47 @@
-# Meta-contract: creating and maintaining contracts
+# Как создавать и поддерживать контракты
 
-This document governs project contracts. It is a process rulebook, not a description of any one product surface. Projects should copy it to `docs/contracts/meta-contract.md` and follow it from their `AGENTS.md` instructions.
+Это обязательные правила работы с контрактами, не описание продукта. Репозиторий хранит их в `docs/contracts/meta-contract.md`; `AGENTS.md` направляет сюда через [контракт разработки](development.md).
 
-## What a contract describes
+## Виды и границы
 
-A contract describes a **surface**: a coherent boundary where behavior or an interface is observable by a user, another system, or a maintainer. It records promises and constraints, not arbitrary implementation detail or a file-by-file plan.
+Контракт описывает наблюдаемую пользователем, системой или разработчиком границу: обещания и ограничения, не произвольные детали реализации или пофайловый план.
 
-Prefer two linked kinds of contract:
+- `docs/contracts/surfaces/<meaningful-name>.md` — постоянный контракт текущего поведения одной поверхности.
+- `docs/contracts/features/<meaningful-name>.md` — временный контракт согласованного изменения для реализации и review, не вторая постоянная спецификация. После проверенного завершения и обновления поверхностей его удаляют; история остаётся в Git.
 
-- **Surface contracts** in `docs/contracts/surfaces/<meaningful-name>.md` describe the current, durable behavior of one coherent surface: users/consumers, inputs and outputs, scenarios, interfaces, guarantees, errors, security/privacy constraints, and intentional non-goals.
-- **Feature contracts** in `docs/contracts/features/<meaningful-name>.md` capture one approved change: goal, scenarios, non-goals, affected surfaces (links), constraints/interfaces, acceptance criteria, and validation. They exist to align implementation and review; they are not a second permanent specification of the same behavior. Delete them after verified completion and durable surface-contract updates; version control preserves their history.
+Имена осмысленные, lowercase kebab-case, без дат; дата допустима внутри. Требования связывают ссылками, не дублируют. Новая поверхность нужна для цельной самостоятельной границы с независимыми потребителями или гарантиями, понятной без повторения другой.
 
-Use semantic filenames, lowercase kebab-case, without dates. A date may appear in the document's metadata when useful. Link related contracts rather than duplicating their requirements. Create a separate surface document only where it has a coherent boundary, independent consumers or guarantees, and can be understood without repeating another contract.
+Постоянные контракты описывают настоящее. История остаётся в Git/PR: без ссылок на удалённые временные контракты, архивные коммиты или `git show`. Актуальные гарантии совместимости и ссылки на текущие docs/source допустимы. Ради устаревших ссылок нельзя менять merge policy или branch protections.
 
-Execution of agreed work is governed by the mandatory [development contract](development.md).
+## Жизненный цикл
 
-## Current-state surface contracts
+1. До согласования — только read-only разведка затронутых поверхностей и scope. Нельзя создавать/редактировать контракт, планировать или делегировать реализацию до одобрения пользователем.
+2. После **явного одобрения** записать feature-контракт **до планирования и реализации**, со статусом внутри; дата необязательна. Путь относительно репозитория указать в orchestration notes и каждом делегировании.
+3. Planner, worker и reviewer читают согласованный feature и каждый затронутый surface. Оркестратор передаёт точные пути и ограничения всем шагам одной полной работы, не частичных поставок. Ручная реализация следует тем же документам.
+4. На каждом этапе сверять находки и предполагаемый diff со всеми затронутыми поверхностями. Другая поверхность, гарантия, интерфейс или scope приёмки — **STOP**: получить одобрение пересмотренного контракта до продолжения нового scope.
+5. Проверить весь фактический diff против feature и поверхностей. После валидации **всего** результата, обязательного CI и приёмки обновить постоянные поверхности; отметить feature COMPLETE для финальной проверки, затем удалить. Проверенным называть только после выполненных проверок. Ссылки оставлять на текущие исходники/поверхности, историю — в Git/PR.
+6. Завершённые поверхности нормативны. Их меняет следующая согласованная feature; прежние требования не копируются в новые контракты ради истории.
 
-Durable surface contracts describe current behavior, not implementation history. Keep history in Git/PRs; do not add links to deleted temporary feature contracts, archival commit links, or `git show` references. Current version/compatibility guarantees and links to current documentation and source are allowed. Do not change merge policy or branch protections to preserve obsolete documentation references.
+## Содержание
 
-## Lifecycle
+Пишите кратко и конкретно. Feature обязательно включает:
 
-1. **Reconnaissance:** Before approval, investigate read-only as needed to identify affected surfaces and explain the proposed scope. Do not create or edit a contract, plan implementation, or delegate implementation before the user approves the contract.
-2. **Approval and recording:** After explicit approval, write the feature contract before planning or implementation. Include its status and optional date inside the file. Record the repository-relative path in the orchestration notes and every delegated task.
-3. **Planning and implementation:** The planner, coder/worker, and reviewer must read the approved feature contract and each affected surface contract. The orchestrator must provide the exact paths and carry their constraints through internal steps of the same complete work, without turning them into partial deliveries. A manual implementation follows the same source documents.
-4. **Impact discovery:** At each stage, compare new findings and the proposed diff with all affected surface contracts. If a different surface, guarantee, interface, or acceptance scope is affected, stop at the boundary and ask the user to approve the revised contract before proceeding with that scope.
-5. **Completion:** Review the entire actual diff against the feature contract and affected surface contracts. After the whole promised result passes validation, required CI, and acceptance, update affected surface contracts to describe the new current behavior, mark the feature contract complete for final verification, then delete the temporary feature-contract file. Keep links to current source and related surfaces; keep implementation history in Git/PRs. Do not claim an update is verified until its checks ran.
-6. **Future changes:** Treat completed surface contracts as current normative documentation. A later approved feature can supersede them; retain useful history in version control rather than copying old requirements into new contracts.
+- цель и наблюдаемое поведение;
+- сценарии с существенными ошибками и крайними случаями, нецели;
+- ссылки на затронутые surfaces либо указание их отсутствия;
+- интерфейсы и ограничения, проверяемую приёмку и план валидации;
+- статус, при необходимости дату внутри.
 
-## Required feature-contract sections
+Surface включает применимые разделы:
 
-Keep contracts concise and specific. Include:
+- граница, потребители и владение;
+- входы, выходы, потоки, протоколы и гарантии совместимости;
+- ошибки и восстановление;
+- безопасность, приватность, пределы хранения данных;
+- намеренно не гарантируемое поведение, связанные feature/surface контракты.
 
-- Goal and user-visible behavior
-- Expected scenarios, including error/edge cases that affect scope
-- Non-goals
-- Affected surface-contract links (or note that none exist yet)
-- Interfaces and constraints
-- Acceptance criteria that can be checked
-- Validation to run
-- Status/date inside the document when useful
+Не придумывайте будущие возможности. TBD допустим только для реальной неразрешённой границы; реализация ждёт её разрешения.
 
-## Required surface-contract sections
+## Безопасная подготовка
 
-Include only applicable sections:
-
-- Boundary, consumers, and ownership
-- Observable inputs, outputs, and flows
-- Interfaces/protocols and compatibility guarantees
-- Failure behavior and recovery
-- Security, privacy, and data-retention limits
-- Non-goals / behavior intentionally not guaranteed
-- Related feature and surface contracts
-
-Do not invent contracts for imagined future behavior. Use `TBD` only for a real unresolved boundary and keep it out of implementation work until resolved.
-
-## Preparation workflow
-
-For a new or existing repository, the project-preparation workflow should:
-
-- Inspect existing documentation and `AGENTS.md` before editing.
-- Create `docs/contracts/features/` and `docs/contracts/surfaces/` without destroying existing files.
-- Copy this meta-contract only when absent. If an existing copy differs, report the difference and ask before replacing or merging it.
-- Add compact references to the contract process in `AGENTS.md`; preserve unrelated project instructions and merge rather than overwrite.
-- Never silently rewrite, delete, or relocate existing contracts.
+Сначала изучите существующие docs и AGENTS. Создайте каталоги `docs/contracts/features/` и `docs/contracts/surfaces/` без уничтожения файлов. Метаконтракт копируют **только при отсутствии**; отличия существующего сначала сообщают и согласуют до замены/слияния. В AGENTS добавляют краткие ссылки, сохраняя посторонние инструкции: объединяют, не перезаписывают. Запрещено молча переписывать, удалять или переносить существующие контракты.
