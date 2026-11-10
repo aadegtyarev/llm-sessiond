@@ -1,6 +1,6 @@
 # Упрощение transport validation и shutdown state
 
-Статус: **APPROVED**. Оператор «Работай по замечаниям» одобрил обе optional рекомендации Sol6.1.
+Статус: **COMPLETE**. Оператор «Работай по замечаниям» одобрил обе optional рекомендации Sol6.1.
 
 ## Цель и поведение
 
@@ -53,3 +53,11 @@
 - Каждый handoff — meaningful verified commit и чистые index/worktree; отчёты/логи вне repo. Независимый review — после integration, не параллельно writer.
 - После общей валидации отметить COMPLETE; parent коммитит и проверяет durable surface updates, затем удаляет временный feature contract без архивных ссылок по [метаконтракту](../meta-contract.md).
 - Parent владеет push/PR/required CI/protected merge после green review; дети не публикуют и не merge. Release/install/restart не входят в поставку.
+
+## Завершение и reconciliation
+
+- Код `f7b335260bd1ebd90a1575d8b33c1f5d4e70e022` проверен: typecheck PASS, полный fake suite 569/569, четыре Linux external Node fake smoke PASS; независимый review — ACCEPT, no issues.
+- По проверке parent required code CI `42782707466` на этом кодовом HEAD — SUCCESS: Ubuntu/Windows smoke, gitleaks и both-platform guard. CI окончательного lifecycle HEAD остаётся обязательным перед merge.
+- Committed durable contracts session-core, local-daemon-api и api-cli-client, guardrails pi-text-harness и claude-code-harness, а также API guide и README из раздела «Затронутые поверхности» побитово совпадают с BASE и остаются корректными: поведение не изменилось, искусственных durable-doc правок нет.
+- Перед удалением этого временного контракта проверить его сохранённый COMPLETE commit, committed/disk равенство всех семи durable документов BASE и неизменность остальных путей относительно принятого кодового HEAD.
+- Только source refactor и fake validation: Native probes 0; release/install/deployment/service restart не выполнялись. Protected merge и проверки окончательного HEAD принадлежат parent.
