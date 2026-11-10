@@ -13,7 +13,9 @@ POST требует JSON object и `Content-Type: application/json`, допус�
 ```sh
 node --input-type=module - /path/to/config.json <<'JS'
 import { readFileSync } from 'node:fs';
-const { token, port = 3000 } = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const config = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const { token } = config;
+const port = config.port ?? 3000;
 const r = await fetch(`http://127.0.0.1:${port}/sessions`, {
   headers: { Authorization: `Bearer ${token}` },
 });
